@@ -17,8 +17,6 @@ const jsonParser = bodyParser.json();
 
 const admin = io.of("/admin");
 
-let rooms = JSON.parse(fs.readFileSync("./data/rooms.json", "utf-8"));
-
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
@@ -39,6 +37,17 @@ app.get("/", (req, res) => {
 admin.on("connection", (socket) => {
   socket.on("join", (data) => {
     socket.join(data.room);
+
+    // Load existing messages
+    const roomMessagesPath = `./data/messages/${data.room}.json`;
+    let messages = [];
+    if (fs.existsSync(roomMessagesPath)) {
+      messages = JSON.parse(fs.readFileSync(roomMessagesPath, "utf-8"));
+    }
+
+    // Send existing messages to the newly connected client
+    socket.emit("load messages", messages);
+
     const msg =
       data.username != null
         ? `${data.username} joined the room!`

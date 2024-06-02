@@ -18,8 +18,6 @@
       const terminalContainer = document.getElementById('terminal-container');
       const term = new Terminal({
         cursorBlink: true,
-
-
       });
 
       const fitAddon = new FitAddon.FitAddon();
@@ -34,7 +32,13 @@
 
       socket.on("connect", () => {
         socket.emit("join", { room: room });
+      });
 
+      socket.on("load messages", (messages) => {
+        messages.forEach(message => {
+          term.writeln(`${message.username}: ${message.msg}`);
+        });
+        term.scrollToBottom();
       });
 
       socket.on("chat message", (msg) => {
