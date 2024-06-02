@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <link rel="stylesheet" type="text/css" href="/style.css" />
+  </head>
+  <body>
+    <form id="create-room-form">
+      <input id="room-input" placeholder="Enter room name" />
+      <label>
+        Save room
+        <input type="checkbox" id="save-room-checkbox" />
+      </label>
+      <button type="submit">Create Room</button>
+    </form>
+
+    <ul id="room-list">
+      <% rooms.forEach(function(room){ %>
+      <li><a href="/<%- room %>"><%- room %></a></li>
+      <% }); %>
+    </ul>
+
+    <form id="form">
+      <input
+        id="input"
+        placeholder="Choose room to enable chat"
+        disabled
+      /><button>Send</button>
+    </form>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      document
+        .getElementById("create-room-form")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+          const roomName = document.getElementById("room-input").value;
+          const saveRoom =
+            document.getElementById("save-room-checkbox").checked;
+          fetch("/newroom", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ room: roomName, save: saveRoom }),
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.error) {
+                alert(data.error);
+              } else {
+                console.log("success");
+                window.location.href = `/${roomName}`;
+              }
+            });
+        });
+    </script>
+  </body>
+</html>
