@@ -23,42 +23,17 @@ app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
 app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(__dirname + "/node_modules/@xterm/"));
 
 app.get("/", (req, res) => {
-  res.render(__dirname + "/index.ejs", { rooms: rooms });
-});
-
-app.get("/:room", (req, res) => {
-  const room = req.params.room;
+  const room = "default-room";
   let messages = [];
   if (fs.existsSync(`./data/messages/${room}.json`)) {
     messages = JSON.parse(
       fs.readFileSync(`./data/messages/${room}.json`, "utf-8")
     );
   }
-  res.render(__dirname + "/room.ejs", { room: room, messages: messages });
-});
-
-app.post("/newroom", jsonParser, (req, res) => {
-  const room = req.body.room;
-  app.get("/" + room, (req, res) => {
-    res.render(__dirname + "/room.ejs", { room: room });
-  });
-  if (!rooms.includes(req.body.room)) {
-    rooms.push(room);
-    if (req.body.save) {
-      let rooms = JSON.parse(fs.readFileSync("./data/rooms.json", "utf-8"));
-      const newRooms = rooms.concat([req.body.room]);
-      fs.writeFileSync("./data/rooms.json", JSON.stringify(newRooms));
-    }
-    res.send({
-      room: room,
-    });
-  } else {
-    res.send({
-      error: "room already exist",
-    });
-  }
+  res.render("index", { room: room, messages: messages });
 });
 
 admin.on("connection", (socket) => {
