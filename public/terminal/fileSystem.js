@@ -184,14 +184,16 @@ async function updateUserNameInFile(oldName, newName) {
 
 async function saveUserHome() {
   const username = promptName || "user";
-  const response = await fetch("/update-user-home", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ home: fileData.root.home.users[username] }),
-  });
+  if (username !== "user" && isWithinDir(username)) {
+    const response = await fetch("/update-user-home", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ home: fileData.root.home.users[username] }),
+    });
 
-  if (!response.ok) {
-    throw new Error(`Failed to save user home: ${response.statusText}`);
+    if (!response.ok) {
+      throw new Error(`Failed to save user home: ${response.statusText}`);
+    }
   }
 }
 

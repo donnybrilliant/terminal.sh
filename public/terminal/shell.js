@@ -24,6 +24,10 @@ function ls(args = []) {
     (key) => key !== "name" && key !== "parent"
   );
 
+  if (contents.length === 0) {
+    return "Directory is empty";
+  }
+
   if (listFlag) {
     return contents
       .map((entry) => {
