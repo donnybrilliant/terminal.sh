@@ -19,7 +19,6 @@ export class LoginManager {
         await this.authenticateUser(username, password);
       }
     } catch (error) {
-      console.error("Auth Status Check Error:", error);
       this.term.write(
         `\r\nError checking authentication status: ${error.message}\r\n$ `
       );
@@ -33,23 +32,19 @@ export class LoginManager {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
+      const data = await response.json(); // Parse JSON only once
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(
           data.message || `HTTP error! status: ${response.status}`
         );
       }
-      const data = await response.json();
       if (data.success) {
         await this.fetchFileSystem(this.apiUrl, data.user.username);
-        this.term.write(
-          `\r\nLogin successful! Welcome ${data.user.username}\r\n$ `
-        );
+        this.term.write(`\r\n${data.message}\r\n$ `); // Use server message directly
       } else {
         this.term.write(`\r\n${data.message}\r\n$ `);
       }
     } catch (error) {
-      console.error("Login Error:", error);
       this.term.write(`\r\nError logging in: ${error.message}\r\n$ `);
     }
   }
@@ -57,46 +52,52 @@ export class LoginManager {
   async fetchFileSystem(apiUrl, username) {
     try {
       const response = await fetch(`${apiUrl}/filesystem`);
+      const data = await response.json();
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const data = await response.json();
       populateFileSystem(data, username);
     } catch (error) {
-      console.error("Fetch File System Error:", error);
       this.term.write(`\r\nError fetching file system: ${error.message}\r\n$ `);
     }
   }
 
-  logout() {
-    fetch(`${this.apiUrl}/logout`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((data) => {
-        this.term.write(`\r\n${data.message}\r\n$ `);
-      })
-      .catch((error) => {
-        console.error("Logout Error:", error);
-        this.term.write(`\r\nError logging out: ${error.message}\r\n$ `);
+  async logout() {
+    try {
+      const response = await fetch(`${this.apiUrl}/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
       });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          data.message || `HTTP error! status: ${response.status}`
+        );
+      }
+      this.term.write(`\r\n${data.message}\r\n$ `);
+    } catch (error) {
+      this.term.write(`\r\nError logging out: ${error.message}\r\n$ `);
+    }
   }
 
-  checkAuthStatus() {
-    return fetch(`${this.apiUrl}/auth-status`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    }).then((response) => {
+  async checkAuthStatus() {
+    try {
+      const response = await fetch(`${this.apiUrl}/auth-status`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await response.json();
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(
+          data.message || `HTTP error! status: ${response.status}`
+        );
       }
-      return response.json();
-    });
+      return data;
+    } catch (error) {
+      this.term.write(
+        `\r\nError checking authentication status: ${error.message}\r\n$ `
+      );
+      throw error; // Optionally rethrow to handle it outside if needed
+    }
   }
 }

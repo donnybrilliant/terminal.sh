@@ -1,5 +1,6 @@
 import express from "express";
 import passport from "../auth.js";
+import { sendResponse } from "../utils/responseUtils.js";
 const router = express.Router();
 
 router.post("/login", function (req, res, next) {
@@ -8,19 +9,13 @@ router.post("/login", function (req, res, next) {
       return next(err);
     }
     if (!user) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Authentication failed" });
+      return sendResponse(res, 401, {}, "Authentication failed");
     }
     req.logIn(user, function (err) {
       if (err) {
         return next(err);
       }
-      res.json({
-        success: true,
-        message: "Authentication succeeded",
-        user: user,
-      });
+      return sendResponse(res, 200, { user: user }, "Authentication succeeded");
     });
   })(req, res, next);
 });
