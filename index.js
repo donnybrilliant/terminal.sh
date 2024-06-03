@@ -28,23 +28,22 @@ app.use(
   })
 );
 
-app.use(passport.authenticate("session"));
-app.use((req, res, next) => {
-  res.locals.isAuthenticated = req.isAuthenticated();
-  next();
-});
-
-//app.post("/login", passport.authenticate("local"));
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.post("/login", function (req, res, next) {
+  if (req.isAuthenticated()) {
+    return res
+      .status(400)
+      .json({ success: false, message: "User already logged in" });
+  }
+
   passport.authenticate("local", function (err, user, info) {
     if (err) {
       return next(err);
     }
     if (!user) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Authentication failed" });
+      return res.status(400).json({ success: false, message: info.message });
     }
     req.logIn(user, function (err) {
       if (err) {

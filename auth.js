@@ -1,4 +1,3 @@
-// auth.js
 import fs from "fs";
 import path from "path";
 import passport from "passport";
@@ -13,6 +12,7 @@ const __dirname = dirname(__filename);
 const DATA_DIR = path.join(__dirname, "data");
 const USERS_FILE_PATH = path.join(DATA_DIR, "users.json");
 const FILE_SYSTEM_PATH = path.join(DATA_DIR, "filesystem.json");
+
 passport.serializeUser(function (user, cb) {
   process.nextTick(function () {
     cb(null, { id: user.id, username: user.username });
