@@ -2,9 +2,10 @@ import fs from "fs";
 import path from "path";
 import passport from "passport";
 import LocalStrategy from "passport-local";
-import bcrypt from "bcryptjs"; // Assuming you will hash passwords for security
+import bcrypt from "bcryptjs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import { v4 as uuidv4 } from "uuid"; // Import uuid library
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -25,6 +26,18 @@ passport.deserializeUser(function (user, cb) {
   });
 });
 
+function generateUniqueIP(users) {
+  const usedIPs = new Set(users.map((user) => user.ip));
+  let ip;
+  do {
+    ip = Array(4)
+      .fill(0)
+      .map(() => Math.floor(Math.random() * 256))
+      .join(".");
+  } while (usedIPs.has(ip));
+  return ip;
+}
+
 passport.use(
   new LocalStrategy(async (username, password, done) => {
     try {
@@ -43,9 +56,10 @@ passport.use(
         // No user found, create new user
         const hashedPassword = await bcrypt.hash(password, 10);
         user = {
-          id: users.length + 1,
+          id: uuidv4(), // Generate a unique ID for the user
           username,
           password: hashedPassword,
+          ip: generateUniqueIP(users),
           home: {},
         };
         users.push(user);
