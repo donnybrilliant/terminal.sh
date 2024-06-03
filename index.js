@@ -7,6 +7,8 @@ import passport from "./auth.js";
 import session from "express-session";
 import authRoutes from "./routes/auth.js";
 import toolRoutes from "./routes/tools.js";
+import morgan from "morgan";
+import errorHandler from "./utils/errorHandler.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -38,6 +40,9 @@ app.use(toolRoutes);
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
+
+app.use(morgan("combined"));
+app.use(errorHandler);
 
 server.listen(3000, () => {
   console.log("listening on localhost:3000");
