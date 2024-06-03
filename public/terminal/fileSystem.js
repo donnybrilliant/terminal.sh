@@ -14,7 +14,7 @@ async function loadFileSystem(apiUrl) {
 
 // Function to get the user's home directory
 function getUserHomeDirectory(username) {
-  return fileData.root.home.users[username] || {};
+  return fileData.root?.home?.users?.[username] || {};
 }
 
 /**
@@ -28,11 +28,21 @@ function populateFileSystem(data, username) {
       fileData[key] = data[key];
     }
   }
+
   if (username) {
     promptName = username;
     pathStack = ["root", "home", "users", username];
     // Ensure the user's home directory exists and has default documents
-    if (!fileData.root.home.users[username]) {
+    if (!fileData.root?.home?.users?.[username]) {
+      if (!fileData.root) {
+        fileData.root = { home: { users: {} } };
+      }
+      if (!fileData.root.home) {
+        fileData.root.home = { users: {} };
+      }
+      if (!fileData.root.home.users) {
+        fileData.root.home.users = {};
+      }
       fileData.root.home.users[username] = {
         documents: {
           document1: "This is the content of document1.",
@@ -44,7 +54,16 @@ function populateFileSystem(data, username) {
     promptName = "";
     pathStack = ["root", "home", "users", "user"];
     // Ensure the default unauthenticated user directory exists and has default documents
-    if (!fileData.root.home.users.user) {
+    if (!fileData.root?.home?.users?.user) {
+      if (!fileData.root) {
+        fileData.root = { home: { users: {} } };
+      }
+      if (!fileData.root.home) {
+        fileData.root.home = { users: {} };
+      }
+      if (!fileData.root.home.users) {
+        fileData.root.home.users = {};
+      }
       fileData.root.home.users.user = {
         documents: {
           document1: "This is the content of document1.",
