@@ -3,9 +3,9 @@ import http from "http";
 import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import path, { dirname } from "path";
+import fs from "fs";
 import passport from "./auth.js";
 import session from "express-session";
-import fs from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -15,6 +15,10 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const admin = io.of("/admin");
+
+const DATA_DIR = path.join(__dirname, "data");
+const USERS_FILE_PATH = path.join(DATA_DIR, "users.json");
+const FILE_SYSTEM_PATH = path.join(DATA_DIR, "filesystem.json");
 
 app.use(express.json()); // This is equivalent to bodyParser.json() if using Express 4.16.0+
 app.use(express.static(path.join(__dirname, "public")));
@@ -37,10 +41,9 @@ app.post("/login", function (req, res, next) {
       return next(err);
     }
     if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: info.message || "Authentication failed",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Authentication failed" });
     }
     req.logIn(user, function (err) {
       if (err) {
@@ -66,12 +69,31 @@ app.post("/logout", function (req, res) {
 });
 
 app.get("/filesystem", (req, res) => {
-  const fsData = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "data/filesystem.json"), "utf-8")
-  );
-  res.json(fsData);
+  if (req.isAuthenticated()) {
+    const users = JSON.parse(fs.readFileSync(USERS_FILE_PATH, "utf-8"));
+    const user = users.find((u) => u.id === req.user.id);
+    res.json(user.home);
+  } else {
+    const fileSystem = JSON.parse(fs.readFileSync(FILE_SYSTEM_PATH, "utf-8"));
+    res.json(fileSystem);
+  }
 });
 
+app.post("/update-user-home", (req, res) => {
+  if (req.isAuthenticated()) {
+    const users = JSON.parse(fs.readFileSync(USERS_FILE_PATH, "utf-8"));
+    const userIndex = users.findIndex((u) => u.id === req.user.id);
+    if (userIndex !== -1) {
+      users[userIndex].home = req.body.home;
+      fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2));
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ success: false, message: "User not found" });
+    }
+  } else {
+    res.status(403).json({ success: false, message: "Not authenticated" });
+  }
+});
 app.post("/set-name", (req, res) => {
   const { oldName, newName } = req.body;
   const usersFilePath = path.join(__dirname, "data/users.json");
@@ -101,16 +123,16 @@ app.post("/set-name", (req, res) => {
   res.json({ success: true, message: `Name updated to ${newName}` });
 });
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
 app.get("/auth-status", (req, res) => {
   if (req.isAuthenticated()) {
     res.json({ authenticated: true, user: req.user });
   } else {
     res.json({ authenticated: false });
   }
+});
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 server.listen(3000, () => {

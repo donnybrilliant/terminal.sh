@@ -3,6 +3,7 @@ import {
   getCurrentDir,
   getCurrentPath,
   setName,
+  saveUserHome,
 } from "./fileSystem.js";
 import { ANSI_COLORS } from "./colors.js";
 import { term } from "./index.js";
@@ -18,10 +19,6 @@ import { term } from "./index.js";
 function ls(args = []) {
   const path = getCurrentDir();
   const listFlag = args.includes("-l");
-
-  if (!path || typeof path !== "object") {
-    return "ls: cannot access: No such file or directory";
-  }
 
   const contents = Object.keys(path).filter(
     (key) => key !== "name" && key !== "parent"
@@ -142,13 +139,8 @@ function help() {
   );
 }
 
-async function handleSetName(newName) {
-  try {
-    const result = await setName(newName);
-    return result;
-  } catch (error) {
-    return `Error changing name: ${error.message}`;
-  }
+function handleSetName(newName) {
+  return setName(newName);
 }
 
 function remove(args = []) {
@@ -177,6 +169,7 @@ function remove(args = []) {
 
   // If everything checks out, delete the target
   delete currentDir[target];
+  saveUserHome();
   return `${target} removed successfully`;
 }
 
@@ -191,6 +184,7 @@ function mkdir(dirname) {
     return `mkdir: ${dirname}: File or directory already exists`;
   }
   currentDir[dirname] = { name: dirname, parent: currentDir };
+  saveUserHome();
   return `Directory '${dirname}' created`;
 }
 
@@ -200,6 +194,7 @@ function touch(filename) {
     return `touch: ${filename}: File already exists`;
   }
   currentDir[filename] = "";
+  saveUserHome();
   return `File '${filename}' created`;
 }
 
@@ -214,6 +209,7 @@ function cp(source, destination) {
     return `cp: ${destination}: File or directory already exists`;
   }
   currentDir[destination] = currentDir[source];
+  saveUserHome();
   return `File '${source}' copied to '${destination}'`;
 }
 
@@ -229,6 +225,7 @@ function mv(source, destination) {
   }
   currentDir[destination] = currentDir[source];
   delete currentDir[source];
+  saveUserHome();
   return `File '${source}' moved to '${destination}'`;
 }
 

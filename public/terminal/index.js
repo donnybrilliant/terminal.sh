@@ -1,7 +1,7 @@
 import processCommand from "./commandProcessor.js";
 import handleKeyInput from "./keyInputHandler.js";
 import ascii from "./ascii.js";
-import { fetchFileSystem, populateFileSystem } from "./fileSystem.js";
+import { loadFileSystem } from "./fileSystem.js";
 import { LoginManager } from "./login.js";
 
 export const term = new Terminal({ cursorBlink: true });
@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   term.onKey((eventData) => handleKeyInput(eventData, term, processCommand));
 
   // Fetch the file system
-  await fetchFileSystem("http://localhost:3000");
+  await loadFileSystem("http://localhost:3000");
 
   // Print the ascii art
   ascii(term);

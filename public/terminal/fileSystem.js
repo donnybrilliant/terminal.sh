@@ -2,28 +2,32 @@ let promptName = "";
 let fileData = {};
 
 // Function to load the filesystem data
-async function fetchFileSystem(apiUrl, username = "") {
-  const response = await fetch(`${apiUrl}/filesystem`);
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+async function loadFileSystem(apiUrl) {
+  try {
+    const response = await fetch(`${apiUrl}/filesystem`);
+    const data = await response.json();
+    populateFileSystem(data);
+  } catch (error) {
+    console.error("Error loading filesystem:", error);
   }
-  const data = await response.json();
-  populateFileSystem(data, username);
+}
+
+// Function to get the user's home directory
+function getUserHomeDirectory(username) {
+  return fileData.root.home.users[username] || {};
 }
 
 /**
  * Populate the file system with data.
  * @param {*} data
- * @param {string} username - The username of the authenticated user.
  */
-function populateFileSystem(data, username = "") {
+function populateFileSystem(data, username) {
   if (data) {
     // Populate with fetched data
     for (const key in data) {
       fileData[key] = data[key];
     }
   }
-
   if (username) {
     promptName = username;
     pathStack = ["root", "home", "users", username];
@@ -123,7 +127,6 @@ function getName() {
 async function setName(newName) {
   // Check if user is in the directory being deleted
   const oldName = promptName || "user"; // Take the default "user" if promptName is empty
-  const inOldUserDir = isWithinDir(oldName);
 
   if (!newName) {
     return "Please provide a name.";
@@ -149,12 +152,9 @@ async function setName(newName) {
       // Update the prompt name
       promptName = newName;
 
-      if (inOldUserDir) {
-        // If in the old user directory, navigate to the new one
-        pathStack = ["root", "home", "users", newName];
-      }
+      pathStack = ["root", "home", "users", newName];
 
-      // Update users.json
+      // Update users.json on the server
       await updateUserNameInFile(oldName, newName);
 
       return `Name updated to ${newName}`;
@@ -167,13 +167,31 @@ async function setName(newName) {
 }
 
 async function updateUserNameInFile(oldName, newName) {
-  const response = await fetch(`/set-name`, {
+  const response = await fetch("/update-user-home", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ oldName, newName }),
+    body: JSON.stringify({
+      oldName,
+      newName,
+      home: fileData.root.home.users[newName],
+    }),
   });
+
   if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+    throw new Error(`Failed to update user name: ${response.statusText}`);
+  }
+}
+
+async function saveUserHome() {
+  const username = promptName || "user";
+  const response = await fetch("/update-user-home", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ home: fileData.root.home.users[username] }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to save user home: ${response.statusText}`);
   }
 }
 
@@ -184,5 +202,7 @@ export {
   getName,
   setName,
   populateFileSystem,
-  fetchFileSystem,
+  loadFileSystem,
+  getUserHomeDirectory,
+  saveUserHome,
 };
