@@ -34,20 +34,20 @@ function populateFileSystem(data, username) {
     pathStack = ["root", "home", "users", username];
     // Ensure the user's home directory exists and has default documents
     if (!fileData.root.home.users[username]) {
-      fileData.root.home.users[username] = {};
+      fileData.root.home.users[username] = {
+        README: "You are logged in as " + username + ".",
+      };
     }
-    fileData.root.home.users[
-      username
-    ].README = `You are logged in as ${username}.`;
   } else {
     promptName = "";
     pathStack = ["root", "home", "users", "user"];
     // Ensure the default unauthenticated user directory exists and has default documents
     if (!fileData.root.home.users.user) {
-      fileData.root.home.users.user = {};
+      fileData.root.home.users.user = {
+        README:
+          "You are not logged in. There should be some instructions here.",
+      };
     }
-    fileData.root.home.users.user.README =
-      "You are not logged in. There should be some instructions here.";
   }
 }
 
