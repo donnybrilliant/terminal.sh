@@ -24,28 +24,59 @@ router.get("/filesystem", (req, res) => {
 
 router.post("/set-name", (req, res) => {
   const { oldName, newName } = req.body;
-  let users = JSON.parse(fs.readFileSync(USERS_FILE_PATH, "utf-8"));
-  let user = users.find((u) => u.username === oldName);
+  let users, fileSystem;
 
+  try {
+    users = JSON.parse(fs.readFileSync(USERS_FILE_PATH, "utf-8"));
+    fileSystem = JSON.parse(fs.readFileSync(FILE_SYSTEM_PATH, "utf-8"));
+  } catch (err) {
+    console.error("Error reading files:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to read data files.",
+      error: err.message,
+    });
+  }
+
+  let user = users.find((u) => u.username === oldName);
   if (!user) {
+    console.log("User not found");
     return res.status(400).json({ success: false, message: "User not found." });
   }
 
-  if (users.find((u) => u.username === newName)) {
+  if (users.some((u) => u.username === newName)) {
+    console.log("Username already exists");
     return res
       .status(400)
       .json({ success: false, message: "Username already exists." });
   }
 
-  user.username = newName;
-  fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2));
+  // Update the users array in the filesystem
+  const userIndex = fileSystem.root.home.users.indexOf(oldName);
+  if (userIndex === -1) {
+    console.log("User directory not found in file system");
+    return res.status(404).json({
+      success: false,
+      message: "User directory not found in file system.",
+    });
+  } else {
+    fileSystem.root.home.users[userIndex] = newName; // Update the username in the array
+  }
 
-  let fileSystem = JSON.parse(fs.readFileSync(FILE_SYSTEM_PATH, "utf-8"));
-  fileSystem.root.home.users[newName] = fileSystem.root.home.users[oldName];
-  delete fileSystem.root.home.users[oldName];
-  fs.writeFileSync(FILE_SYSTEM_PATH, JSON.stringify(fileSystem, null, 2));
-
-  res.json({ success: true, message: `Name updated to ${newName}` });
+  try {
+    user.username = newName;
+    fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2));
+    fs.writeFileSync(FILE_SYSTEM_PATH, JSON.stringify(fileSystem, null, 2));
+    console.log("Files written successfully");
+    res.json({ success: true, message: `Name updated to ${newName}` });
+  } catch (err) {
+    console.error("Error writing files:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to write changes to disk.",
+      error: err.message,
+    });
+  }
 });
 
 router.post("/update-user-home", (req, res) => {
