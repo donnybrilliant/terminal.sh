@@ -21,14 +21,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.static(__dirname + "/node_modules/@xterm/"));
 
 app.get("/", (req, res) => {
-  const room = "default-room";
-  let messages = [];
-  if (fs.existsSync(`./data/messages/${room}.json`)) {
-    messages = JSON.parse(
-      fs.readFileSync(`./data/messages/${room}.json`, "utf-8")
-    );
-  }
-  res.render("index", { room: room, messages: messages });
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 admin.on("connection", (socket) => {
