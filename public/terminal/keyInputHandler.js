@@ -57,7 +57,10 @@ export default function handleKeyInput(
     } else {
       // If not in edit mode, add a new line and prompt
       const user = getName();
-      term.write(`\r\n${output}\r\n${user}$ `);
+      if (output) {
+        // Only write if output is not empty
+        term.write(`\r\n${output}\r\n${user}$ `);
+      }
     }
     commandBuffer = ""; // Reset the command buffer
     return; // Exit function after handling Enter key

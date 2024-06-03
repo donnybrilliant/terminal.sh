@@ -109,8 +109,11 @@ export default function processCommand(command) {
       if (args.length < 2) {
         return "Usage: login <username> <password>";
       }
-      loginManager.login(args[0], args[1]);
-      break;
+      return loginManager.login(args[0], args[1]);
+
+    case "logout":
+      return loginManager.logout();
+
     default:
       return `Unknown command: ${cmd}`;
   }

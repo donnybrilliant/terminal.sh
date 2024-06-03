@@ -12,6 +12,26 @@ export class LoginManager {
     this.authenticateUser(username, password);
   }
 
+  logout() {
+    fetch(`${this.apiUrl}/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        this.term.write(`\r\n${data.message}\r\n$ `);
+      })
+      .catch((error) => {
+        console.error("Logout Error:", error);
+        this.term.write(`\r\nError logging out: ${error.message}\r\n$ `);
+      });
+  }
+
   authenticateUser(username, password) {
     fetch(`${this.apiUrl}/login`, {
       method: "POST",
