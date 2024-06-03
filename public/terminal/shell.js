@@ -183,7 +183,7 @@ function mkdir(dirname) {
   if (currentDir[dirname]) {
     return `mkdir: ${dirname}: File or directory already exists`;
   }
-  currentDir[dirname] = { name: dirname, parent: currentDir };
+  currentDir[dirname] = {};
   saveUserHome();
   return `Directory '${dirname}' created`;
 }
