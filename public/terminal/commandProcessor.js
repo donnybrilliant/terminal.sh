@@ -10,6 +10,8 @@ import {
   getEditedContent,
 } from "./edit.js";
 import { exitChatMode, initializeChat, isInChatMode } from "./chat.js";
+import { loginManager } from "./index.js";
+
 /**
  * Main function to process terminal commands.
  * Delegates work to individual command functions from the mockShell (shell.js).
@@ -103,6 +105,12 @@ export default function processCommand(command) {
       return term.write(
         `\r\nWelcome to the chat! Type ':exit' to leave chat mode.\r\n`
       );
+    case "login":
+      if (args.length < 2) {
+        return "Usage: login <username> <password>";
+      }
+      loginManager.login(args[0], args[1]);
+      break;
     default:
       return `Unknown command: ${cmd}`;
   }

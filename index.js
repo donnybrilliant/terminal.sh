@@ -3,8 +3,12 @@ import http from "http";
 import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import path, { dirname } from "path";
-import bodyParser from "body-parser";
 import fs from "fs";
+import passport from "passport";
+
+import LocalStrategy from "passport-local";
+import session from "express-session";
+import JsonStore from "express-session-json";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -13,52 +17,89 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const jsonParser = bodyParser.json();
-
 const admin = io.of("/admin");
 
+app.use(express.json()); // This is equivalent to bodyParser.json() if using Express 4.16.0+
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.static(__dirname + "/node_modules/@xterm/"));
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+// Using MemoryStore for development purposes
+const sessionStore = new session.MemoryStore();
+
+app.use(
+  session({
+    secret: "keyboard cat",
+    resave: false,
+    saveUninitialized: false,
+    store: new session.MemoryStore(), // Use MemoryStore for development
+  })
+);
+
+app.use(passport.authenticate("session"));
+app.use((req, res, next) => {
+  res.locals.isAuthenticated = req.isAuthenticated();
+  next();
 });
 
-admin.on("connection", (socket) => {
-  socket.on("join", (data) => {
-    socket.join(data.room);
+passport.serializeUser(function (user, cb) {
+  process.nextTick(function () {
+    cb(null, { id: user.id, username: user.username });
+  });
+});
 
-    // Load existing messages
-    const roomMessagesPath = `./data/messages/${data.room}.json`;
-    let messages = [];
-    if (fs.existsSync(roomMessagesPath)) {
-      messages = JSON.parse(fs.readFileSync(roomMessagesPath, "utf-8"));
+passport.deserializeUser(function (user, cb) {
+  process.nextTick(function () {
+    return cb(null, user);
+  });
+});
+
+passport.use(
+  new LocalStrategy(function (username, password, done) {
+    console.log("Username:", username, "Password:", password); // Debugging output
+    let usersArray = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "data/users.json"))
+    );
+    let user = usersArray.find((u) => u.username === username); // Fix the comparison issue here
+    if (user && user.password === password) {
+      return done(null, user);
+    } else {
+      return done(null, false);
     }
+  })
+);
 
-    // Send existing messages to the newly connected client
-    socket.emit("load messages", messages);
+//app.post("/login", passport.authenticate("local"));
 
-    const msg =
-      data.username != null
-        ? `${data.username} joined the room!`
-        : "New user joined the room!";
-    admin.in(data.room).emit("chat message", msg);
-  });
-
-  socket.on("chat message", (data) => {
-    let messages = [];
-    const roomMessagesPath = `./data/messages/${data.room}.json`;
-    if (fs.existsSync(roomMessagesPath)) {
-      messages = JSON.parse(fs.readFileSync(roomMessagesPath, "utf-8"));
+app.post("/login", function (req, res, next) {
+  passport.authenticate("local", function (err, user, info) {
+    if (err) {
+      return next(err);
     }
-    messages.push({ username: data.username, msg: data.msg });
-    fs.writeFileSync(roomMessagesPath, JSON.stringify(messages));
-    admin.in(data.room).emit("chat message", `${data.username}: ${data.msg}`);
-  });
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Authentication failed" });
+    }
+    req.logIn(user, function (err) {
+      if (err) {
+        return next(err);
+      }
+      return res.json({
+        success: true,
+        message: "Authentication succeeded",
+        user: user,
+      });
+    });
+  })(req, res, next);
+});
 
-  socket.on("disconnect", () => {
-    admin.emit("chat message", `User disconnected`);
-  });
+app.post("/logout", function (req, res) {
+  req.logout();
+  res.json({ message: "Logged out" });
+});
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 server.listen(3000, () => {

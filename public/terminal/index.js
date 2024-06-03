@@ -2,8 +2,10 @@ import processCommand from "./commandProcessor.js";
 import handleKeyInput from "./keyInputHandler.js";
 import ascii from "./ascii.js";
 import { populateFileSystem } from "./fileSystem.js";
+import { LoginManager } from "./login.js";
 
 export const term = new Terminal({ cursorBlink: true });
+export const loginManager = new LoginManager("http://localhost:3000");
 
 document.addEventListener("DOMContentLoaded", function () {
   const terminalContainer = document.getElementById("terminal-container");
@@ -20,6 +22,7 @@ document.addEventListener("DOMContentLoaded", function () {
   populateFileSystem();
 
   term.open(terminalContainer);
+  loginManager.setTerminal(term);
   term.focus();
   fitAddon.fit();
 

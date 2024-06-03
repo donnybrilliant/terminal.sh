@@ -54,7 +54,6 @@ export default function handleKeyInput(
     const output = processCommand(commandBuffer);
     if (isInEditMode()) {
       term.write(`\r\n${output}`);
-    } else if (isInChatMode()) {
     } else {
       // If not in edit mode, add a new line and prompt
       const user = getName();
