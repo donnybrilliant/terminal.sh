@@ -1,6 +1,7 @@
 import { stopMatrix } from "./random.js";
 import { getName } from "./fileSystem.js";
 import { isInEditMode } from "./edit.js";
+import { isInChatMode } from "./chat.js";
 
 // Buffer to hold the current command being typed by the user.
 let commandBuffer = "";
@@ -51,12 +52,12 @@ export default function handleKeyInput(
   // Handle Enter key press
   if (keyCode === 13) {
     const output = processCommand(commandBuffer);
-    if (!isInEditMode()) {
+    if (isInEditMode() || isInChatMode) {
+      term.write(`\r\n${output}`);
+    } else {
       // If not in edit mode, add a new line and prompt
       const user = getName();
       term.write(`\r\n${output}\r\n${user}$ `);
-    } else {
-      term.write(`\r\n${output}`);
     }
     commandBuffer = ""; // Reset the command buffer
     return; // Exit function after handling Enter key

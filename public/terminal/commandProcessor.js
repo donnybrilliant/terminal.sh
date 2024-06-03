@@ -9,7 +9,7 @@ import {
   appendToEditedContent,
   getEditedContent,
 } from "./edit.js";
-import { initializeChat } from "./chat.js";
+import { exitChatMode, initializeChat, isInChatMode } from "./chat.js";
 /**
  * Main function to process terminal commands.
  * Delegates work to individual command functions from the mockShell (shell.js).
@@ -19,6 +19,16 @@ import { initializeChat } from "./chat.js";
  */
 export default function processCommand(command) {
   const [cmd, ...args] = command.split(" ");
+
+  // Handle chat mode
+  if (isInChatMode()) {
+    if (cmd.trim() === ":exit") {
+      exitChatMode();
+      return "Exited chat mode.";
+    }
+    // Here, consider what should happen if a command is attempted in chat mode.
+    return ""; // To avoid undefined
+  }
 
   // Check if the system is in edit mode
   if (isInEditMode()) {
@@ -95,9 +105,7 @@ export default function processCommand(command) {
       return "hello";
     case "chat":
       initializeChat();
-      term.writeln(`Chat initialized. You can start typing messages.`);
-      return;
-
+      return "Chat initialized. You can start typing messages.";
     default:
       return `Unknown command: ${cmd}`;
   }
