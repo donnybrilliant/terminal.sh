@@ -130,7 +130,7 @@ function help() {
     `${ANSI_COLORS.green}name${ANSI_COLORS.reset}                     - Change your username\r\n` +
     `${ANSI_COLORS.green}matrix${ANSI_COLORS.reset}                   - Start the Matrix animation\r\n` +
     `${ANSI_COLORS.green}hack${ANSI_COLORS.reset}                     - Simulate hacking (just for fun!)\r\n` +
-    `${ANSI_COLORS.green}snake${ANSI_COLORS.reset}                    - Start snake game\r\n` +
+    `${ANSI_COLORS.green}chat${ANSI_COLORS.reset}                     - Start Chat\r\n` +
     `${ANSI_COLORS.green}loadtest${ANSI_COLORS.reset}                 - Stolen from xtermjs.org\r\n` +
     `${ANSI_COLORS.green}chars${ANSI_COLORS.reset}                    - Stolen from xtermjs.org\r\n` +
     `${ANSI_COLORS.green}clear${ANSI_COLORS.reset}                    - Clears terminal\r\n` +

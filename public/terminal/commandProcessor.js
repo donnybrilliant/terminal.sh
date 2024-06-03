@@ -9,7 +9,7 @@ import {
   appendToEditedContent,
   getEditedContent,
 } from "./edit.js";
-import { startSnakeGame } from "./snake.js";
+import { initializeChat } from "./chat.js";
 /**
  * Main function to process terminal commands.
  * Delegates work to individual command functions from the mockShell (shell.js).
@@ -91,11 +91,12 @@ export default function processCommand(command) {
         return "Usage: mv <source> <destination>";
       }
       return commands.mv(args[0], args[1]);
-    case "snake":
-      startSnakeGame(term);
-      break;
     case "hola":
       return "hello";
+    case "chat":
+      initializeChat();
+      term.writeln(`Chat initialized. You can start typing messages.`);
+      return;
 
     default:
       return `Unknown command: ${cmd}`;
