@@ -151,9 +151,9 @@ async function setName(newName) {
       pathStack = ["root", "home", "users", newName];
 
       // Update users.json on the server
-      await updateUserNameInFile(oldName, newName);
-
-      return `Name updated to ${newName}`;
+      return await updateUserNameInFile(oldName, newName).then(
+        () => `Name updated to ${newName}`
+      );
     } else {
       return `Error: Directory for ${oldName} not found.`;
     }
@@ -163,7 +163,7 @@ async function setName(newName) {
 }
 
 async function updateUserNameInFile(oldName, newName) {
-  const response = await fetch("/update-user-home", {
+  const response = await fetch("/set-name", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

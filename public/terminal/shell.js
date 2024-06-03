@@ -150,6 +150,8 @@ function help() {
     `${ANSI_COLORS.green}loadtest${ANSI_COLORS.reset}                 - Stolen from xtermjs.org\r\n` +
     `${ANSI_COLORS.green}chars${ANSI_COLORS.reset}                    - Stolen from xtermjs.org\r\n` +
     `${ANSI_COLORS.green}clear${ANSI_COLORS.reset}                    - Clears terminal\r\n` +
+    `${ANSI_COLORS.green}login${ANSI_COLORS.reset}                    - Log in or create user\r\n` +
+    `${ANSI_COLORS.green}logout${ANSI_COLORS.reset}                   - Log out\r\n` +
     `${ANSI_COLORS.green}help${ANSI_COLORS.reset}                     - Display this help menu`
   );
 }

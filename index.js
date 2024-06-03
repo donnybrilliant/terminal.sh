@@ -20,7 +20,7 @@ const DATA_DIR = path.join(__dirname, "data");
 const USERS_FILE_PATH = path.join(DATA_DIR, "users.json");
 const FILE_SYSTEM_PATH = path.join(DATA_DIR, "filesystem.json");
 
-app.use(express.json()); // This is equivalent to bodyParser.json() if using Express 4.16.0+
+app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.static(__dirname + "/node_modules/@xterm/"));
 
@@ -29,7 +29,7 @@ app.use(
     secret: "keyboard cat",
     resave: false,
     saveUninitialized: false,
-    store: new session.MemoryStore(), // Use MemoryStore for development
+    store: new session.MemoryStore(),
   })
 );
 
@@ -94,6 +94,7 @@ app.post("/update-user-home", (req, res) => {
     res.status(403).json({ success: false, message: "Not authenticated" });
   }
 });
+
 app.post("/set-name", (req, res) => {
   const { oldName, newName } = req.body;
   const usersFilePath = path.join(__dirname, "data/users.json");
