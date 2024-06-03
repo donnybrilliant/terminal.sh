@@ -76,10 +76,21 @@ function createHyperlink(text, url) {
  * @param {string} filename - Name of the file to display.
  * @returns {string} - Content of the file or an error message.
  */
+/**
+ * Mocked ShellJS 'cat' command.
+ * Displays the contents of a file.
+ *
+ * @param {string} filename - Name of the file to display.
+ * @returns {string} - Content of the file or an error message.
+ */
 function cat(filename) {
   const currentDir = getCurrentDir();
   if (filename in currentDir) {
-    return currentDir[filename].replace(/\n/g, "\r\n");
+    const file = currentDir[filename];
+    if (typeof file === "object") {
+      return `cat: ${filename}: Is a directory`;
+    }
+    return file.replace(/\n/g, "\r\n");
   } else {
     return `cat: ${filename}: No such file`;
   }
