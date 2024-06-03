@@ -22,11 +22,6 @@ export default function processCommand(command) {
 
   // Handle chat mode
   if (isInChatMode()) {
-    if (cmd.trim() === ":exit") {
-      exitChatMode();
-      return "Exited chat mode.";
-    }
-    // Here, consider what should happen if a command is attempted in chat mode.
     return ""; // To avoid undefined
   }
 
@@ -105,7 +100,9 @@ export default function processCommand(command) {
       return "hello";
     case "chat":
       initializeChat();
-      return "Chat initialized. You can start typing messages.";
+      return term.write(
+        `\r\nWelcome to the chat! Type ':exit' to leave chat mode.\r\n`
+      );
     default:
       return `Unknown command: ${cmd}`;
   }

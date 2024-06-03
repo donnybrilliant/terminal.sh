@@ -3,7 +3,7 @@ import handleKeyInput from "./keyInputHandler.js";
 import ascii from "./ascii.js";
 import { populateFileSystem } from "./fileSystem.js";
 
-export const term = new Terminal();
+export const term = new Terminal({ cursorBlink: true });
 
 document.addEventListener("DOMContentLoaded", function () {
   const terminalContainer = document.getElementById("terminal-container");
