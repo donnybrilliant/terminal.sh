@@ -12,20 +12,24 @@ function populateFileSystem(data) {
       fileData[key] = data[key];
     }
   } else {
-    // Fallback: Create default directories and files
-    if (!Object.prototype.hasOwnProperty.call(fileData, "home")) {
-      fileData.home = {};
+    // Fallback: Create default directories and files for unauthenticated users
+    if (!Object.prototype.hasOwnProperty.call(fileData, "root")) {
+      fileData.root = { home: { users: {} } };
     }
-    if (!Object.prototype.hasOwnProperty.call(fileData.home, "user")) {
-      fileData.home.user = {
-        document1: "This is the content of document1.",
-        document2: "Another content here for document2.",
+    if (
+      !Object.prototype.hasOwnProperty.call(fileData.root.home.users, "user")
+    ) {
+      fileData.root.home.users.user = {
+        documents: {
+          document1: "This is the content of document1.",
+          document2: "Another content here for document2.",
+        },
       };
     }
   }
 }
 
-let pathStack = ["home", "user"]; // We start in /home/user by default
+let pathStack = ["root", "home", "users", "user"]; // Default path
 
 /**
  * Getter for the current directory.
@@ -87,8 +91,7 @@ function getCurrentPath() {
 }
 
 function isWithinDir(directoryName) {
-  const oldName = promptName || "user"; // Take the default "user" if promptName is empty
-  return pathStack.includes(oldName) || pathStack.includes(directoryName);
+  return pathStack.includes(directoryName);
 }
 
 function getName() {
@@ -119,7 +122,7 @@ function setName(newName) {
 
       if (inOldUserDir) {
         // If in the old user directory, navigate to the new one
-        pathStack = ["home", newName];
+        pathStack = ["root", "home", "users", newName];
       }
 
       return `Name updated to ${newName}`;
