@@ -1,24 +1,46 @@
 let promptName = "";
 let fileData = {};
 
+// Function to load the filesystem data
+async function fetchFileSystem(apiUrl, username = "") {
+  const response = await fetch(`${apiUrl}/filesystem`);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  const data = await response.json();
+  populateFileSystem(data, username);
+}
+
 /**
  * Populate the file system with data.
  * @param {*} data
+ * @param {string} username - The username of the authenticated user.
  */
-function populateFileSystem(data) {
+function populateFileSystem(data, username = "") {
   if (data) {
     // Populate with fetched data
     for (const key in data) {
       fileData[key] = data[key];
     }
-  } else {
-    // Fallback: Create default directories and files for unauthenticated users
-    if (!Object.prototype.hasOwnProperty.call(fileData, "root")) {
-      fileData.root = { home: { users: {} } };
+  }
+
+  if (username) {
+    promptName = username;
+    pathStack = ["root", "home", "users", username];
+    // Ensure the user's home directory exists and has default documents
+    if (!fileData.root.home.users[username]) {
+      fileData.root.home.users[username] = {
+        documents: {
+          document1: "This is the content of document1.",
+          document2: "Another content here for document2.",
+        },
+      };
     }
-    if (
-      !Object.prototype.hasOwnProperty.call(fileData.root.home.users, "user")
-    ) {
+  } else {
+    promptName = "";
+    pathStack = ["root", "home", "users", "user"];
+    // Ensure the default unauthenticated user directory exists and has default documents
+    if (!fileData.root.home.users.user) {
       fileData.root.home.users.user = {
         documents: {
           document1: "This is the content of document1.",
@@ -98,7 +120,7 @@ function getName() {
   return promptName;
 }
 
-function setName(newName) {
+async function setName(newName) {
   // Check if user is in the directory being deleted
   const oldName = promptName || "user"; // Take the default "user" if promptName is empty
   const inOldUserDir = isWithinDir(oldName);
@@ -108,14 +130,21 @@ function setName(newName) {
   }
 
   // Check if home directory exists
-  if (fileData.home) {
+  if (fileData.root && fileData.root.home && fileData.root.home.users) {
+    // Check if new username already exists
+    if (fileData.root.home.users[newName]) {
+      return "Username already exists. Please choose a different name.";
+    }
+
     // Check if old user directory exists
-    if (fileData.home[oldName]) {
+    if (fileData.root.home.users[oldName]) {
       // Duplicate the old user directory to the new name
-      fileData.home[newName] = { ...fileData.home[oldName] };
+      fileData.root.home.users[newName] = {
+        ...fileData.root.home.users[oldName],
+      };
 
       // Delete the old user directory
-      delete fileData.home[oldName];
+      delete fileData.root.home.users[oldName];
 
       // Update the prompt name
       promptName = newName;
@@ -124,6 +153,9 @@ function setName(newName) {
         // If in the old user directory, navigate to the new one
         pathStack = ["root", "home", "users", newName];
       }
+
+      // Update users.json
+      await updateUserNameInFile(oldName, newName);
 
       return `Name updated to ${newName}`;
     } else {
@@ -134,6 +166,17 @@ function setName(newName) {
   }
 }
 
+async function updateUserNameInFile(oldName, newName) {
+  const response = await fetch(`/set-name`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ oldName, newName }),
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+}
+
 export {
   getCurrentDir,
   setCurrentDir,
@@ -141,4 +184,5 @@ export {
   getName,
   setName,
   populateFileSystem,
+  fetchFileSystem,
 };

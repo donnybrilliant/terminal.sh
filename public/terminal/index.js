@@ -1,13 +1,13 @@
 import processCommand from "./commandProcessor.js";
 import handleKeyInput from "./keyInputHandler.js";
 import ascii from "./ascii.js";
-import { populateFileSystem } from "./fileSystem.js";
+import { fetchFileSystem, populateFileSystem } from "./fileSystem.js";
 import { LoginManager } from "./login.js";
 
 export const term = new Terminal({ cursorBlink: true });
 export const loginManager = new LoginManager("http://localhost:3000");
 
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
   const terminalContainer = document.getElementById("terminal-container");
 
   // Create and apply the fit addon
@@ -17,9 +17,6 @@ document.addEventListener("DOMContentLoaded", function () {
   // Create and apply the web links addon
   /*  const webLinksAddon = new WebLinksAddon();
   term.loadAddon(webLinksAddon); */
-
-  // Populate the file system
-  populateFileSystem();
 
   term.open(terminalContainer);
   loginManager.setTerminal(term);
@@ -33,6 +30,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Handle key input
   term.onKey((eventData) => handleKeyInput(eventData, term, processCommand));
+
+  // Fetch the file system
+  await fetchFileSystem("http://localhost:3000");
 
   // Print the ascii art
   ascii(term);

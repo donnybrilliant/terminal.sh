@@ -19,6 +19,10 @@ function ls(args = []) {
   const path = getCurrentDir();
   const listFlag = args.includes("-l");
 
+  if (!path || typeof path !== "object") {
+    return "ls: cannot access: No such file or directory";
+  }
+
   const contents = Object.keys(path).filter(
     (key) => key !== "name" && key !== "parent"
   );
@@ -138,8 +142,13 @@ function help() {
   );
 }
 
-function handleSetName(newName) {
-  return setName(newName);
+async function handleSetName(newName) {
+  try {
+    const result = await setName(newName);
+    return result;
+  } catch (error) {
+    return `Error changing name: ${error.message}`;
+  }
 }
 
 function remove(args = []) {
