@@ -46,7 +46,10 @@ export function initializeChat() {
         .translateToString(true)
         .trim();
       console.log(input);
-      if (input.length > 0) {
+      if (input === ":exit") {
+        exitChatMode();
+        term.write("\r\nExited chat mode.\r\n$ ");
+      } else if (input.length > 0) {
         socket.emit("chat message", {
           room: room,
           username: "User",

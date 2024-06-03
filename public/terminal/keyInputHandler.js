@@ -52,8 +52,9 @@ export default function handleKeyInput(
   // Handle Enter key press
   if (keyCode === 13) {
     const output = processCommand(commandBuffer);
-    if (isInEditMode() || isInChatMode) {
+    if (isInEditMode()) {
       term.write(`\r\n${output}`);
+    } else if (isInChatMode()) {
     } else {
       // If not in edit mode, add a new line and prompt
       const user = getName();
