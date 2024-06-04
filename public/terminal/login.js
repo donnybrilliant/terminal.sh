@@ -13,17 +13,14 @@ export class LoginManager {
   async initializeLoginState() {
     try {
       const status = await this.checkAuthStatus();
-      console.log(status);
       if (status.data.authenticated) {
         await this.fetchFileSystem(this.apiUrl, status.data.user.username);
-        this.term.write(`\r\nLogged in as ${status.data.user.username}\r\n$ `);
+        return `\r\nLogged in as ${status.data.user.username}\r\n${status.data.user.username}$ `;
       } else {
         await loadFileSystem(this.apiUrl);
       }
     } catch (error) {
-      this.term.write(
-        `\r\nFailed to check login status: ${error.message}\r\n$ `
-      );
+      return `\r\nFailed to check login status: ${error.message}\r\n$ `;
     }
   }
 
@@ -60,7 +57,6 @@ export class LoginManager {
   async fetchFileSystem(apiUrl, username) {
     try {
       const data = await fetchWithTimeout(`${apiUrl}/filesystem`);
-      console.log(data);
       populateFileSystem(data.data, username);
     } catch (error) {
       this.term.write(`\r\nError fetching file system: ${error.message}\r\n$ `);
