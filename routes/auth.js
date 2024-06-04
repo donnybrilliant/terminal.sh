@@ -1,26 +1,23 @@
 import express from "express";
 import passport from "../auth.js";
+import { sendResponse } from "../utils/responseUtils.js";
+import errorHandler from "../utils/errorHandler.js";
+
 const router = express.Router();
 
 router.post("/login", function (req, res, next) {
   passport.authenticate("local", function (err, user, info) {
     if (err) {
-      return next(err);
+      return next(err); // Errors will be caught by errorHandler
     }
     if (!user) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Authentication failed" });
+      return sendResponse(res, 401, {}, "Authentication failed");
     }
     req.logIn(user, function (err) {
       if (err) {
         return next(err);
       }
-      res.json({
-        success: true,
-        message: "Authentication succeeded",
-        user: user,
-      });
+      sendResponse(res, 200, user, "Authentication succeeded");
     });
   })(req, res, next);
 });
@@ -28,19 +25,30 @@ router.post("/login", function (req, res, next) {
 router.post("/logout", function (req, res) {
   req.logout(function (err) {
     if (err) {
-      console.log(err);
-      return res.status(500).json({ message: "Logout failed", error: err });
+      return next(err);
     }
-    res.json({ message: "Logged out successfully" });
+    sendResponse(res, 200, {}, "Logged out successfully");
   });
 });
 
 router.get("/auth-status", (req, res) => {
   if (req.isAuthenticated()) {
-    res.json({ authenticated: true, user: req.user });
+    sendResponse(
+      res,
+      200,
+      { authenticated: true, user: req.user },
+      "User is authenticated"
+    );
   } else {
-    res.json({ authenticated: false });
+    sendResponse(
+      res,
+      200,
+      { authenticated: false },
+      "User is not authenticated"
+    );
   }
 });
+
+router.use(errorHandler);
 
 export default router;

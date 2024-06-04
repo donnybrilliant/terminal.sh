@@ -1,4 +1,6 @@
-import { populateFileSystem } from "./fileSystem.js";
+import { loadFileSystem } from "./fileSystem.js";
+import { fetchWithTimeout } from "../utils/fetch.js";
+
 export class LoginManager {
   constructor(apiUrl) {
     this.apiUrl = apiUrl;
@@ -8,18 +10,49 @@ export class LoginManager {
     this.term = term;
   }
 
+  setUsername(username) {
+    sessionStorage.setItem("username", username);
+  }
+
+  getUsername() {
+    return sessionStorage.getItem("username") || "";
+  }
+
+  clearUsername() {
+    sessionStorage.removeItem("username");
+  }
+
+  async initializeLoginState() {
+    try {
+      const status = await this.checkAuthStatus();
+      if (status.data.authenticated) {
+        this.setUsername(status.data.user.username);
+        await loadFileSystem(this.apiUrl);
+        this.term.write(
+          `\r\nLogged in as ${status.data.user.username}\r\n${status.data.user.username}$ `
+        );
+      } else {
+        await loadFileSystem(this.apiUrl);
+      }
+    } catch (error) {
+      this.term.write(
+        `\r\nFailed to check login status: ${error.message}\r\n$ `
+      );
+    }
+  }
+
   async login(username, password) {
     try {
       const status = await this.checkAuthStatus();
-      if (status.authenticated) {
+      if (status.data.authenticated) {
         this.term.write(
-          `\r\nUser already logged in as ${status.user.username}\r\n$ `
+          `\r\nUser already logged in as ${status.data.user.username}\r\n$ `
         );
       } else {
-        await this.authenticateUser(username, password);
+        const data = await this.authenticateUser(username, password);
+        this.term.write(`\r\n${data.message}\r\n${username}$ `);
       }
     } catch (error) {
-      console.error("Auth Status Check Error:", error);
       this.term.write(
         `\r\nError checking authentication status: ${error.message}\r\n$ `
       );
@@ -28,75 +61,47 @@ export class LoginManager {
 
   async authenticateUser(username, password) {
     try {
-      const response = await fetch(`${this.apiUrl}/login`, {
+      const data = await fetchWithTimeout(`${this.apiUrl}/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(
-          data.message || `HTTP error! status: ${response.status}`
-        );
-      }
-      const data = await response.json();
       if (data.success) {
-        await this.fetchFileSystem(this.apiUrl, data.user.username);
-        this.term.write(
-          `\r\nLogin successful! Welcome ${data.user.username}\r\n$ `
-        );
-      } else {
-        this.term.write(`\r\n${data.message}\r\n$ `);
+        this.setUsername(username);
+        await loadFileSystem(this.apiUrl);
       }
+      return data;
     } catch (error) {
-      console.error("Login Error:", error);
       this.term.write(`\r\nError logging in: ${error.message}\r\n$ `);
+      throw error;
     }
   }
 
-  async fetchFileSystem(apiUrl, username) {
+  async logout() {
     try {
-      const response = await fetch(`${apiUrl}/filesystem`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      const status = await this.checkAuthStatus();
+      if (status.data.authenticated) {
+        const data = await fetchWithTimeout(`${this.apiUrl}/logout`, {
+          method: "POST",
+        });
+        this.clearUsername();
+        await loadFileSystem(this.apiUrl);
+        this.term.write(`\r\n${data.message}\r\n$ `);
+      } else {
+        this.term.write(`\r\nYou are not logged in.\r\n$ `);
       }
-      const data = await response.json();
-      populateFileSystem(data, username);
     } catch (error) {
-      console.error("Fetch File System Error:", error);
-      this.term.write(`\r\nError fetching file system: ${error.message}\r\n$ `);
+      this.term.write(`\r\nError logging out: ${error.message}\r\n$ `);
     }
   }
 
-  logout() {
-    fetch(`${this.apiUrl}/logout`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((data) => {
-        this.term.write(`\r\n${data.message}\r\n$ `);
-      })
-      .catch((error) => {
-        console.error("Logout Error:", error);
-        this.term.write(`\r\nError logging out: ${error.message}\r\n$ `);
-      });
-  }
-
-  checkAuthStatus() {
-    return fetch(`${this.apiUrl}/auth-status`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    }).then((response) => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    });
+  async checkAuthStatus() {
+    try {
+      return await fetchWithTimeout(`${this.apiUrl}/auth-status`);
+    } catch (error) {
+      this.term.write(
+        `\r\nError checking authentication status: ${error.message}\r\n$ `
+      );
+      throw error;
+    }
   }
 }

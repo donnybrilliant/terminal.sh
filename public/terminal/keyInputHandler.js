@@ -1,5 +1,5 @@
 import { stopMatrix } from "./random.js";
-import { getName } from "./fileSystem.js";
+import { loginManager } from "./index.js";
 import { isInEditMode } from "./edit.js";
 import { isInChatMode } from "./chat.js";
 
@@ -33,7 +33,7 @@ export function setCommandBuffer(value) {
  * @param {Object} term - The xterm.js terminal object.
  * @param {function} processCommand - The function to process the full command once Enter is pressed.
  */
-export default function handleKeyInput(
+export default async function handleKeyInput(
   { key, domEvent },
   term,
   processCommand
@@ -41,40 +41,38 @@ export default function handleKeyInput(
   const keyCode = domEvent.keyCode;
 
   // Handle backspace key press
-  if (keyCode === 8) {
-    if (commandBuffer.length > 0) {
-      commandBuffer = commandBuffer.slice(0, -1);
-      term.write("\b \b"); // Erase the last character
-    }
-    return; // Exit function after handling Backspace key
+  if (keyCode === 8 && commandBuffer.length > 0) {
+    commandBuffer = commandBuffer.slice(0, -1);
+    term.write("\b \b"); // Erase the last character
   }
 
   // Handle Enter key press
-  if (keyCode === 13) {
-    const output = processCommand(commandBuffer);
+  else if (keyCode === 13) {
+    const output = await processCommand(commandBuffer);
     if (isInEditMode()) {
       term.write(`\r\n${output}`);
     } else {
       // If not in edit mode, add a new line and prompt
-      const user = getName();
+      const user = loginManager.getUsername();
       if (output) {
         // Only write if output is not empty
         term.write(`\r\n${output}\r\n${user}$ `);
       }
     }
-    commandBuffer = ""; // Reset the command buffer
-    return; // Exit function after handling Enter key
+    commandBuffer = "";
+    term.scrollToBottom();
   }
 
   // Handle Ctrl + C key press
-  if (domEvent.ctrlKey && domEvent.key === "c") {
+  else if (domEvent.ctrlKey && domEvent.key === "c") {
     stopMatrix();
     term.write("\r\nInterrupted\r\n$ ");
     commandBuffer = ""; // Reset the command buffer
-    return; // Exit function after handling Ctrl+C
   }
 
   // For regular key presses, append the character to the command buffer and write to terminal
-  commandBuffer += key;
-  term.write(key);
+  else {
+    commandBuffer += key;
+    term.write(key);
+  }
 }

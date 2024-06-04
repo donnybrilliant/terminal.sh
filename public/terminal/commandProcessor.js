@@ -19,7 +19,7 @@ import { loginManager } from "./index.js";
  * @param {string} command - The command entered by the user.
  * @returns {string} - The output of the command.
  */
-export default function processCommand(command) {
+export default async function processCommand(command) {
   const [cmd, ...args] = command.split(" ");
 
   // Handle chat mode
@@ -109,10 +109,10 @@ export default function processCommand(command) {
       if (args.length < 2) {
         return "Usage: login <username> <password>";
       }
-      return loginManager.login(args[0], args[1]);
+      return await loginManager.login(args[0], args[1]);
 
     case "logout":
-      return loginManager.logout();
+      return await loginManager.logout();
 
     default:
       return `Unknown command: ${cmd}`;

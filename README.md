@@ -1,0 +1,3 @@
+- Initialization
+- No user can be names user
+- README is not present when initializing when authenticated

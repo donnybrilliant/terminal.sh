@@ -1,7 +1,6 @@
 import processCommand from "./commandProcessor.js";
 import handleKeyInput from "./keyInputHandler.js";
 import ascii from "./ascii.js";
-import { loadFileSystem } from "./fileSystem.js";
 import { LoginManager } from "./login.js";
 
 export const term = new Terminal({ cursorBlink: true });
@@ -20,7 +19,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   term.open(terminalContainer);
   loginManager.setTerminal(term);
-  term.focus();
   fitAddon.fit();
 
   // Refit on window resize
@@ -31,9 +29,13 @@ document.addEventListener("DOMContentLoaded", async function () {
   // Handle key input
   term.onKey((eventData) => handleKeyInput(eventData, term, processCommand));
 
-  // Fetch the file system
-  await loadFileSystem("http://localhost:3000");
+  loginManager.clearUsername();
+  // Initialize the login state and load filesystem if logged in
+  await loginManager.initializeLoginState();
 
   // Print the ascii art
   ascii(term);
+  // Should asciii be awaited?
+
+  term.focus();
 });

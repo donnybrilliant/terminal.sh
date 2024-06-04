@@ -1,98 +1,110 @@
 import express from "express";
-import fs from "fs";
-import { fileURLToPath } from "url";
-import path, { dirname } from "path";
+import { sendResponse } from "../utils/responseUtils.js";
+import errorHandler from "../utils/errorHandler.js";
+import {
+  readJSONFile,
+  writeJSONFile,
+  USERS_FILE_PATH,
+  FILE_SYSTEM_PATH,
+} from "../utils/fileUtils.js";
+
 const router = express.Router();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const DATA_DIR = path.join(__dirname, "../data");
-const USERS_FILE_PATH = path.join(DATA_DIR, "users.json");
-const FILE_SYSTEM_PATH = path.join(DATA_DIR, "filesystem.json");
-
-router.get("/filesystem", (req, res) => {
-  if (req.isAuthenticated()) {
-    let users = JSON.parse(fs.readFileSync(USERS_FILE_PATH, "utf-8"));
-    const user = users.find((u) => u.id === req.user.id);
-    res.json(user.home);
-  } else {
-    let fileSystem = JSON.parse(fs.readFileSync(FILE_SYSTEM_PATH, "utf-8"));
-    res.json(fileSystem);
-  }
-});
-
-router.post("/set-name", (req, res) => {
-  const { oldName, newName } = req.body;
-  let users, fileSystem;
-
+router.get("/filesystem", async (req, res, next) => {
   try {
-    users = JSON.parse(fs.readFileSync(USERS_FILE_PATH, "utf-8"));
-    fileSystem = JSON.parse(fs.readFileSync(FILE_SYSTEM_PATH, "utf-8"));
-  } catch (err) {
-    console.error("Error reading files:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to read data files.",
-      error: err.message,
-    });
-  }
+    let baseFileSystem = await readJSONFile(FILE_SYSTEM_PATH);
 
-  let user = users.find((u) => u.username === oldName);
-  if (!user) {
-    console.log("User not found");
-    return res.status(400).json({ success: false, message: "User not found." });
-  }
+    if (req.isAuthenticated()) {
+      let users = await readJSONFile(USERS_FILE_PATH);
+      const user = users.find((u) => u.id === req.user.id);
 
-  if (users.some((u) => u.username === newName)) {
-    console.log("Username already exists");
-    return res
-      .status(400)
-      .json({ success: false, message: "Username already exists." });
-  }
+      // Assuming baseFileSystem is structured such that `baseFileSystem.root.home.users` is an array
+      // Convert it to an object for easier manipulation
+      if (Array.isArray(baseFileSystem.root.home.users)) {
+        baseFileSystem.root.home.users = baseFileSystem.root.home.users.reduce(
+          (acc, username) => {
+            acc[username] = { README: "User directory for " + username };
+            return acc;
+          },
+          {}
+        );
+      }
 
-  // Update the users array in the filesystem
-  const userIndex = fileSystem.root.home.users.indexOf(oldName);
-  if (userIndex === -1) {
-    console.log("User directory not found in file system");
-    return res.status(404).json({
-      success: false,
-      message: "User directory not found in file system.",
-    });
-  } else {
-    fileSystem.root.home.users[userIndex] = newName; // Update the username in the array
-  }
+      // Merge user-specific directory
+      baseFileSystem.root.home.users[user.username] = {
+        ...user.home,
+        README: "Welcome, " + user.username,
+      };
 
-  try {
-    user.username = newName;
-    fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2));
-    fs.writeFileSync(FILE_SYSTEM_PATH, JSON.stringify(fileSystem, null, 2));
-    console.log("Files written successfully");
-    res.json({ success: true, message: `Name updated to ${newName}` });
-  } catch (err) {
-    console.error("Error writing files:", err);
-    res.status(500).json({
-      success: false,
-      message: "Failed to write changes to disk.",
-      error: err.message,
-    });
-  }
-});
-
-router.post("/update-user-home", (req, res) => {
-  if (req.isAuthenticated()) {
-    let users = JSON.parse(fs.readFileSync(USERS_FILE_PATH, "utf-8"));
-    const userIndex = users.findIndex((u) => u.id === req.user.id);
-    if (userIndex !== -1) {
-      users[userIndex].home = req.body.home;
-      fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2));
-      res.json({ success: true });
+      sendResponse(res, 200, baseFileSystem);
     } else {
-      res.status(400).json({ success: false, message: "User not found" });
+      sendResponse(res, 200, baseFileSystem);
     }
-  } else {
-    res.status(403).json({ success: false, message: "Not authenticated" });
+  } catch (err) {
+    next(err);
   }
 });
+
+router.post("/set-name", async (req, res, next) => {
+  const { oldName, newName } = req.body;
+  try {
+    let users = await readJSONFile(USERS_FILE_PATH);
+    let fileSystem = await readJSONFile(FILE_SYSTEM_PATH);
+
+    let user = users.find((u) => u.username === oldName);
+    if (!user) {
+      return sendResponse(res, 400, {}, "User not found.");
+    }
+
+    if (users.some((u) => u.username === newName)) {
+      return sendResponse(res, 400, {}, "Username already exists.");
+    }
+
+    const userIndex = fileSystem.root.home.users.indexOf(oldName);
+    if (userIndex === -1) {
+      return sendResponse(
+        res,
+        404,
+        {},
+        "User directory not found in file system."
+      );
+    }
+
+    fileSystem.root.home.users[userIndex] = newName; // Update the username in the array
+    user.username = newName;
+    //delete fileSystem.root.home.users[oldName]; // Delete the old username from the object
+
+    await writeJSONFile(USERS_FILE_PATH, users);
+    await writeJSONFile(FILE_SYSTEM_PATH, fileSystem);
+
+    sendResponse(res, 200, {}, `Name updated to ${newName}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/update-user-home", async (req, res, next) => {
+  if (!req.isAuthenticated()) {
+    return sendResponse(res, 403, {}, "Not authenticated");
+  }
+
+  try {
+    let users = await readJSONFile(USERS_FILE_PATH);
+    const userIndex = users.findIndex((u) => u.id === req.user.id);
+    if (userIndex === -1) {
+      return sendResponse(res, 400, {}, "User not found");
+    }
+
+    users[userIndex].home = req.body.home;
+    await writeJSONFile(USERS_FILE_PATH, users);
+
+    sendResponse(res, 200, {}, "User home updated successfully");
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Error handling middleware should be at the end of all routes
+router.use(errorHandler);
 
 export default router;
