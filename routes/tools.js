@@ -12,13 +12,33 @@ const router = express.Router();
 
 router.get("/filesystem", async (req, res, next) => {
   try {
+    let baseFileSystem = await readJSONFile(FILE_SYSTEM_PATH);
+
     if (req.isAuthenticated()) {
       let users = await readJSONFile(USERS_FILE_PATH);
       const user = users.find((u) => u.id === req.user.id);
-      sendResponse(res, 200, user);
+
+      // Assuming baseFileSystem is structured such that `baseFileSystem.root.home.users` is an array
+      // Convert it to an object for easier manipulation
+      if (Array.isArray(baseFileSystem.root.home.users)) {
+        baseFileSystem.root.home.users = baseFileSystem.root.home.users.reduce(
+          (acc, username) => {
+            acc[username] = { README: "User directory for " + username };
+            return acc;
+          },
+          {}
+        );
+      }
+
+      // Merge user-specific directory
+      baseFileSystem.root.home.users[user.username] = {
+        ...user.home,
+        README: "Welcome, " + user.username,
+      };
+
+      sendResponse(res, 200, baseFileSystem);
     } else {
-      let fileSystem = await readJSONFile(FILE_SYSTEM_PATH);
-      sendResponse(res, 200, fileSystem);
+      sendResponse(res, 200, baseFileSystem);
     }
   } catch (err) {
     next(err);

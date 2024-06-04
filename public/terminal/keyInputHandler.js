@@ -1,5 +1,5 @@
 import { stopMatrix } from "./random.js";
-import { getName } from "./fileSystem.js";
+import { loginManager } from "./index.js";
 import { isInEditMode } from "./edit.js";
 import { isInChatMode } from "./chat.js";
 
@@ -53,13 +53,14 @@ export default async function handleKeyInput(
       term.write(`\r\n${output}`);
     } else {
       // If not in edit mode, add a new line and prompt
-      const user = getName();
+      const user = loginManager.getUsername();
       if (output) {
         // Only write if output is not empty
         term.write(`\r\n${output}\r\n${user}$ `);
       }
     }
     commandBuffer = "";
+    term.scrollToBottom();
   }
 
   // Handle Ctrl + C key press

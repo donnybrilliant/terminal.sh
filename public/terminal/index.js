@@ -1,7 +1,6 @@
 import processCommand from "./commandProcessor.js";
 import handleKeyInput from "./keyInputHandler.js";
 import ascii from "./ascii.js";
-import { loadFileSystem } from "./fileSystem.js";
 import { LoginManager } from "./login.js";
 
 export const term = new Terminal({ cursorBlink: true });
@@ -30,6 +29,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   // Handle key input
   term.onKey((eventData) => handleKeyInput(eventData, term, processCommand));
 
+  loginManager.clearUsername();
   // Initialize the login state and load filesystem if logged in
   await loginManager.initializeLoginState();
 

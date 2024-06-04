@@ -1,4 +1,4 @@
-import { loadFileSystem, populateFileSystem } from "./fileSystem.js";
+import { loadFileSystem } from "./fileSystem.js";
 import { fetchWithTimeout } from "../utils/fetch.js";
 
 export class LoginManager {
@@ -10,17 +10,34 @@ export class LoginManager {
     this.term = term;
   }
 
+  setUsername(username) {
+    sessionStorage.setItem("username", username);
+  }
+
+  getUsername() {
+    return sessionStorage.getItem("username") || "";
+  }
+
+  clearUsername() {
+    sessionStorage.removeItem("username");
+  }
+
   async initializeLoginState() {
     try {
       const status = await this.checkAuthStatus();
       if (status.data.authenticated) {
-        await this.fetchFileSystem(this.apiUrl, status.data.user.username);
-        return `\r\nLogged in as ${status.data.user.username}\r\n${status.data.user.username}$ `;
+        this.setUsername(status.data.user.username);
+        await loadFileSystem(this.apiUrl);
+        this.term.write(
+          `\r\nLogged in as ${status.data.user.username}\r\n${status.data.user.username}$ `
+        );
       } else {
         await loadFileSystem(this.apiUrl);
       }
     } catch (error) {
-      return `\r\nFailed to check login status: ${error.message}\r\n$ `;
+      this.term.write(
+        `\r\nFailed to check login status: ${error.message}\r\n$ `
+      );
     }
   }
 
@@ -32,7 +49,8 @@ export class LoginManager {
           `\r\nUser already logged in as ${status.data.user.username}\r\n$ `
         );
       } else {
-        await this.authenticateUser(username, password);
+        const data = await this.authenticateUser(username, password);
+        this.term.write(`\r\n${data.message}\r\n${username}$ `);
       }
     } catch (error) {
       this.term.write(
@@ -47,19 +65,14 @@ export class LoginManager {
         method: "POST",
         body: JSON.stringify({ username, password }),
       });
-      await this.fetchFileSystem(this.apiUrl, username);
-      this.term.write(`\r\n${data.message}\r\n${username}$ `);
+      if (data.success) {
+        this.setUsername(username);
+        await loadFileSystem(this.apiUrl);
+      }
+      return data;
     } catch (error) {
       this.term.write(`\r\nError logging in: ${error.message}\r\n$ `);
-    }
-  }
-
-  async fetchFileSystem(apiUrl, username) {
-    try {
-      const data = await fetchWithTimeout(`${apiUrl}/filesystem`);
-      populateFileSystem(data.data, username);
-    } catch (error) {
-      this.term.write(`\r\nError fetching file system: ${error.message}\r\n$ `);
+      throw error;
     }
   }
 
@@ -70,8 +83,9 @@ export class LoginManager {
         const data = await fetchWithTimeout(`${this.apiUrl}/logout`, {
           method: "POST",
         });
-        this.term.write(`\r\n${data.message}\r\n$ `);
+        this.clearUsername();
         await loadFileSystem(this.apiUrl);
+        this.term.write(`\r\n${data.message}\r\n$ `);
       } else {
         this.term.write(`\r\nYou are not logged in.\r\n$ `);
       }

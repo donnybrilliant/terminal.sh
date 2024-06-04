@@ -1,63 +1,33 @@
 import { fetchWithTimeout } from "../utils/fetch.js";
-let promptName = "";
-let fileData = {};
-let pathStack = ["root", "home", "users", "user"];
+import { loginManager } from "./index.js";
 
-// Function to load the filesystem data
+let fileData = {};
+let pathStack = ["root", "home", "users", "guest"]; // Default path for unauthenticated access
+
+// Function to load the filesystem data from server
 async function loadFileSystem(apiUrl) {
   try {
-    const data = await fetchWithTimeout(`${apiUrl}/filesystem`);
-    populateFileSystem(data.data);
+    const response = await fetchWithTimeout(`${apiUrl}/filesystem`);
+    fileData = response.data; // Load the complete filesystem
+
+    // Setup pathStack based on if the user is logged in
+    const username = loginManager.getUsername(); // Assuming this function retrieves the authenticated user's username
+    if (username && fileData.root.home.users[username]) {
+      pathStack = ["root", "home", "users", username];
+    } else {
+      pathStack = ["root", "home", "users", "guest"];
+      if (!fileData.root.home.users.guest) {
+        fileData.root.home.users.guest = { README: "You are not logged in." };
+      }
+    }
+
     return "Filesystem loaded successfully.";
   } catch (error) {
     return `Error loading filesystem: ${error.message}`;
   }
 }
 
-// Function to get the user's home directory
-function getUserHomeDirectory(username) {
-  return fileData.root.home.users[username] || {};
-}
-
-/**
- * Populate the file system with data.
- * @param {*} data
- */
-function populateFileSystem(data, username) {
-  if (data) {
-    // Populate with fetched data
-    for (const key in data) {
-      fileData[key] = data[key];
-    }
-  }
-
-  if (username) {
-    promptName = username;
-    pathStack = ["root", "home", "users", username];
-    // Ensure the user's home directory exists and has default documents
-    if (!fileData.root.home.users[username]) {
-      fileData.root.home.users[username] = {
-        README: "You are logged in as " + username + ".",
-      };
-    }
-  } else {
-    promptName = "";
-    pathStack = ["root", "home", "users", "user"];
-    // Ensure the default unauthenticated user directory exists and has default documents
-    if (!fileData.root.home.users.user) {
-      fileData.root.home.users.user = {
-        README:
-          "You are not logged in. There should be some instructions here.",
-      };
-    }
-  }
-}
-
-/**
- * Getter for the current directory.
- *
- * @returns {object} - The current directory.
- */
+// Function to get the current directory
 function getCurrentDir() {
   return (
     pathStack.reduce(
@@ -67,17 +37,11 @@ function getCurrentDir() {
   );
 }
 
-/**
- * Setter for the current directory.
- * Handles movement between directories and maintains a stack for directory traversal.
- *
- * @param {object} dir - The directory to set as current.
- */
+// Function to set the current directory
 function setCurrentDir(dir) {
   if (dir.startsWith("/")) {
-    // Handle absolute paths
     let tmpDir = fileData; // Start from root
-    const parts = dir.split("/").filter(Boolean); // Get directory parts, removing empty strings
+    const parts = dir.split("/").filter(Boolean);
 
     for (const part of parts) {
       if (part in tmpDir && typeof tmpDir[part] === "object") {
@@ -87,11 +51,9 @@ function setCurrentDir(dir) {
       }
     }
 
-    // Only update pathStack after successfully navigating the path
     pathStack = parts;
     return true;
   } else {
-    // Existing logic for relative paths...
     const currentDir = getCurrentDir();
 
     if (dir === "..") {
@@ -101,8 +63,7 @@ function setCurrentDir(dir) {
     } else if (dir in currentDir && typeof currentDir[dir] === "object") {
       pathStack.push(dir);
     } else {
-      // Handle error (not a directory or doesn't exist)
-      return false;
+      return false; // Handle error (not a directory or doesn't exist)
     }
     return true;
   }
@@ -113,76 +74,55 @@ function getCurrentPath() {
   return "/" + pathStack.join("/");
 }
 
-// Check if the user is within a specific directory
-function isWithinDir(directoryName) {
-  return pathStack.includes(directoryName);
-}
-// Get the current user's name - should this be fetched? Or stored on login?
-function getName() {
-  return promptName;
-}
-
 // Update the user's name
 async function setName(newName) {
-  // Check if user is in the directory being deleted
-  const oldName = promptName || "user"; // Take the default "user" if promptName is empty
+  const oldName = loginManager.getUsername(); // Fetch the current username from session or a similar method
 
-  // Check if home directory exists
-  if (fileData.root && fileData.root.home && fileData.root.home.users) {
-    // Check if new username already exists
-    if (fileData.root.home.users[newName]) {
-      return "Username already exists. Please choose a different name.";
+  if (fileData.root.home.users[newName]) {
+    return "Username already exists. Please choose a different name.";
+  }
+
+  // Send the newName and oldName to the server for updating
+  try {
+    const response = await fetchWithTimeout("/set-name", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ oldName, newName }),
+    });
+
+    if (response.success) {
+      loginManager.setUsername(newName); // Update username in session storage
+      updateLocalFileSystemUser(oldName, newName); // Update local filesystem
+      return `Name updated to ${newName}`;
     }
-
-    // Check if old user directory exists
-    if (fileData.root.home.users[oldName]) {
-      // Duplicate the old user directory to the new name
-      fileData.root.home.users[newName] = {
-        ...fileData.root.home.users[oldName],
-      };
-
-      // Delete the old user directory
-      delete fileData.root.home.users[oldName];
-
-      // Update the prompt name
-      promptName = newName;
-
-      pathStack = ["root", "home", "users", newName];
-
-      // Update users.json on the server
-      try {
-        // This assumes the server handles all validation and errors
-        await fetchWithTimeout("/set-name", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ oldName, newName }),
-        });
-        // Update local state only after successful server update
-        promptName = newName;
-        // Assume pathStack and other related data are also updated appropriately
-        return `Name updated to ${newName}`;
-      } catch (error) {
-        return `Error updating name: ${error.message}`;
-      }
-    } else {
-      return `Home directory not found.`;
-    }
+  } catch (error) {
+    return `Error updating name: ${error.message}`;
   }
 }
 
+function updateLocalFileSystemUser(oldName, newName) {
+  fileData.root.home.users[newName] = { ...fileData.root.home.users[oldName] };
+  delete fileData.root.home.users[oldName];
+  pathStack = ["root", "home", "users", newName];
+}
+
 async function saveUserHome() {
-  const username = promptName || "user";
-  if (username !== "user" && isWithinDir(username)) {
+  const username = loginManager.getUsername(); // Assume we retrieve the current user name from session
+  //pathStack.includes(username) instead?
+  if (username !== "" && fileData.root.home.users[username]) {
     try {
-      await fetchWithTimeout("/update-user-home", {
+      const response = await fetchWithTimeout("/update-user-home", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ home: fileData.root.home.users[promptName] }),
+        body: JSON.stringify({ home: fileData.root.home.users[username] }),
       });
-      return "User home updated successfully.";
+
+      return response.message;
     } catch (error) {
       return `Error saving user home: ${error.message}`;
     }
+  } else {
+    return "User not recognized or missing home directory.";
   }
 }
 
@@ -190,10 +130,7 @@ export {
   getCurrentDir,
   setCurrentDir,
   getCurrentPath,
-  getName,
   setName,
-  populateFileSystem,
   loadFileSystem,
-  getUserHomeDirectory,
   saveUserHome,
 };
