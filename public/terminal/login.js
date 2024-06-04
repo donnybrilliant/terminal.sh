@@ -10,18 +10,13 @@ export class LoginManager {
     this.term = term;
   }
 
-  setUserState(user) {
-    promptName = user.username; // Set the global promptName to user's username
-    // Additional state updates can be handled here if necessary
-  }
-
   async initializeLoginState() {
     try {
       const status = await this.checkAuthStatus();
-      if (status.authenticated) {
-        this.setUserState(status.user);
-        await this.fetchFileSystem(this.apiUrl, status.user.username);
-        this.term.write(`\r\nLogged in as ${status.user.username}\r\n$ `);
+      console.log(status);
+      if (status.data.authenticated) {
+        await this.fetchFileSystem(this.apiUrl, status.data.user.username);
+        this.term.write(`\r\nLogged in as ${status.data.user.username}\r\n$ `);
       } else {
         await loadFileSystem(this.apiUrl);
       }
@@ -35,9 +30,9 @@ export class LoginManager {
   async login(username, password) {
     try {
       const status = await this.checkAuthStatus();
-      if (status.authenticated) {
+      if (status.data.authenticated) {
         this.term.write(
-          `\r\nUser already logged in as ${status.user.username}\r\n$ `
+          `\r\nUser already logged in as ${status.data.user.username}\r\n$ `
         );
       } else {
         await this.authenticateUser(username, password);
@@ -56,7 +51,7 @@ export class LoginManager {
         body: JSON.stringify({ username, password }),
       });
       await this.fetchFileSystem(this.apiUrl, username);
-      this.term.write(`\r\n${data.message}\r\n$ `);
+      this.term.write(`\r\n${data.message}\r\n${username}$ `);
     } catch (error) {
       this.term.write(`\r\nError logging in: ${error.message}\r\n$ `);
     }
