@@ -1,3 +1,7 @@
 - Initialization
 - No user can be names user
 - README is not present when initializing when authenticated
+- Better response system with colors
+- term.write system
+- backspace handling
+- set name without auth

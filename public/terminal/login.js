@@ -35,9 +35,7 @@ export class LoginManager {
         await loadFileSystem(this.apiUrl);
       }
     } catch (error) {
-      this.term.write(
-        `\r\nFailed to check login status: ${error.message}\r\n$ `
-      );
+      this.term.write(`\r\nFailed to check login status: ${error.message}\r\n`);
     }
   }
 
@@ -46,15 +44,16 @@ export class LoginManager {
       const status = await this.checkAuthStatus();
       if (status.data.authenticated) {
         this.term.write(
-          `\r\nUser already logged in as ${status.data.user.username}\r\n$ `
+          `\r\nUser already logged in as ${status.data.user.username}\r\n`
         );
       } else {
         const data = await this.authenticateUser(username, password);
-        this.term.write(`\r\n${data.message}\r\n${username}$ `);
+        console.log(data);
+        this.term.write(`\r\n${data.message}\r\n`);
       }
     } catch (error) {
       this.term.write(
-        `\r\nError checking authentication status: ${error.message}\r\n$ `
+        `\r\nError checking authentication status: ${error.message}\r\n`
       );
     }
   }
@@ -71,7 +70,7 @@ export class LoginManager {
       }
       return data;
     } catch (error) {
-      this.term.write(`\r\nError logging in: ${error.message}\r\n$ `);
+      this.term.write(`\r\nError logging in: ${error.message}\r\n`);
       throw error;
     }
   }
@@ -85,12 +84,12 @@ export class LoginManager {
         });
         this.clearUsername();
         await loadFileSystem(this.apiUrl);
-        this.term.write(`\r\n${data.message}\r\n$ `);
+        this.term.write(`\r\n${data.message}\r\n`);
       } else {
-        this.term.write(`\r\nYou are not logged in.\r\n$ `);
+        this.term.write(`\r\nYou are not logged in.`);
       }
     } catch (error) {
-      this.term.write(`\r\nError logging out: ${error.message}\r\n$ `);
+      this.term.write(`\r\nError logging out: ${error.message}\r\n`);
     }
   }
 
@@ -99,7 +98,7 @@ export class LoginManager {
       return await fetchWithTimeout(`${this.apiUrl}/auth-status`);
     } catch (error) {
       this.term.write(
-        `\r\nError checking authentication status: ${error.message}\r\n$ `
+        `\r\nError checking authentication status: ${error.message}\r\n`
       );
       throw error;
     }

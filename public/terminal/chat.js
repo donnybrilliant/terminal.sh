@@ -48,7 +48,7 @@ export function initializeChat() {
       console.log(input);
       if (input === ":exit") {
         exitChatMode();
-        term.write("\r\nExited chat mode.\r\n$ ");
+        term.write("\r\nExited chat mode.\r\n");
       } else if (input.length > 0) {
         socket.emit("chat message", {
           room: room,

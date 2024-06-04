@@ -25,6 +25,17 @@ export function setCommandBuffer(value) {
 }
 
 /**
+ * Renders the terminal prompt.
+ *
+ * @param {Object} term - The xterm.js terminal object.
+ */
+function renderPrompt(term) {
+  const user = loginManager.getUsername();
+  const prompt = user ? `${user}$ ` : "$ ";
+  term.write(`\r\n${prompt}`);
+}
+
+/**
  * Handles individual key inputs from the user for the terminal.
  *
  * @param {Object} param0 - Destructured parameter object.
@@ -38,41 +49,46 @@ export default async function handleKeyInput(
   term,
   processCommand
 ) {
-  const keyCode = domEvent.keyCode;
+  const keyCode = domEvent.keyCode || domEvent.which;
 
-  // Handle backspace key press
-  if (keyCode === 8 && commandBuffer.length > 0) {
-    commandBuffer = commandBuffer.slice(0, -1);
-    term.write("\b \b"); // Erase the last character
+  if (key === "Backspace" || keyCode === 8) {
+    if (commandBuffer.length > 0) {
+      commandBuffer = commandBuffer.slice(0, -1); // Update the command buffer
+      term.write("\b \b"); // Move cursor back, write space to delete char, then move cursor back again
+    } else {
+      domEvent.preventDefault(); // Prevent the backspace if the command buffer is empty
+      console.log("Backspace blocked at prompt");
+    }
+    return; // Stop further processing
   }
 
   // Handle Enter key press
-  else if (keyCode === 13) {
+  if ((key = "Enter" || keyCode === 13)) {
     const output = await processCommand(commandBuffer);
     if (isInEditMode()) {
       term.write(`\r\n${output}`);
     } else {
-      // If not in edit mode, add a new line and prompt
-      const user = loginManager.getUsername();
+      // If not in edit mode, write the output and render the prompt
       if (output) {
-        // Only write if output is not empty
-        term.write(`\r\n${output}\r\n${user}$ `);
+        term.write(`\r\n${output}`);
       }
+      renderPrompt(term);
     }
     commandBuffer = "";
     term.scrollToBottom();
+    return;
   }
 
   // Handle Ctrl + C key press
-  else if (domEvent.ctrlKey && domEvent.key === "c") {
+  if (domEvent.ctrlKey && domEvent.key === "c") {
     stopMatrix();
-    term.write("\r\nInterrupted\r\n$ ");
+    term.write("\r\nInterrupted");
     commandBuffer = ""; // Reset the command buffer
+    renderPrompt(term); // Render the prompt
+    return;
   }
 
   // For regular key presses, append the character to the command buffer and write to terminal
-  else {
-    commandBuffer += key;
-    term.write(key);
-  }
+  commandBuffer += key;
+  term.write(key);
 }
