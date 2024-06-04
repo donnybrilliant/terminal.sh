@@ -1,4 +1,4 @@
-import { populateFileSystem } from "./fileSystem.js";
+import { loadFileSystem, populateFileSystem } from "./fileSystem.js";
 import { fetchWithTimeout } from "../utils/fetch.js";
 
 export class LoginManager {
@@ -8,6 +8,28 @@ export class LoginManager {
 
   setTerminal(term) {
     this.term = term;
+  }
+
+  setUserState(user) {
+    promptName = user.username; // Set the global promptName to user's username
+    // Additional state updates can be handled here if necessary
+  }
+
+  async initializeLoginState() {
+    try {
+      const status = await this.checkAuthStatus();
+      if (status.authenticated) {
+        this.setUserState(status.user);
+        await this.fetchFileSystem(this.apiUrl, status.user.username);
+        this.term.write(`\r\nLogged in as ${status.user.username}\r\n$ `);
+      } else {
+        await loadFileSystem(this.apiUrl);
+      }
+    } catch (error) {
+      this.term.write(
+        `\r\nFailed to check login status: ${error.message}\r\n$ `
+      );
+    }
   }
 
   async login(username, password) {
@@ -52,11 +74,12 @@ export class LoginManager {
   async logout() {
     try {
       const status = await this.checkAuthStatus();
-      if (status.authenticated) {
+      if (status.data.authenticated) {
         const data = await fetchWithTimeout(`${this.apiUrl}/logout`, {
           method: "POST",
         });
         this.term.write(`\r\n${data.message}\r\n$ `);
+        await loadFileSystem(this.apiUrl);
       } else {
         this.term.write(`\r\nYou are not logged in.\r\n$ `);
       }

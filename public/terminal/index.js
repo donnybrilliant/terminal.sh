@@ -20,7 +20,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   term.open(terminalContainer);
   loginManager.setTerminal(term);
-  term.focus();
   fitAddon.fit();
 
   // Refit on window resize
@@ -31,9 +30,12 @@ document.addEventListener("DOMContentLoaded", async function () {
   // Handle key input
   term.onKey((eventData) => handleKeyInput(eventData, term, processCommand));
 
-  // Fetch the file system
-  await loadFileSystem("http://localhost:3000");
+  // Initialize the login state and load filesystem if logged in
+  await loginManager.initializeLoginState();
 
   // Print the ascii art
   ascii(term);
+  // Should asciii be awaited?
+
+  term.focus();
 });
