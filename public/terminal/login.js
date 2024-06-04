@@ -60,6 +60,7 @@ export class LoginManager {
   async fetchFileSystem(apiUrl, username) {
     try {
       const data = await fetchWithTimeout(`${apiUrl}/filesystem`);
+      console.log(data);
       populateFileSystem(data.data, username);
     } catch (error) {
       this.term.write(`\r\nError fetching file system: ${error.message}\r\n$ `);
