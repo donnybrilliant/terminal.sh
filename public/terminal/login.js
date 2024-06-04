@@ -33,10 +33,8 @@ export class LoginManager {
         method: "POST",
         body: JSON.stringify({ username, password }),
       });
-      if (data.success) {
-        await this.fetchFileSystem(this.apiUrl, data.data.username);
-        this.term.write(`\r\n${data.message}\r\n$ `);
-      }
+      await this.fetchFileSystem(this.apiUrl, username);
+      this.term.write(`\r\n${data.message}\r\n$ `);
     } catch (error) {
       this.term.write(`\r\nError logging in: ${error.message}\r\n$ `);
     }
@@ -45,7 +43,7 @@ export class LoginManager {
   async fetchFileSystem(apiUrl, username) {
     try {
       const data = await fetchWithTimeout(`${apiUrl}/filesystem`);
-      populateFileSystem(data, username);
+      populateFileSystem(data.data, username);
     } catch (error) {
       this.term.write(`\r\nError fetching file system: ${error.message}\r\n$ `);
     }

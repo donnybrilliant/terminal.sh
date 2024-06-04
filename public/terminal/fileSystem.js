@@ -7,7 +7,7 @@ let pathStack = ["root", "home", "users", "user"];
 async function loadFileSystem(apiUrl) {
   try {
     const data = await fetchWithTimeout(`${apiUrl}/filesystem`);
-    populateFileSystem(data);
+    populateFileSystem(data.data);
     return "Filesystem loaded successfully.";
   } catch (error) {
     return `Error loading filesystem: ${error.message}`;
@@ -27,8 +27,8 @@ function populateFileSystem(data, username) {
   console.log(data, username);
   if (data) {
     // Populate with fetched data
-    for (const key in data.data) {
-      fileData[key] = data.data[key];
+    for (const key in data) {
+      fileData[key] = data[key];
     }
   }
 

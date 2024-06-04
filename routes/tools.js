@@ -27,6 +27,7 @@ router.get("/filesystem", async (req, res, next) => {
 
 router.post("/set-name", async (req, res, next) => {
   const { oldName, newName } = req.body;
+  console.log(oldName, newName);
   try {
     let users = await readJSONFile(USERS_FILE_PATH);
     let fileSystem = await readJSONFile(FILE_SYSTEM_PATH);
@@ -52,6 +53,7 @@ router.post("/set-name", async (req, res, next) => {
 
     fileSystem.root.home.users[userIndex] = newName; // Update the username in the array
     user.username = newName;
+    //delete fileSystem.root.home.users[oldName]; // Delete the old username from the object
 
     await writeJSONFile(USERS_FILE_PATH, users);
     await writeJSONFile(FILE_SYSTEM_PATH, fileSystem);
