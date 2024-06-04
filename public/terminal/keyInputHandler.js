@@ -63,7 +63,7 @@ export default async function handleKeyInput(
   }
 
   // Handle Enter key press
-  if ((key = "Enter" || keyCode === 13)) {
+  if (keyCode === 13) {
     const output = await processCommand(commandBuffer);
     if (isInEditMode()) {
       term.write(`\r\n${output}`);
