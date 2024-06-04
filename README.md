@@ -1,0 +1,2 @@
+- Initialization
+- No user can be names user

@@ -1,4 +1,6 @@
 import { populateFileSystem } from "./fileSystem.js";
+import { fetchWithTimeout } from "../utils/fetch.js";
+
 export class LoginManager {
   constructor(apiUrl) {
     this.apiUrl = apiUrl;
@@ -27,23 +29,12 @@ export class LoginManager {
 
   async authenticateUser(username, password) {
     try {
-      const response = await fetch(`${this.apiUrl}/login`, {
+      const data = await fetchWithTimeout(`${this.apiUrl}/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-      const data = await response.json(); // Parse JSON only once
-      if (!response.ok) {
-        throw new Error(
-          data.message || `HTTP error! status: ${response.status}`
-        );
-      }
-      if (data.success) {
-        await this.fetchFileSystem(this.apiUrl, data.user.username);
-        this.term.write(`\r\n${data.message}\r\n$ `); // Use server message directly
-      } else {
-        this.term.write(`\r\n${data.message}\r\n$ `);
-      }
+      await this.fetchFileSystem(this.apiUrl, data.username);
+      this.term.write(`\r\n${data.message}\r\n$ `);
     } catch (error) {
       this.term.write(`\r\nError logging in: ${error.message}\r\n$ `);
     }
@@ -51,11 +42,7 @@ export class LoginManager {
 
   async fetchFileSystem(apiUrl, username) {
     try {
-      const response = await fetch(`${apiUrl}/filesystem`);
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      const data = await fetchWithTimeout(`${apiUrl}/filesystem`);
       populateFileSystem(data, username);
     } catch (error) {
       this.term.write(`\r\nError fetching file system: ${error.message}\r\n$ `);
@@ -64,16 +51,9 @@ export class LoginManager {
 
   async logout() {
     try {
-      const response = await fetch(`${this.apiUrl}/logout`, {
+      const data = await fetchWithTimeout(`${this.apiUrl}/logout`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(
-          data.message || `HTTP error! status: ${response.status}`
-        );
-      }
       this.term.write(`\r\n${data.message}\r\n$ `);
     } catch (error) {
       this.term.write(`\r\nError logging out: ${error.message}\r\n$ `);
@@ -82,22 +62,12 @@ export class LoginManager {
 
   async checkAuthStatus() {
     try {
-      const response = await fetch(`${this.apiUrl}/auth-status`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(
-          data.message || `HTTP error! status: ${response.status}`
-        );
-      }
-      return data;
+      return await fetchWithTimeout(`${this.apiUrl}/auth-status`);
     } catch (error) {
       this.term.write(
         `\r\nError checking authentication status: ${error.message}\r\n$ `
       );
-      throw error; // Optionally rethrow to handle it outside if needed
+      throw error;
     }
   }
 }

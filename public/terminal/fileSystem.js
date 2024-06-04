@@ -1,14 +1,16 @@
+import { fetchWithTimeout } from "../utils/fetch.js";
 let promptName = "";
 let fileData = {};
+let pathStack = ["root", "home", "users", "user"];
 
 // Function to load the filesystem data
 async function loadFileSystem(apiUrl) {
   try {
-    const response = await fetch(`${apiUrl}/filesystem`);
-    const data = await response.json();
+    const data = await fetchWithTimeout(`${apiUrl}/filesystem`);
     populateFileSystem(data);
+    return "Filesystem loaded successfully.";
   } catch (error) {
-    console.error("Error loading filesystem:", error);
+    return `Error loading filesystem: ${error.message}`;
   }
 }
 
@@ -50,8 +52,6 @@ function populateFileSystem(data, username) {
     }
   }
 }
-
-let pathStack = ["root", "home", "users", "user"]; // Default path
 
 /**
  * Getter for the current directory.
@@ -108,25 +108,24 @@ function setCurrentDir(dir) {
   }
 }
 
+// Get the full path as a string
 function getCurrentPath() {
   return "/" + pathStack.join("/");
 }
 
+// Check if the user is within a specific directory
 function isWithinDir(directoryName) {
   return pathStack.includes(directoryName);
 }
-
+// Get the current user's name - should this be fetched? Or stored on login?
 function getName() {
   return promptName;
 }
 
+// Update the user's name
 async function setName(newName) {
   // Check if user is in the directory being deleted
   const oldName = promptName || "user"; // Take the default "user" if promptName is empty
-
-  if (!newName) {
-    return "Please provide a name.";
-  }
 
   // Check if home directory exists
   if (fileData.root && fileData.root.home && fileData.root.home.users) {
@@ -151,44 +150,38 @@ async function setName(newName) {
       pathStack = ["root", "home", "users", newName];
 
       // Update users.json on the server
-      return await updateUserNameInFile(oldName, newName).then(
-        () => `Name updated to ${newName}`
-      );
+      try {
+        // This assumes the server handles all validation and errors
+        await fetchWithTimeout("/set-name", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ oldName, newName }),
+        });
+        // Update local state only after successful server update
+        promptName = newName;
+        // Assume pathStack and other related data are also updated appropriately
+        return `Name updated to ${newName}`;
+      } catch (error) {
+        return `Error updating name: ${error.message}`;
+      }
     } else {
-      return `Error: Directory for ${oldName} not found.`;
+      return `Home directory not found.`;
     }
-  } else {
-    return "Home directory not found.";
-  }
-}
-
-async function updateUserNameInFile(oldName, newName) {
-  const response = await fetch("/set-name", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      oldName,
-      newName,
-      home: fileData.root.home.users[newName],
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to update user name: ${response.statusText}`);
   }
 }
 
 async function saveUserHome() {
   const username = promptName || "user";
   if (username !== "user" && isWithinDir(username)) {
-    const response = await fetch("/update-user-home", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ home: fileData.root.home.users[username] }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to save user home: ${response.statusText}`);
+    try {
+      await fetchWithTimeout("/update-user-home", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ home: fileData.root.home.users[promptName] }),
+      });
+      return "User home updated successfully.";
+    } catch (error) {
+      return `Error saving user home: ${error.message}`;
     }
   }
 }
