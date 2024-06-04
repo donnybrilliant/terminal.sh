@@ -33,8 +33,10 @@ export class LoginManager {
         method: "POST",
         body: JSON.stringify({ username, password }),
       });
-      await this.fetchFileSystem(this.apiUrl, data.username);
-      this.term.write(`\r\n${data.message}\r\n$ `);
+      if (data.success) {
+        await this.fetchFileSystem(this.apiUrl, data.data.username);
+        this.term.write(`\r\n${data.message}\r\n$ `);
+      }
     } catch (error) {
       this.term.write(`\r\nError logging in: ${error.message}\r\n$ `);
     }

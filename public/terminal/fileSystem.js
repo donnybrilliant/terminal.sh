@@ -24,10 +24,11 @@ function getUserHomeDirectory(username) {
  * @param {*} data
  */
 function populateFileSystem(data, username) {
+  console.log(data, username);
   if (data) {
     // Populate with fetched data
-    for (const key in data) {
-      fileData[key] = data[key];
+    for (const key in data.data) {
+      fileData[key] = data.data[key];
     }
   }
 
