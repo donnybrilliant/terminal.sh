@@ -51,10 +51,15 @@ export class LoginManager {
 
   async logout() {
     try {
-      const data = await fetchWithTimeout(`${this.apiUrl}/logout`, {
-        method: "POST",
-      });
-      this.term.write(`\r\n${data.message}\r\n$ `);
+      const status = await this.checkAuthStatus();
+      if (status.authenticated) {
+        const data = await fetchWithTimeout(`${this.apiUrl}/logout`, {
+          method: "POST",
+        });
+        this.term.write(`\r\n${data.message}\r\n$ `);
+      } else {
+        this.term.write(`\r\nYou are not logged in.\r\n$ `);
+      }
     } catch (error) {
       this.term.write(`\r\nError logging out: ${error.message}\r\n$ `);
     }

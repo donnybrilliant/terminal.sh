@@ -27,7 +27,6 @@ router.get("/filesystem", async (req, res, next) => {
 
 router.post("/set-name", async (req, res, next) => {
   const { oldName, newName } = req.body;
-  console.log(oldName, newName);
   try {
     let users = await readJSONFile(USERS_FILE_PATH);
     let fileSystem = await readJSONFile(FILE_SYSTEM_PATH);
