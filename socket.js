@@ -11,6 +11,7 @@ let chatRooms = {
   general: [],
 };
 let users = [];
+let onlineUsers = new Set(); // Use a set to track online users
 
 // Load chat rooms and users from JSON files at startup
 async function loadChatRooms() {
@@ -63,19 +64,13 @@ export async function setupSocket(io) {
 
   chatNamespace.on("connection", (socket) => {
     socket.on("joinGeneral", async (username) => {
+      socket.username = username; // Store username in socket for later use
       socket.join("general");
       if (!chatRooms.general.includes(username)) {
         chatRooms.general.push(username);
         await saveChatRooms();
       }
-      //if (!users.includes(username)) {
-      if (!users.some((user) => user.username === username)) {
-        users.push({ username, online: true });
-        await writeJSONFile(USERS_FILE_PATH, users); // Save only at login
-      } else {
-        const user = users.find((u) => u.username === username);
-        if (user) user.online = true;
-      }
+      onlineUsers.add(username);
       logAction(username, "Joined general chat");
       socket.broadcast
         .to("general")
@@ -109,8 +104,7 @@ export async function setupSocket(io) {
     socket.on("disconnect", () => {
       const username = socket.username;
       if (username) {
-        const user = users.find((u) => u.username === username);
-        if (user) user.online = false;
+        onlineUsers.delete(username);
         socket.broadcast
           .to("general")
           .emit("message", `${username} has left the chat`);
@@ -119,17 +113,19 @@ export async function setupSocket(io) {
     });
 
     socket.on("exit", (username) => {
-      const user = users.find((u) => u.username === username);
-      if (user) user.online = false;
+      onlineUsers.delete(username);
       socket.broadcast
         .to("general")
         .emit("message", `${username} has left the chat`);
       logAction(username, "Exited chat");
     });
 
-    socket.on("listUsers", () => {
-      const onlineUsers = users.filter((u) => u.online).map((u) => u.username);
-      socket.emit("userList", onlineUsers);
+    socket.on("listUsers", async () => {
+      let usersList = await readJSONFile(USERS_FILE_PATH);
+      usersList = usersList.map((user) =>
+        onlineUsers.has(user.username) ? `${user.username} *` : user.username
+      );
+      socket.emit("userList", usersList);
     });
   });
 
