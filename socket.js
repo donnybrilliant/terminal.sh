@@ -38,10 +38,10 @@ export async function setupSocket(io) {
       socket.join("general");
       if (!chatRooms.general.includes(username)) {
         chatRooms.general.push(username);
+        await saveChatRooms();
       }
-      await saveChatRooms();
       logAction(username, "Joined general chat");
-      chatNamespace
+      socket.broadcast
         .to("general")
         .emit("message", `${username} has joined the chat`);
     });

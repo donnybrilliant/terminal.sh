@@ -7,18 +7,19 @@ let chatMode = false;
 let currentChatRoom = "general";
 
 export function setupChat() {
-  chatNamespace = io("/chat");
+  if (!chatNamespace) {
+    chatNamespace = io("/chat");
+
+    chatNamespace.on("message", (message) => {
+      // Clear the current line and move cursor to the beginning
+      term.write(`\r\x1b[2K\r`);
+      term.write(`${message}\r\n`);
+      renderPrompt();
+    });
+  }
 
   const user = loginManager.getUsername() || "Guest";
-
-  chatNamespace.on("message", (message) => {
-    // Clear the current line and move cursor to the beginning
-    term.write(`\r\x1b[2K\r`);
-    term.write(`${message}\r\n`);
-    renderPrompt();
-  });
-
-  chatNamespace.emit("joinGeneral", user);
+  //chatNamespace.emit("joinGeneral", user);
 }
 
 export function handleChatCommand(command) {
