@@ -7,6 +7,7 @@ const messagesDir = path.join(dataDir, "messages");
 const filesToEmpty = [
   path.join(messagesDir, "general.json"),
   path.join(dataDir, "users.json"),
+  path.join(dataDir, "logs.json"), // Adding logs.json to the list
 ];
 const fileSystemPath = path.join(dataDir, "filesystem.json");
 
