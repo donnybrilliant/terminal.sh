@@ -2,7 +2,6 @@ import processCommand from "./commandProcessor.js";
 import handleKeyInput from "./keyInputHandler.js";
 import ascii from "./ascii.js";
 import { LoginManager } from "./login.js";
-import { setupChat } from "./chat.js";
 
 export const term = new Terminal({ cursorBlink: true });
 export const loginManager = new LoginManager("http://localhost:3000");
@@ -16,8 +15,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   term.loadAddon(fitAddon);
 
   // Create and apply the web links addon
-  /*  const webLinksAddon = new WebLinksAddon();
-  term.loadAddon(webLinksAddon); */
+  const webLinksAddon = new WebLinksAddon.WebLinksAddon();
+  term.loadAddon(webLinksAddon);
 
   term.open(terminalContainer);
   loginManager.setTerminal(term);
@@ -40,6 +39,4 @@ document.addEventListener("DOMContentLoaded", async function () {
   // Should asciii be awaited?
 
   term.focus();
-
-  setupChat();
 });

@@ -15,8 +15,7 @@ async function loadChatRooms() {
     chatRooms = await readJSONFile(CHAT_ROOMS_FILE_PATH);
   } catch (err) {
     console.error("Error loading chat rooms:", err);
-    // If there's an error (e.g., file doesn't exist), initialize with an empty general room
-    chatRooms = { general: [] };
+    chatRooms = { general: [] }; // Initialize with an empty general room if there's an error
   }
 }
 
@@ -30,9 +29,11 @@ async function saveChatRooms() {
 }
 
 export async function setupSocket(io) {
-  await loadChatRooms(); // Load chat rooms when setting up sockets
+  await loadChatRooms();
 
-  io.on("connection", (socket) => {
+  const chatNamespace = io.of("/chat");
+
+  chatNamespace.on("connection", (socket) => {
     socket.on("joinGeneral", async (username) => {
       socket.join("general");
       if (!chatRooms.general.includes(username)) {
@@ -40,13 +41,15 @@ export async function setupSocket(io) {
       }
       await saveChatRooms();
       logAction(username, "Joined general chat");
-      io.to("general").emit("message", `${username} has joined the chat`);
+      chatNamespace
+        .to("general")
+        .emit("message", `${username} has joined the chat`);
     });
 
     socket.on("chatMessage", async (data) => {
       const { room, message, username } = data;
       logAction(username, `Message in ${room}: ${message}`);
-      io.to(room).emit("message", `${username}: ${message}`);
+      chatNamespace.to(room).emit("message", `${username}: ${message}`);
     });
 
     socket.on("createAlliance", async (data) => {
@@ -54,25 +57,31 @@ export async function setupSocket(io) {
       const allianceRoom = `alliance-${creator}-${Date.now()}`;
       chatRooms[allianceRoom] = usernames;
       usernames.forEach((user) => {
-        const userSocket = findUserSocket(user, io);
+        const userSocket = findUserSocket(user, chatNamespace);
         if (userSocket) {
           userSocket.join(allianceRoom);
         }
       });
       await saveChatRooms();
       logAction(creator, `Created alliance with ${usernames.join(", ")}`);
-      io.to(allianceRoom).emit("message", `Alliance created by ${creator}`);
+      chatNamespace
+        .to(allianceRoom)
+        .emit("message", `Alliance created by ${creator}`);
     });
 
-    socket.on("disconnect", async () => {
+    socket.on("disconnect", () => {
       console.log("A user disconnected");
       // Optional: Remove user from chatRooms if needed
     });
   });
+
+  io.on("connection", (socket) => {
+    // General and game-related socket handling can be added here
+  });
 }
 
-function findUserSocket(username, io) {
-  const sockets = io.sockets.sockets;
+function findUserSocket(username, namespace) {
+  const sockets = namespace.sockets;
   for (let [id, socket] of sockets) {
     if (socket.username === username) {
       return socket;

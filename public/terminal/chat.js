@@ -1,20 +1,24 @@
-import { term, loginManager, socket } from "./index.js";
+import { term, loginManager } from "./index.js";
+
+// Chat-specific socket
+let chatNamespace;
 
 let chatMode = false;
 let currentChatRoom = "general";
 
 export function setupChat() {
+  chatNamespace = io("/chat");
+
   const user = loginManager.getUsername() || "Guest";
 
-  socket.on("message", (message) => {
+  chatNamespace.on("message", (message) => {
     // Clear the current line and move cursor to the beginning
     term.write(`\r\x1b[2K\r`);
     term.write(`${message}\r\n`);
-    renderPrompt(); // Re-render the prompt after showing the message
+    renderPrompt();
   });
 
-  // Initialize chat by joining the general room
-  socket.emit("joinGeneral", user);
+  chatNamespace.emit("joinGeneral", user);
 }
 
 export function handleChatCommand(command) {
@@ -26,37 +30,42 @@ export function handleChatCommand(command) {
     const args = parts.slice(1);
 
     if (cmd === "alliance") {
-      socket.emit("createAlliance", {
+      chatNamespace.emit("createAlliance", {
         usernames: args,
         creator: user,
       });
     } else if (cmd === "exit") {
       chatMode = false;
       currentChatRoom = "general";
-      socket.emit("joinGeneral", user); // Rejoin general room - this might not be wanted..
+      chatNamespace.emit("joinGeneral", user);
+      renderPrompt();
       return "Exiting chat mode.";
     } else {
-      socket.emit("chatMessage", {
+      chatNamespace.emit("chatMessage", {
         room: currentChatRoom,
         message: command,
         username: user,
       });
     }
   } else {
-    socket.emit("chatMessage", {
+    chatNamespace.emit("chatMessage", {
       room: currentChatRoom,
       message: command,
       username: user,
     });
   }
-  renderPrompt(); // Render prompt after sending message
+  renderPrompt();
 }
 
 export function initializeChat() {
+  if (!chatNamespace) {
+    setupChat();
+  }
+
   chatMode = true;
   const user = loginManager.getUsername() || "Guest";
-  socket.emit("joinGeneral", user);
-  renderPrompt(); // Render prompt after initializing chat
+  chatNamespace.emit("joinGeneral", user);
+  renderPrompt();
 }
 
 export function isInChatMode() {
