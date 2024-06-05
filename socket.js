@@ -149,7 +149,7 @@ export async function setupSocket(io) {
       );
 
       if (guestCount > 0) {
-        usersList.push(`Guest (${guestCount} online)`);
+        usersList.unshift(`Guest (${guestCount} online)`); // Add Guest count at the beginning of the list
       }
 
       socket.emit("userList", usersList);
