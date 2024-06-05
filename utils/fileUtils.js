@@ -8,7 +8,6 @@ const __dirname = dirname(__filename);
 const DATA_DIR = path.join(__dirname, "../data");
 const USERS_FILE_PATH = path.join(DATA_DIR, "users.json");
 const FILE_SYSTEM_PATH = path.join(DATA_DIR, "filesystem.json");
-const CHAT_ROOMS_FILE_PATH = path.join(DATA_DIR, "chatRooms.json");
 const LOG_FILE_PATH = path.join(DATA_DIR, "logs.json");
 
 async function readJSONFile(filePath) {
@@ -36,6 +35,5 @@ export {
   writeJSONFile,
   USERS_FILE_PATH,
   FILE_SYSTEM_PATH,
-  CHAT_ROOMS_FILE_PATH,
   LOG_FILE_PATH,
 };

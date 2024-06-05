@@ -2,7 +2,6 @@ import { term, loginManager } from "./index.js";
 
 // Chat-specific socket
 let chatNamespace;
-
 let chatMode = false;
 let currentChatRoom = "general";
 
@@ -16,10 +15,17 @@ export function setupChat() {
       term.write(`${message}\r\n`);
       renderPrompt();
     });
+
+    chatNamespace.on("userList", (users) => {
+      // Clear the current line and move cursor to the beginning
+      term.write(`\r\x1b[2K\r`);
+      term.write(`\r\nUsers:\r\n${users.join("\r\n")}\r\n`);
+      renderPrompt();
+    });
   }
 
   const user = loginManager.getUsername() || "Guest";
-  //chatNamespace.emit("joinGeneral", user);
+  chatNamespace.emit("joinGeneral", user);
 }
 
 export function handleChatCommand(command) {
@@ -35,12 +41,22 @@ export function handleChatCommand(command) {
         usernames: args,
         creator: user,
       });
+    } else if (cmd === "join") {
+      const room = args[0];
+      if (room) {
+        currentChatRoom = room;
+        chatNamespace.emit("joinRoom", room);
+      }
+    } else if (cmd === "alliances") {
+      chatNamespace.emit("listAlliances");
     } else if (cmd === "exit") {
       chatMode = false;
       currentChatRoom = "general";
-      chatNamespace.emit("joinGeneral", user);
+      chatNamespace.emit("exit", user);
       renderPrompt();
       return "Exiting chat mode.";
+    } else if (cmd === "list" || cmd === "users") {
+      chatNamespace.emit("listUsers");
     } else {
       chatNamespace.emit("chatMessage", {
         room: currentChatRoom,

@@ -2,6 +2,5 @@
 /data
 .DS_Store
 .env
-*.note
 *.idea
 *.log
