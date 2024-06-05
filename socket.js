@@ -42,14 +42,13 @@ export async function setupSocket(io) {
 
   chatNamespace.on("connection", (socket) => {
     let username;
-    let currentRoom = "general"; // Default room is general
+    socket.currentRoom = "general"; // Default room is general
 
     socket.on("joinGeneral", async (providedUsername) => {
       if (username) return; // Prevent double counting if joinGeneral is called multiple times
 
       username = providedUsername;
       socket.username = username; // Store username in socket for later use
-      socket.currentRoom = "general"; // Set initial room to general
       socket.join("general");
 
       if (username === "Guest") {
@@ -106,17 +105,18 @@ export async function setupSocket(io) {
       // Create an empty file for the new alliance room
       await writeJSONFile(`./data/messages/${allianceRoom}.json`, []);
 
-      usernames.forEach((user) => {
-        const userSocket = findUserSocket(user, chatNamespace);
-        if (userSocket) {
-          userSocket.join(allianceRoom);
+      logAction(creator, `Created alliance with ${usernames.join(", ")}`);
+
+      // Notify users about the new alliance and how to join
+      usernames.forEach((username) => {
+        const userSocket = findUserSocket(username, chatNamespace);
+        if (userSocket && username !== creator) {
+          userSocket.emit(
+            "message",
+            `You are added to the alliance '${allianceRoom}'. Use ':join ${allianceRoom}' to join.`
+          );
         }
       });
-
-      logAction(creator, `Created alliance with ${usernames.join(", ")}`);
-      chatNamespace
-        .to(allianceRoom)
-        .emit("message", `Alliance created by ${creator}`);
 
       // Automatically join the creator to the new alliance room
       const creatorSocket = findUserSocket(creator, chatNamespace);
@@ -128,6 +128,27 @@ export async function setupSocket(io) {
           "message",
           `You have been moved to the new alliance room: ${allianceRoom}`
         );
+      }
+    });
+
+    socket.on("joinRoom", async (room) => {
+      if (socket.currentRoom) {
+        socket.leave(socket.currentRoom);
+      }
+      socket.join(room);
+      socket.currentRoom = room;
+      socket.emit("message", `You have joined the room: ${room}`);
+    });
+
+    socket.on("listAlliances", async () => {
+      const user = users.find((u) => u.username === socket.username);
+      console.log(user);
+      console.log(user.alliance);
+      console.log(socket.username);
+      if (user && user.alliance) {
+        socket.emit("message", `Your alliances: ${user.alliance.join(", ")}`);
+      } else {
+        socket.emit("message", "You have no alliances.");
       }
     });
 

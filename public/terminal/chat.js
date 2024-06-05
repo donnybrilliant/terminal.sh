@@ -41,6 +41,14 @@ export function handleChatCommand(command) {
         usernames: args,
         creator: user,
       });
+    } else if (cmd === "join") {
+      const room = args[0];
+      if (room) {
+        currentChatRoom = room;
+        chatNamespace.emit("joinRoom", room);
+      }
+    } else if (cmd === "alliances") {
+      chatNamespace.emit("listAlliances");
     } else if (cmd === "exit") {
       chatMode = false;
       currentChatRoom = "general";
