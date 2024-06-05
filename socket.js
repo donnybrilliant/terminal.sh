@@ -31,20 +31,12 @@ async function loadUsers() {
   }
 }
 
-// Save chat rooms and users to JSON files
+// Save chat rooms to JSON file
 async function saveChatRooms() {
   try {
     await writeJSONFile(CHAT_ROOMS_FILE_PATH, chatRooms);
   } catch (err) {
     console.error("Error saving chat rooms:", err);
-  }
-}
-
-async function saveUsers() {
-  try {
-    await writeJSONFile(USERS_FILE_PATH, users);
-  } catch (err) {
-    console.error("Error saving users:", err);
   }
 }
 
@@ -76,13 +68,13 @@ export async function setupSocket(io) {
         chatRooms.general.push(username);
         await saveChatRooms();
       }
-      if (!users.includes(username)) {
+      //if (!users.includes(username)) {
+      if (!users.some((user) => user.username === username)) {
         users.push({ username, online: true });
-        await saveUsers();
+        await writeJSONFile(USERS_FILE_PATH, users); // Save only at login
       } else {
         const user = users.find((u) => u.username === username);
         if (user) user.online = true;
-        await saveUsers();
       }
       logAction(username, "Joined general chat");
       socket.broadcast
@@ -114,12 +106,11 @@ export async function setupSocket(io) {
         .emit("message", `Alliance created by ${creator}`);
     });
 
-    socket.on("disconnect", async () => {
+    socket.on("disconnect", () => {
       const username = socket.username;
       if (username) {
         const user = users.find((u) => u.username === username);
         if (user) user.online = false;
-        await saveUsers();
         socket.broadcast
           .to("general")
           .emit("message", `${username} has left the chat`);
@@ -127,14 +118,18 @@ export async function setupSocket(io) {
       }
     });
 
-    socket.on("exit", async (username) => {
+    socket.on("exit", (username) => {
       const user = users.find((u) => u.username === username);
       if (user) user.online = false;
-      await saveUsers();
       socket.broadcast
         .to("general")
         .emit("message", `${username} has left the chat`);
       logAction(username, "Exited chat");
+    });
+
+    socket.on("listUsers", () => {
+      const onlineUsers = users.filter((u) => u.online).map((u) => u.username);
+      socket.emit("userList", onlineUsers);
     });
   });
 
