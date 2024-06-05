@@ -16,10 +16,17 @@ export function setupChat() {
       term.write(`${message}\r\n`);
       renderPrompt();
     });
+
+    chatNamespace.on("userList", (users) => {
+      // Clear the current line and move cursor to the beginning
+      term.write(`\r\x1b[2K\r`);
+      term.write(`\r\nUsers:\r\n${users.join("\r\n")}\r\n`);
+      renderPrompt();
+    });
   }
 
   const user = loginManager.getUsername() || "Guest";
-  //chatNamespace.emit("joinGeneral", user);
+  chatNamespace.emit("joinGeneral", user);
 }
 
 export function handleChatCommand(command) {
@@ -38,9 +45,11 @@ export function handleChatCommand(command) {
     } else if (cmd === "exit") {
       chatMode = false;
       currentChatRoom = "general";
-      chatNamespace.emit("joinGeneral", user);
+      chatNamespace.emit("exit", user);
       renderPrompt();
       return "Exiting chat mode.";
+    } else if (cmd === "list" || cmd === "users") {
+      chatNamespace.emit("listUsers");
     } else {
       chatNamespace.emit("chatMessage", {
         room: currentChatRoom,

@@ -3,13 +3,16 @@ import {
   readJSONFile,
   writeJSONFile,
   CHAT_ROOMS_FILE_PATH,
+  USERS_FILE_PATH,
 } from "./utils/fileUtils.js";
+import fs from "fs";
 
 let chatRooms = {
   general: [],
 };
+let users = [];
 
-// Load chat rooms from JSON file at startup
+// Load chat rooms and users from JSON files at startup
 async function loadChatRooms() {
   try {
     chatRooms = await readJSONFile(CHAT_ROOMS_FILE_PATH);
@@ -19,7 +22,16 @@ async function loadChatRooms() {
   }
 }
 
-// Save chat rooms to JSON file
+async function loadUsers() {
+  try {
+    users = await readJSONFile(USERS_FILE_PATH);
+  } catch (err) {
+    console.error("Error loading users:", err);
+    users = [];
+  }
+}
+
+// Save chat rooms and users to JSON files
 async function saveChatRooms() {
   try {
     await writeJSONFile(CHAT_ROOMS_FILE_PATH, chatRooms);
@@ -28,8 +40,32 @@ async function saveChatRooms() {
   }
 }
 
+async function saveUsers() {
+  try {
+    await writeJSONFile(USERS_FILE_PATH, users);
+  } catch (err) {
+    console.error("Error saving users:", err);
+  }
+}
+
+// Log messages to individual JSON files for each room
+async function logMessage(room, message) {
+  const filePath = `./data/messages/${room}.json`;
+  let messages = [];
+  try {
+    if (fs.existsSync(filePath)) {
+      messages = await readJSONFile(filePath);
+    }
+    messages.push(message);
+    await writeJSONFile(filePath, messages);
+  } catch (err) {
+    console.error(`Error logging message to ${filePath}:`, err);
+  }
+}
+
 export async function setupSocket(io) {
   await loadChatRooms();
+  await loadUsers();
 
   const chatNamespace = io.of("/chat");
 
@@ -40,6 +76,14 @@ export async function setupSocket(io) {
         chatRooms.general.push(username);
         await saveChatRooms();
       }
+      if (!users.includes(username)) {
+        users.push({ username, online: true });
+        await saveUsers();
+      } else {
+        const user = users.find((u) => u.username === username);
+        if (user) user.online = true;
+        await saveUsers();
+      }
       logAction(username, "Joined general chat");
       socket.broadcast
         .to("general")
@@ -49,6 +93,7 @@ export async function setupSocket(io) {
     socket.on("chatMessage", async (data) => {
       const { room, message, username } = data;
       logAction(username, `Message in ${room}: ${message}`);
+      await logMessage(room, { username, message });
       chatNamespace.to(room).emit("message", `${username}: ${message}`);
     });
 
@@ -69,9 +114,27 @@ export async function setupSocket(io) {
         .emit("message", `Alliance created by ${creator}`);
     });
 
-    socket.on("disconnect", () => {
-      console.log("A user disconnected");
-      // Optional: Remove user from chatRooms if needed
+    socket.on("disconnect", async () => {
+      const username = socket.username;
+      if (username) {
+        const user = users.find((u) => u.username === username);
+        if (user) user.online = false;
+        await saveUsers();
+        socket.broadcast
+          .to("general")
+          .emit("message", `${username} has left the chat`);
+        logAction(username, "Disconnected");
+      }
+    });
+
+    socket.on("exit", async (username) => {
+      const user = users.find((u) => u.username === username);
+      if (user) user.online = false;
+      await saveUsers();
+      socket.broadcast
+        .to("general")
+        .emit("message", `${username} has left the chat`);
+      logAction(username, "Exited chat");
     });
   });
 
