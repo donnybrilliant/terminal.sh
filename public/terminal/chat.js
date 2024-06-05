@@ -7,7 +7,10 @@ export function setupChat() {
   const user = loginManager.getUsername() || "Guest";
 
   socket.on("message", (message) => {
-    term.write(`\r\n${message}`);
+    // Clear the current line and move cursor to the beginning
+    term.write(`\r\x1b[2K\r`);
+    term.write(`${message}\r\n`);
+    renderPrompt(); // Re-render the prompt after showing the message
   });
 
   // Initialize chat by joining the general room
@@ -46,14 +49,22 @@ export function handleChatCommand(command) {
       username: user,
     });
   }
+  renderPrompt(); // Render prompt after sending message
 }
 
 export function initializeChat() {
   chatMode = true;
   const user = loginManager.getUsername() || "Guest";
   socket.emit("joinGeneral", user);
+  renderPrompt(); // Render prompt after initializing chat
 }
 
 export function isInChatMode() {
   return chatMode;
+}
+
+function renderPrompt() {
+  const user = loginManager.getUsername();
+  const prompt = user ? `${user}> ` : "> ";
+  term.write(prompt);
 }

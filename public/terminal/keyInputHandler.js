@@ -57,7 +57,6 @@ export default async function handleKeyInput(
       term.write("\b \b"); // Move cursor back, write space to delete char, then move cursor back again
     } else {
       domEvent.preventDefault(); // Prevent the backspace if the command buffer is empty
-      console.log("Backspace blocked at prompt");
     }
     return; // Stop further processing
   }
@@ -66,7 +65,6 @@ export default async function handleKeyInput(
   if (keyCode === 13) {
     if (isInChatMode()) {
       handleChatCommand(commandBuffer);
-      //renderPrompt(term);
     } else {
       const output = await processCommand(commandBuffer);
       if (isInEditMode()) {
