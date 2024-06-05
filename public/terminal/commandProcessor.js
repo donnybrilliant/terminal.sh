@@ -9,7 +9,7 @@ import {
   appendToEditedContent,
   getEditedContent,
 } from "./edit.js";
-import { initializeChat, isInChatMode } from "./chat.js";
+import { initializeChat, isInChatMode, handleChatCommand } from "./chat.js";
 import { loginManager } from "./index.js";
 
 /**
@@ -24,7 +24,7 @@ export default async function processCommand(command) {
 
   // Handle chat mode
   if (isInChatMode()) {
-    return "Chat mode active. Type ':exit' to leave chat mode.";
+    return handleChatCommand(command);
   }
 
   // Check if the system is in edit mode

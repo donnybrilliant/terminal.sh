@@ -1,20 +1,22 @@
-//import { io } from "/socket.io/socket.io.js";
-import { term, loginManager } from "./index.js";
+import { term, loginManager, socket } from "./index.js";
 
-const socket = io();
 let chatMode = false;
 let currentChatRoom = "general";
 
-const user = loginManager.getUsername() || "Guest";
+export function setupChat() {
+  const user = loginManager.getUsername() || "Guest";
 
-socket.on("message", (message) => {
-  term.writeln(message);
-});
+  socket.on("message", (message) => {
+    term.write(`\r\n${message}`);
+  });
 
-// Initialize chat by joining the general room
-socket.emit("joinGeneral", user); // Replace with actual username
+  // Initialize chat by joining the general room
+  socket.emit("joinGeneral", user);
+}
 
 export function handleChatCommand(command) {
+  const user = loginManager.getUsername() || "Guest";
+
   if (command.startsWith("/") || command.startsWith(":")) {
     const parts = command.split(" ");
     const cmd = parts[0].substring(1);
@@ -23,32 +25,33 @@ export function handleChatCommand(command) {
     if (cmd === "alliance") {
       socket.emit("createAlliance", {
         usernames: args,
-        creator: user, // Replace with actual username
+        creator: user,
       });
     } else if (cmd === "exit") {
       chatMode = false;
       currentChatRoom = "general";
-      socket.emit("joinGeneral", user); // Rejoin general room
+      socket.emit("joinGeneral", user); // Rejoin general room - this might not be wanted..
       return "Exiting chat mode.";
     } else {
       socket.emit("chatMessage", {
         room: currentChatRoom,
         message: command,
-        username: user, // Replace with actual username
+        username: user,
       });
     }
   } else {
     socket.emit("chatMessage", {
       room: currentChatRoom,
       message: command,
-      username: user, // Replace with actual username
+      username: user,
     });
   }
 }
 
 export function initializeChat() {
   chatMode = true;
-  socket.emit("joinGeneral", user); // Replace with actual username
+  const user = loginManager.getUsername() || "Guest";
+  socket.emit("joinGeneral", user);
 }
 
 export function isInChatMode() {

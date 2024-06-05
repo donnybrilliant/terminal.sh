@@ -40,13 +40,13 @@ export async function setupSocket(io) {
       }
       await saveChatRooms();
       logAction(username, "Joined general chat");
-      io.to("general").emit("message", `${username} has joined the chat`);
+      io.to("general").emit("message", `${username} has joined the chat\r\n`);
     });
 
     socket.on("chatMessage", async (data) => {
       const { room, message, username } = data;
       logAction(username, `Message in ${room}: ${message}`);
-      io.to(room).emit("message", `${username}: ${message}`);
+      io.to(room).emit("message", `${username}: ${message}\r\n`);
     });
 
     socket.on("createAlliance", async (data) => {
@@ -61,7 +61,7 @@ export async function setupSocket(io) {
       });
       await saveChatRooms();
       logAction(creator, `Created alliance with ${usernames.join(", ")}`);
-      io.to(allianceRoom).emit("message", `Alliance created by ${creator}`);
+      io.to(allianceRoom).emit("message", `Alliance created by ${creator}\r\n`);
     });
 
     socket.on("disconnect", async () => {

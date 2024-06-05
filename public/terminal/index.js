@@ -2,9 +2,11 @@ import processCommand from "./commandProcessor.js";
 import handleKeyInput from "./keyInputHandler.js";
 import ascii from "./ascii.js";
 import { LoginManager } from "./login.js";
+import { setupChat } from "./chat.js";
 
 export const term = new Terminal({ cursorBlink: true });
 export const loginManager = new LoginManager("http://localhost:3000");
+export const socket = io();
 
 document.addEventListener("DOMContentLoaded", async function () {
   const terminalContainer = document.getElementById("terminal-container");
@@ -38,4 +40,6 @@ document.addEventListener("DOMContentLoaded", async function () {
   // Should asciii be awaited?
 
   term.focus();
+
+  setupChat();
 });

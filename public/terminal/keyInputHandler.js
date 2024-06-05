@@ -64,17 +64,20 @@ export default async function handleKeyInput(
 
   // Handle Enter key press
   if (keyCode === 13) {
-    const output = await processCommand(commandBuffer);
     if (isInChatMode()) {
-      handleChatCommand(output);
-    } else if (isInEditMode()) {
-      term.write(`\r\n${output}`);
+      handleChatCommand(commandBuffer);
+      //renderPrompt(term);
     } else {
-      // If not in edit mode, write the output and render the prompt
-      if (output) {
+      const output = await processCommand(commandBuffer);
+      if (isInEditMode()) {
         term.write(`\r\n${output}`);
+      } else {
+        // If not in edit mode, write the output and render the prompt
+        if (output) {
+          term.write(`\r\n${output}`);
+        }
+        renderPrompt(term);
       }
-      renderPrompt(term);
     }
     commandBuffer = "";
     term.scrollToBottom();
