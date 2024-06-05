@@ -2,43 +2,21 @@ import { logAction } from "./utils/logger.js";
 import {
   readJSONFile,
   writeJSONFile,
-  CHAT_ROOMS_FILE_PATH,
   USERS_FILE_PATH,
 } from "./utils/fileUtils.js";
 import fs from "fs";
 
-let chatRooms = {
-  general: [],
-};
 let users = [];
 let onlineUsers = new Set(); // Use a set to track online users
 let guestCount = 0; // Counter for Guest users
 
-// Load chat rooms and users from JSON files at startup
-async function loadChatRooms() {
-  try {
-    chatRooms = await readJSONFile(CHAT_ROOMS_FILE_PATH);
-  } catch (err) {
-    console.error("Error loading chat rooms:", err);
-    chatRooms = { general: [] }; // Initialize with an empty general room if there's an error
-  }
-}
-
+// Load users from JSON file at startup
 async function loadUsers() {
   try {
     users = await readJSONFile(USERS_FILE_PATH);
   } catch (err) {
     console.error("Error loading users:", err);
     users = [];
-  }
-}
-
-// Save chat rooms to JSON file
-async function saveChatRooms() {
-  try {
-    await writeJSONFile(CHAT_ROOMS_FILE_PATH, chatRooms);
-  } catch (err) {
-    console.error("Error saving chat rooms:", err);
   }
 }
 
@@ -58,7 +36,6 @@ async function logMessage(room, message) {
 }
 
 export async function setupSocket(io) {
-  await loadChatRooms();
   await loadUsers();
 
   const chatNamespace = io.of("/chat");
@@ -72,11 +49,6 @@ export async function setupSocket(io) {
       username = providedUsername;
       socket.username = username; // Store username in socket for later use
       socket.join("general");
-
-      if (!chatRooms.general.includes(username)) {
-        chatRooms.general.push(username);
-        await saveChatRooms();
-      }
 
       if (username === "Guest") {
         guestCount++;
@@ -98,16 +70,46 @@ export async function setupSocket(io) {
     });
 
     socket.on("createAlliance", async (data) => {
-      const { usernames, creator } = data;
+      let { usernames, creator } = data;
       const allianceRoom = `alliance-${creator}-${Date.now()}`;
-      chatRooms[allianceRoom] = usernames;
+
+      // Ensure the creator is included in the alliance
+      if (!usernames.includes(creator)) {
+        usernames.push(creator);
+      }
+
+      // Load the current users from the file again to ensure data consistency
+      let currentUsers = [];
+      try {
+        currentUsers = await readJSONFile(USERS_FILE_PATH);
+      } catch (err) {
+        console.error("Error loading users:", err);
+      }
+
+      // Update users to include the alliance room
+      for (const username of usernames) {
+        const user = currentUsers.find((u) => u.username === username);
+        if (user) {
+          if (!user.alliance) {
+            user.alliance = [];
+          }
+          user.alliance.push(allianceRoom);
+        }
+      }
+
+      // Save updated users with alliances
+      await writeJSONFile(USERS_FILE_PATH, currentUsers);
+
+      // Create an empty file for the new alliance room
+      await writeJSONFile(`./data/messages/${allianceRoom}.json`, []);
+
       usernames.forEach((user) => {
         const userSocket = findUserSocket(user, chatNamespace);
         if (userSocket) {
           userSocket.join(allianceRoom);
         }
       });
-      await saveChatRooms();
+
       logAction(creator, `Created alliance with ${usernames.join(", ")}`);
       chatNamespace
         .to(allianceRoom)
