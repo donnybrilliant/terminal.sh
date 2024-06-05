@@ -42,12 +42,14 @@ export async function setupSocket(io) {
 
   chatNamespace.on("connection", (socket) => {
     let username;
+    let currentRoom = "general"; // Default room is general
 
     socket.on("joinGeneral", async (providedUsername) => {
       if (username) return; // Prevent double counting if joinGeneral is called multiple times
 
       username = providedUsername;
       socket.username = username; // Store username in socket for later use
+      socket.currentRoom = "general"; // Set initial room to general
       socket.join("general");
 
       if (username === "Guest") {
@@ -63,7 +65,8 @@ export async function setupSocket(io) {
     });
 
     socket.on("chatMessage", async (data) => {
-      const { room, message, username } = data;
+      const { message, username } = data;
+      const room = socket.currentRoom; // Get current room of the user
       logAction(username, `Message in ${room}: ${message}`);
       await logMessage(room, { username, message });
       chatNamespace.to(room).emit("message", `${username}: ${message}`);
@@ -114,6 +117,18 @@ export async function setupSocket(io) {
       chatNamespace
         .to(allianceRoom)
         .emit("message", `Alliance created by ${creator}`);
+
+      // Automatically join the creator to the new alliance room
+      const creatorSocket = findUserSocket(creator, chatNamespace);
+      if (creatorSocket) {
+        creatorSocket.leave("general");
+        creatorSocket.join(allianceRoom);
+        creatorSocket.currentRoom = allianceRoom; // Update the current room
+        creatorSocket.emit(
+          "message",
+          `You have been moved to the new alliance room: ${allianceRoom}`
+        );
+      }
     });
 
     socket.on("disconnect", () => {

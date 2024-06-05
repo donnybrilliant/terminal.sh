@@ -2,7 +2,6 @@ import { term, loginManager } from "./index.js";
 
 // Chat-specific socket
 let chatNamespace;
-
 let chatMode = false;
 let currentChatRoom = "general";
 
