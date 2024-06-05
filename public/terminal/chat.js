@@ -1,62 +1,56 @@
 //import { io } from "/socket.io/socket.io.js";
-import { term } from "./index.js"; // Adjust the import path as needed
+import { term, loginManager } from "./index.js";
 
-let isChatMode = false;
+const socket = io();
+let chatMode = false;
+let currentChatRoom = "general";
 
-export function isInChatMode() {
-  return isChatMode;
-}
+const user = loginManager.getUsername() || "Guest";
 
-export function enterChatMode() {
-  isChatMode = true;
-}
+socket.on("message", (message) => {
+  term.writeln(message);
+});
 
-export function exitChatMode() {
-  isChatMode = false;
+// Initialize chat by joining the general room
+socket.emit("joinGeneral", user); // Replace with actual username
+
+export function handleChatCommand(command) {
+  if (command.startsWith("/") || command.startsWith(":")) {
+    const parts = command.split(" ");
+    const cmd = parts[0].substring(1);
+    const args = parts.slice(1);
+
+    if (cmd === "alliance") {
+      socket.emit("createAlliance", {
+        usernames: args,
+        creator: user, // Replace with actual username
+      });
+    } else if (cmd === "exit") {
+      chatMode = false;
+      currentChatRoom = "general";
+      socket.emit("joinGeneral", user); // Rejoin general room
+      return "Exiting chat mode.";
+    } else {
+      socket.emit("chatMessage", {
+        room: currentChatRoom,
+        message: command,
+        username: user, // Replace with actual username
+      });
+    }
+  } else {
+    socket.emit("chatMessage", {
+      room: currentChatRoom,
+      message: command,
+      username: user, // Replace with actual username
+    });
+  }
 }
 
 export function initializeChat() {
-  const socket = io("/admin");
-  const room = "default-room"; // Default single room
+  chatMode = true;
+  socket.emit("joinGeneral", user); // Replace with actual username
+}
 
-  socket.on("connect", () => {
-    socket.emit("join", { room: room });
-  });
-
-  enterChatMode();
-
-  socket.on("load messages", (messages) => {
-    messages.forEach((message) => {
-      term.writeln(`${message.username}: ${message.msg}`);
-    });
-    term.scrollToBottom();
-  });
-
-  socket.on("chat message", (msg) => {
-    term.writeln(msg);
-    term.scrollToBottom();
-  });
-
-  term.onKey((e) => {
-    const char = e.key;
-    if (char === "\r") {
-      // Enter key
-      const input = term.buffer.active
-        .getLine(term.buffer.active.cursorY)
-        .translateToString(true)
-        .trim();
-      console.log(input);
-      if (input === ":exit") {
-        exitChatMode();
-        term.write("\r\nExited chat mode.\r\n");
-      } else if (input.length > 0) {
-        socket.emit("chat message", {
-          room: room,
-          username: "User",
-          msg: input,
-        });
-        term.write("\r\n");
-      }
-    }
-  });
+export function isInChatMode() {
+  return chatMode;
 }

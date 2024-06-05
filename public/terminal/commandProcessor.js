@@ -9,7 +9,7 @@ import {
   appendToEditedContent,
   getEditedContent,
 } from "./edit.js";
-import { exitChatMode, initializeChat, isInChatMode } from "./chat.js";
+import { initializeChat, isInChatMode } from "./chat.js";
 import { loginManager } from "./index.js";
 
 /**
@@ -24,7 +24,7 @@ export default async function processCommand(command) {
 
   // Handle chat mode
   if (isInChatMode()) {
-    return ""; // To avoid undefined
+    return "Chat mode active. Type ':exit' to leave chat mode.";
   }
 
   // Check if the system is in edit mode
@@ -102,9 +102,7 @@ export default async function processCommand(command) {
       return "hello";
     case "chat":
       initializeChat();
-      return term.write(
-        `\r\nWelcome to the chat! Type ':exit' to leave chat mode.\r\n`
-      );
+      return "Welcome to the chat! Type ':exit' to leave chat mode.";
     case "login":
       if (args.length < 2) {
         return "Usage: login <username> <password>";

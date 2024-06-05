@@ -1,7 +1,7 @@
 import { stopMatrix } from "./random.js";
 import { loginManager } from "./index.js";
 import { isInEditMode } from "./edit.js";
-import { isInChatMode } from "./chat.js";
+import { isInChatMode, handleChatCommand } from "./chat.js";
 
 // Buffer to hold the current command being typed by the user.
 let commandBuffer = "";
@@ -65,7 +65,9 @@ export default async function handleKeyInput(
   // Handle Enter key press
   if (keyCode === 13) {
     const output = await processCommand(commandBuffer);
-    if (isInEditMode()) {
+    if (isInChatMode()) {
+      handleChatCommand(output);
+    } else if (isInEditMode()) {
       term.write(`\r\n${output}`);
     } else {
       // If not in edit mode, write the output and render the prompt

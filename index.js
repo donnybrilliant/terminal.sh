@@ -9,6 +9,7 @@ import authRoutes from "./routes/auth.js";
 import toolRoutes from "./routes/tools.js";
 import morgan from "morgan";
 import errorHandler from "./utils/errorHandler.js";
+import { setupSocket } from "./socket.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -16,8 +17,6 @@ const __dirname = dirname(__filename);
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
-const admin = io.of("/admin");
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
@@ -43,6 +42,8 @@ app.get("/", (req, res) => {
 
 app.use(morgan("combined"));
 app.use(errorHandler);
+
+setupSocket(io);
 
 server.listen(3000, () => {
   console.log("listening on localhost:3000");
