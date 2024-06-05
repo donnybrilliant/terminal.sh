@@ -80,32 +80,22 @@ export async function setupSocket(io) {
         usernames.push(creator);
       }
 
-      // Load the current users from the file again to ensure data consistency
-      let currentUsers = [];
-      try {
-        currentUsers = await readJSONFile(USERS_FILE_PATH);
-      } catch (err) {
-        console.error("Error loading users:", err);
-      }
+      // Refresh the list of users from the JSON file to ensure data consistency
+      await loadUsers();
 
       // Update users to include the alliance room
       for (const username of usernames) {
-        const user = currentUsers.find((u) => u.username === username);
+        const user = users.find((u) => u.username === username);
         if (user) {
           if (!user.alliance) {
-            user.alliance = [];
+            user.alliance = []; // Initialize if not present
           }
           user.alliance.push(allianceRoom);
         }
       }
 
       // Save updated users with alliances
-      await writeJSONFile(USERS_FILE_PATH, currentUsers);
-
-      // Create an empty file for the new alliance room
-      await writeJSONFile(`./data/messages/${allianceRoom}.json`, []);
-
-      logAction(creator, `Created alliance with ${usernames.join(", ")}`);
+      await writeJSONFile(USERS_FILE_PATH, users);
 
       // Notify users about the new alliance and how to join
       usernames.forEach((username) => {
@@ -123,7 +113,7 @@ export async function setupSocket(io) {
       if (creatorSocket) {
         creatorSocket.leave("general");
         creatorSocket.join(allianceRoom);
-        creatorSocket.currentRoom = allianceRoom; // Update the current room
+        creatorSocket.currentRoom = allianceRoom;
         creatorSocket.emit(
           "message",
           `You have been moved to the new alliance room: ${allianceRoom}`
