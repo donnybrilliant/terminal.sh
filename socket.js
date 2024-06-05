@@ -12,6 +12,7 @@ let chatRooms = {
 };
 let users = [];
 let onlineUsers = new Set(); // Use a set to track online users
+let guestCount = 0; // Counter for Guest users
 
 // Load chat rooms and users from JSON files at startup
 async function loadChatRooms() {
@@ -63,14 +64,26 @@ export async function setupSocket(io) {
   const chatNamespace = io.of("/chat");
 
   chatNamespace.on("connection", (socket) => {
-    socket.on("joinGeneral", async (username) => {
+    let username;
+
+    socket.on("joinGeneral", async (providedUsername) => {
+      if (username) return; // Prevent double counting if joinGeneral is called multiple times
+
+      username = providedUsername;
       socket.username = username; // Store username in socket for later use
       socket.join("general");
+
       if (!chatRooms.general.includes(username)) {
         chatRooms.general.push(username);
         await saveChatRooms();
       }
-      onlineUsers.add(username);
+
+      if (username === "Guest") {
+        guestCount++;
+      } else {
+        onlineUsers.add(username);
+      }
+
       logAction(username, "Joined general chat");
       socket.broadcast
         .to("general")
@@ -102,18 +115,27 @@ export async function setupSocket(io) {
     });
 
     socket.on("disconnect", () => {
-      const username = socket.username;
-      if (username) {
+      if (!username) return; // Prevent decrementing if disconnect is called before joinGeneral
+
+      if (username === "Guest") {
+        guestCount--;
+      } else {
         onlineUsers.delete(username);
-        socket.broadcast
-          .to("general")
-          .emit("message", `${username} has left the chat`);
-        logAction(username, "Disconnected");
       }
+
+      socket.broadcast
+        .to("general")
+        .emit("message", `${username} has left the chat`);
+      logAction(username, "Disconnected");
     });
 
     socket.on("exit", (username) => {
-      onlineUsers.delete(username);
+      if (username === "Guest") {
+        guestCount--;
+      } else {
+        onlineUsers.delete(username);
+      }
+
       socket.broadcast
         .to("general")
         .emit("message", `${username} has left the chat`);
@@ -125,6 +147,11 @@ export async function setupSocket(io) {
       usersList = usersList.map((user) =>
         onlineUsers.has(user.username) ? `${user.username} *` : user.username
       );
+
+      if (guestCount > 0) {
+        usersList.push(`Guest (${guestCount} online)`);
+      }
+
       socket.emit("userList", usersList);
     });
   });
