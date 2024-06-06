@@ -7,6 +7,12 @@ import { isInChatMode, handleChatCommand } from "./chat.js";
 let commandBuffer = "";
 let cursorPosition = 0;
 
+// Command history for the main terminal and chat
+const mainCommandHistory = [];
+const chatCommandHistory = [];
+let mainHistoryIndex = -1;
+let chatHistoryIndex = -1;
+
 /**
  * Renders the terminal prompt and command buffer.
  *
@@ -34,6 +40,8 @@ export default async function handleKeyInput(
   processCommand
 ) {
   const keyCode = domEvent.keyCode || domEvent.which;
+  const history = isInChatMode() ? chatCommandHistory : mainCommandHistory;
+  let historyIndex = isInChatMode() ? chatHistoryIndex : mainHistoryIndex;
 
   if (keyCode === 37) {
     // Left arrow
@@ -49,6 +57,47 @@ export default async function handleKeyInput(
     if (cursorPosition < commandBuffer.length) {
       cursorPosition++;
       term.write("\x1b[C");
+    }
+    return;
+  }
+
+  if (keyCode === 38) {
+    // Up arrow
+    if (historyIndex > 0) {
+      historyIndex--;
+      commandBuffer = history[historyIndex] || "";
+      cursorPosition = commandBuffer.length;
+      render(term);
+    } else if (historyIndex === 0) {
+      commandBuffer = history[historyIndex] || "";
+      cursorPosition = commandBuffer.length;
+      render(term);
+    }
+    if (isInChatMode()) {
+      chatHistoryIndex = historyIndex;
+    } else {
+      mainHistoryIndex = historyIndex;
+    }
+    return;
+  }
+
+  if (keyCode === 40) {
+    // Down arrow
+    if (historyIndex < history.length - 1) {
+      historyIndex++;
+      commandBuffer = history[historyIndex] || "";
+      cursorPosition = commandBuffer.length;
+      render(term);
+    } else if (historyIndex === history.length - 1) {
+      historyIndex++;
+      commandBuffer = "";
+      cursorPosition = 0;
+      render(term);
+    }
+    if (isInChatMode()) {
+      chatHistoryIndex = historyIndex;
+    } else {
+      mainHistoryIndex = historyIndex;
     }
     return;
   }
@@ -71,25 +120,28 @@ export default async function handleKeyInput(
       return;
     }
 
-    let output;
     if (isInChatMode()) {
       handleChatCommand(commandBuffer);
+      chatCommandHistory.push(commandBuffer);
+      chatHistoryIndex = chatCommandHistory.length;
       commandBuffer = "";
       cursorPosition = 0;
       render(term); // Render the chat prompt
       return;
     } else {
-      output = await processCommand(commandBuffer);
+      const output = await processCommand(commandBuffer);
+      if (!isInEditMode() && output) {
+        term.write(`\r\n${output}`);
+      }
+      mainCommandHistory.push(commandBuffer);
+      mainHistoryIndex = mainCommandHistory.length;
+      commandBuffer = "";
+      cursorPosition = 0;
+      term.write("\r\n"); // Ensure we move to a new line
+      render(term);
+      term.scrollToBottom();
+      return;
     }
-    commandBuffer = "";
-    cursorPosition = 0;
-    if (!isInEditMode() && output) {
-      term.write(`\r\n${output}`);
-    }
-    term.write("\r\n"); // Ensure we move to a new line
-    render(term);
-    term.scrollToBottom();
-    return;
   }
 
   // Handle Ctrl + C key press
