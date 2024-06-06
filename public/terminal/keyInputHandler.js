@@ -5,34 +5,18 @@ import { isInChatMode, handleChatCommand } from "./chat.js";
 
 // Buffer to hold the current command being typed by the user.
 let commandBuffer = "";
+let cursorPosition = 0;
 
 /**
- * Gets the current value of the command buffer.
- *
- * @returns {string} - The current value of the command buffer.
- */
-export function getCommandBuffer() {
-  return commandBuffer;
-}
-
-/**
- * Sets a new value for the command buffer.
- *
- * @param {string} value - The value to set for the command buffer.
- */
-export function setCommandBuffer(value) {
-  commandBuffer = value;
-}
-
-/**
- * Renders the terminal prompt.
+ * Renders the terminal prompt and command buffer.
  *
  * @param {Object} term - The xterm.js terminal object.
  */
-function renderPrompt(term) {
+function render(term) {
   const user = loginManager.getUsername();
-  const prompt = user ? `${user}$ ` : "$ ";
-  term.write(`\r\n${prompt}`);
+  const prompt = isInChatMode() ? `${user}> ` : `${user}$ `;
+  term.write(`\r\x1b[2K\r${prompt}${commandBuffer}`);
+  term.write(`\x1b[${cursorPosition + prompt.length}G`);
 }
 
 /**
@@ -51,33 +35,59 @@ export default async function handleKeyInput(
 ) {
   const keyCode = domEvent.keyCode || domEvent.which;
 
-  if (key === "Backspace" || keyCode === 8) {
-    if (commandBuffer.length > 0) {
-      commandBuffer = commandBuffer.slice(0, -1); // Update the command buffer
-      term.write("\b \b"); // Move cursor back, write space to delete char, then move cursor back again
-    } else {
-      domEvent.preventDefault(); // Prevent the backspace if the command buffer is empty
+  if (keyCode === 37) {
+    // Left arrow
+    if (cursorPosition > 0) {
+      cursorPosition--;
+      term.write("\x1b[D");
     }
-    return; // Stop further processing
+    return;
+  }
+
+  if (keyCode === 39) {
+    // Right arrow
+    if (cursorPosition < commandBuffer.length) {
+      cursorPosition++;
+      term.write("\x1b[C");
+    }
+    return;
+  }
+
+  if (key === "Backspace" || keyCode === 8) {
+    if (cursorPosition > 0) {
+      commandBuffer =
+        commandBuffer.slice(0, cursorPosition - 1) +
+        commandBuffer.slice(cursorPosition);
+      cursorPosition--;
+      render(term);
+    }
+    return;
   }
 
   // Handle Enter key press
   if (keyCode === 13) {
+    if (commandBuffer.trim() === "") {
+      render(term); // Just render the prompt again if the command buffer is empty
+      return;
+    }
+
+    let output;
     if (isInChatMode()) {
       handleChatCommand(commandBuffer);
+      commandBuffer = "";
+      cursorPosition = 0;
+      render(term); // Render the chat prompt
+      return;
     } else {
-      const output = await processCommand(commandBuffer);
-      if (isInEditMode()) {
-        term.write(`\r\n${output}`);
-      } else {
-        // If not in edit mode, write the output and render the prompt
-        if (output) {
-          term.write(`\r\n${output}`);
-        }
-        renderPrompt(term);
-      }
+      output = await processCommand(commandBuffer);
     }
     commandBuffer = "";
+    cursorPosition = 0;
+    if (!isInEditMode() && output) {
+      term.write(`\r\n${output}`);
+    }
+    term.write("\r\n"); // Ensure we move to a new line
+    render(term);
     term.scrollToBottom();
     return;
   }
@@ -87,11 +97,18 @@ export default async function handleKeyInput(
     stopMatrix();
     term.write("\r\nInterrupted");
     commandBuffer = ""; // Reset the command buffer
-    renderPrompt(term); // Render the prompt
+    cursorPosition = 0;
+    render(term); // Render the prompt
     return;
   }
 
-  // For regular key presses, append the character to the command buffer and write to terminal
-  commandBuffer += key;
-  term.write(key);
+  // For regular key presses, insert the character at the cursor position
+  if (key.length === 1) {
+    commandBuffer =
+      commandBuffer.slice(0, cursorPosition) +
+      key +
+      commandBuffer.slice(cursorPosition);
+    cursorPosition++;
+    render(term);
+  }
 }
