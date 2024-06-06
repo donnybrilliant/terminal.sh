@@ -22,7 +22,7 @@ function render(term) {
   const user = loginManager.getUsername();
   const prompt = isInChatMode() ? `${user}> ` : `${user}$ `;
   term.write(`\r\x1b[2K\r${prompt}${commandBuffer}`);
-  term.write(`\x1b[${cursorPosition + prompt.length}G`);
+  term.write(`\x1b[${cursorPosition + prompt.length + 1}G`);
 }
 
 /**
