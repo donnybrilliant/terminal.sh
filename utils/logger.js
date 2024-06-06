@@ -1,6 +1,13 @@
-import { readJSONFile, writeJSONFile, LOG_FILE_PATH } from "./fileUtils.js";
+import {
+  readJSONFile,
+  writeJSONFile,
+  LOG_FILE_PATH,
+  MESSAGES_DIR,
+} from "./fileUtils.js";
+import fs from "fs";
+import path from "path";
 
-async function logAction(username, action) {
+export async function logAction(username, action) {
   const logEntry = { username, action, timestamp: new Date() };
 
   try {
@@ -15,4 +22,16 @@ async function logAction(username, action) {
   }
 }
 
-export { logAction };
+export async function logMessage(room, message) {
+  const filePath = path.join(MESSAGES_DIR, `${room}.json`);
+  let messages = [];
+  try {
+    if (fs.existsSync(filePath)) {
+      messages = await readJSONFile(filePath);
+    }
+    messages.push(message);
+    await writeJSONFile(filePath, messages);
+  } catch (err) {
+    console.error(`Error logging message to ${filePath}:`, err);
+  }
+}

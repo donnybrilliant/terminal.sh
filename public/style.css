@@ -12,6 +12,5 @@ body {
 }
 
 .xterm-screen {
-    padding: 1rem;
-    margin-bottom: 1rem;
+    padding-left: 1rem;
 }

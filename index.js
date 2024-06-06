@@ -9,7 +9,7 @@ import authRoutes from "./routes/auth.js";
 import toolRoutes from "./routes/tools.js";
 import morgan from "morgan";
 import errorHandler from "./utils/errorHandler.js";
-import { setupSocket } from "./socket.js";
+import { setupSocket } from "./sockets/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
