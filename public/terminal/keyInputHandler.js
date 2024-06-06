@@ -157,8 +157,9 @@ export default async function handleKeyInput(
       render(term);
     } else if (possibleCommands.length > 1) {
       suggestions = possibleCommands;
+      const savedCursorPosition = cursorPosition;
       displaySuggestions(term, possibleCommands);
-      render(term);
+      term.write(`\x1b[${savedCursorPosition + prompt.length + 3}G`);
     } else {
       suggestions = [];
       render(term);
