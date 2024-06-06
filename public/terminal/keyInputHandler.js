@@ -2,6 +2,7 @@ import { stopMatrix } from "./random.js";
 import { loginManager } from "./index.js";
 import { isInEditMode } from "./edit.js";
 import { isInChatMode, handleChatCommand } from "./chat.js";
+import { commands } from "./shell.js"; // Import commands for auto-completion
 
 // Buffer to hold the current command being typed by the user.
 let commandBuffer = "";
@@ -13,11 +14,7 @@ const chatCommandHistory = [];
 let mainHistoryIndex = -1;
 let chatHistoryIndex = -1;
 
-/**
- * Renders the terminal prompt and command buffer.
- *
- * @param {Object} term - The xterm.js terminal object.
- */
+// Renders the terminal prompt and command buffer.
 function render(term) {
   const user = loginManager.getUsername();
   const prompt = isInChatMode() ? `${user}> ` : `${user}$ `;
@@ -108,6 +105,22 @@ export default async function handleKeyInput(
         commandBuffer.slice(0, cursorPosition - 1) +
         commandBuffer.slice(cursorPosition);
       cursorPosition--;
+      render(term);
+    }
+    return;
+  }
+
+  // Handle Tab key press for command auto-completion
+  if (key === "Tab" || keyCode === 9) {
+    const possibleCommands = Object.keys(commands).filter((cmd) =>
+      cmd.startsWith(commandBuffer)
+    );
+    if (possibleCommands.length === 1) {
+      commandBuffer = possibleCommands[0];
+      cursorPosition = commandBuffer.length;
+      render(term);
+    } else if (possibleCommands.length > 1) {
+      term.write(`\r\n${possibleCommands.join("  ")}\r\n`);
       render(term);
     }
     return;
