@@ -66,6 +66,8 @@ export default async function handleKeyInput(
   const keyCode = domEvent.keyCode || domEvent.which;
   const history = isInChatMode() ? chatCommandHistory : mainCommandHistory;
   let historyIndex = isInChatMode() ? chatHistoryIndex : mainHistoryIndex;
+  const user = loginManager.getUsername();
+  const prompt = isInChatMode() ? `${user}> ` : `${user}$ `;
 
   if (keyCode === 37) {
     // Left arrow
@@ -159,7 +161,7 @@ export default async function handleKeyInput(
       suggestions = possibleCommands;
       const savedCursorPosition = cursorPosition;
       displaySuggestions(term, possibleCommands);
-      term.write(`\x1b[${savedCursorPosition + prompt.length + 3}G`);
+      term.write(`\x1b[${savedCursorPosition + prompt.length + 1}G`);
     } else {
       suggestions = [];
       render(term);
