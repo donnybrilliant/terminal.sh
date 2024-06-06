@@ -8,6 +8,9 @@ import { getCommandList } from "./commandProcessor.js"; // Import getCommandList
 let commandBuffer = "";
 let cursorPosition = 0;
 
+let suggestions = [];
+let isShowingSuggestions = false;
+
 // Command history for the main terminal and chat
 const mainCommandHistory = [];
 const chatCommandHistory = [];
@@ -18,12 +21,32 @@ let chatHistoryIndex = -1;
 const availableCommands = getCommandList();
 const chatCommands = getChatCommandList();
 
-//Renders the terminal prompt and command buffer.
+function clearSuggestions(term) {
+  if (isShowingSuggestions) {
+    term.write(`\x1b[1B\r\x1b[2K`); // Move down one line and clear it
+    term.write(`\x1b[1A\r`); // Move back up
+    isShowingSuggestions = false;
+  }
+}
+
+function displaySuggestions(term, suggestions) {
+  if (suggestions.length > 0) {
+    term.write(`\x1b[1B\r\x1b[2K`); // Move down one line and clear it
+    term.write(`${suggestions.join("  ")}\r`); // Display suggestions
+    term.write(`\x1b[1A\r`); // Move back up
+    isShowingSuggestions = true;
+  }
+}
+
 function render(term) {
   const user = loginManager.getUsername();
   const prompt = isInChatMode() ? `${user}> ` : `${user}$ `;
   term.write(`\r\x1b[2K\r${prompt}${commandBuffer}`);
   term.write(`\x1b[${cursorPosition + prompt.length + 1}G`);
+  if (isShowingSuggestions) {
+    term.write(`\x1b[1B\r${suggestions.join("  ")}\r`);
+    term.write(`\x1b[1A\r`);
+  }
 }
 
 /**
@@ -68,10 +91,12 @@ export default async function handleKeyInput(
       historyIndex--;
       commandBuffer = history[historyIndex] || "";
       cursorPosition = commandBuffer.length;
+      clearSuggestions(term);
       render(term);
     } else if (historyIndex === 0) {
       commandBuffer = history[historyIndex] || "";
       cursorPosition = commandBuffer.length;
+      clearSuggestions(term);
       render(term);
     }
     if (isInChatMode()) {
@@ -88,11 +113,13 @@ export default async function handleKeyInput(
       historyIndex++;
       commandBuffer = history[historyIndex] || "";
       cursorPosition = commandBuffer.length;
+      clearSuggestions(term);
       render(term);
     } else if (historyIndex === history.length - 1) {
       historyIndex++;
       commandBuffer = "";
       cursorPosition = 0;
+      clearSuggestions(term);
       render(term);
     }
     if (isInChatMode()) {
@@ -109,6 +136,7 @@ export default async function handleKeyInput(
         commandBuffer.slice(0, cursorPosition - 1) +
         commandBuffer.slice(cursorPosition);
       cursorPosition--;
+      clearSuggestions(term);
       render(term);
     }
     return;
@@ -120,14 +148,22 @@ export default async function handleKeyInput(
     const possibleCommands = commands.filter((cmd) =>
       cmd.startsWith(commandBuffer)
     );
+
+    clearSuggestions(term);
+
     if (possibleCommands.length === 1) {
-      commandBuffer = possibleCommands[0];
+      commandBuffer = possibleCommands[0] + " "; // Add a space after the completed command
       cursorPosition = commandBuffer.length;
       render(term);
     } else if (possibleCommands.length > 1) {
-      term.write(`\r\n${possibleCommands.join("  ")}\r\n`);
+      suggestions = possibleCommands;
+      displaySuggestions(term, possibleCommands);
+      render(term);
+    } else {
+      suggestions = [];
       render(term);
     }
+    domEvent.preventDefault(); // Prevent the default action of the Tab key
     return;
   }
 
@@ -144,6 +180,7 @@ export default async function handleKeyInput(
       chatHistoryIndex = chatCommandHistory.length;
       commandBuffer = "";
       cursorPosition = 0;
+      clearSuggestions(term);
       render(term); // Render the chat prompt
       return;
     } else {
@@ -155,6 +192,7 @@ export default async function handleKeyInput(
       mainHistoryIndex = mainCommandHistory.length;
       commandBuffer = "";
       cursorPosition = 0;
+      clearSuggestions(term);
       term.write("\r\n"); // Ensure we move to a new line
       render(term);
       term.scrollToBottom();
@@ -168,6 +206,7 @@ export default async function handleKeyInput(
     term.write("\r\nInterrupted");
     commandBuffer = ""; // Reset the command buffer
     cursorPosition = 0;
+    clearSuggestions(term);
     render(term); // Render the prompt
     return;
   }
@@ -179,6 +218,7 @@ export default async function handleKeyInput(
       key +
       commandBuffer.slice(cursorPosition);
     cursorPosition++;
+    clearSuggestions(term);
     render(term);
   }
 }
