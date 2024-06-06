@@ -1,15 +1,15 @@
 - Initialization
-- :exit command in chat
 - No user can be named guest(Guest)
+- Guest resctrictions (no alliances etc)
+- fix alliance (should not work without args)
 - README is not present when initializing when authenticated
-- Better response system with colors
+- Better response system with colors - line breaks etc
 - term.write system (also change everything to (eol?) and writeln)
 - set name without auth
 - not authenticated, save as guest object, save on login?
 - name command in chat too
 - unique names generator for alliances?
-- commandhistory, arrow key usage
-- autocomplete, tab usage. he, tab should complete to help. :alliances tab should list the available alliances
+- autocomplete for /join with available user.alliance[] or the way socket keeps track of the rooms.
 
 Now i want to think bigger about this! I want this to be a game with socketio. It should also have a chat. The chat should be initiated with "chat" command, bypass all other commands and have own commands starting with / or : .
 There should be one general room, but the user can enter a command /alliance (or :alliance) with one or more existing usernames to create a private room for those users.

@@ -5,6 +5,40 @@ let chatNamespace;
 let chatMode = false;
 let currentChatRoom = "general";
 
+// Chat command map
+const chatCommandMap = {
+  alliance: (args, user) => {
+    chatNamespace.emit("createAlliance", { usernames: args, creator: user });
+  },
+  join: (args) => {
+    const room = args[0];
+    if (room) {
+      currentChatRoom = room;
+      chatNamespace.emit("joinRoom", room);
+    }
+  },
+  alliances: () => {
+    chatNamespace.emit("listAlliances");
+  },
+  exit: (user) => {
+    chatMode = false;
+    currentChatRoom = "general";
+    chatNamespace.emit("exit", user);
+    renderPrompt();
+    return "Exiting chat mode.";
+  },
+  list: () => {
+    chatNamespace.emit("listUsers");
+  },
+  users: () => {
+    chatNamespace.emit("listUsers");
+  },
+};
+
+export function getChatCommandList() {
+  return Object.keys(chatCommandMap).map((cmd) => `/${cmd}`);
+}
+
 export function setupChat() {
   if (!chatNamespace) {
     chatNamespace = io("/chat");
@@ -36,33 +70,11 @@ export function handleChatCommand(command) {
     const cmd = parts[0].substring(1);
     const args = parts.slice(1);
 
-    if (cmd === "alliance") {
-      chatNamespace.emit("createAlliance", {
-        usernames: args,
-        creator: user,
-      });
-    } else if (cmd === "join") {
-      const room = args[0];
-      if (room) {
-        currentChatRoom = room;
-        chatNamespace.emit("joinRoom", room);
-      }
-    } else if (cmd === "alliances") {
-      chatNamespace.emit("listAlliances");
-    } else if (cmd === "exit") {
-      chatMode = false;
-      currentChatRoom = "general";
-      chatNamespace.emit("exit", user);
-      renderPrompt();
-      return "Exiting chat mode.";
-    } else if (cmd === "list" || cmd === "users") {
-      chatNamespace.emit("listUsers");
+    const commandFunction = chatCommandMap[cmd];
+    if (commandFunction) {
+      return commandFunction(args, user);
     } else {
-      chatNamespace.emit("chatMessage", {
-        room: currentChatRoom,
-        message: command,
-        username: user,
-      });
+      return `Unknown chat command: ${cmd}`;
     }
   } else {
     chatNamespace.emit("chatMessage", {
@@ -82,7 +94,7 @@ export function initializeChat() {
   chatMode = true;
   const user = loginManager.getUsername() || "Guest";
   chatNamespace.emit("joinGeneral", user);
-  renderPrompt();
+  term.write(`\r\nWelcome to the chat! Type ':exit' to leave chat mode.\r\n`);
 }
 
 export function isInChatMode() {
@@ -91,6 +103,6 @@ export function isInChatMode() {
 
 function renderPrompt() {
   const user = loginManager.getUsername();
-  const prompt = user ? `${user}> ` : "> ";
+  const prompt = isInChatMode() ? `${user}> ` : `${user}$ `;
   term.write(prompt);
 }
