@@ -18,11 +18,7 @@ let chatHistoryIndex = -1;
 const availableCommands = getCommandList();
 const chatCommands = getChatCommandList();
 
-/**
- * Renders the terminal prompt and command buffer.
- *
- * @param {Object} term - The xterm.js terminal object.
- */
+//Renders the terminal prompt and command buffer.
 function render(term) {
   const user = loginManager.getUsername();
   const prompt = isInChatMode() ? `${user}> ` : `${user}$ `;
