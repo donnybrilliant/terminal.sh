@@ -94,7 +94,7 @@ export function initializeChat() {
   chatMode = true;
   const user = loginManager.getUsername() || "Guest";
   chatNamespace.emit("joinGeneral", user);
-  renderPrompt();
+  term.write(`\r\nWelcome to the chat! Type ':exit' to leave chat mode.\r\n`);
 }
 
 export function isInChatMode() {
@@ -103,6 +103,6 @@ export function isInChatMode() {
 
 function renderPrompt() {
   const user = loginManager.getUsername();
-  const prompt = user ? `${user}> ` : "> ";
+  const prompt = isInChatMode() ? `${user}> ` : `${user}$ `;
   term.write(prompt);
 }

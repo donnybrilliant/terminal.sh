@@ -67,7 +67,7 @@ const commandMap = {
   hola: () => "hello",
   chat: () => {
     initializeChat();
-    return "Welcome to the chat! Type ':exit' to leave chat mode.";
+    return ""; // Remove the "Welcome to the chat" message from here
   },
   login: async (args) => {
     if (args.length < 2) {
