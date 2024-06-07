@@ -1,4 +1,3 @@
-// index.js
 import { term, loginManager } from "../terminal/index.js";
 
 // Chat-specific socket
@@ -65,8 +64,13 @@ export function setupChat() {
     });
 
     chatNamespace.on("listAlliances", (alliances) => {
-      term.write(`\r\x1b[2K\r`);
-      term.write(`\r\nAlliances:\r\n${alliances.join("\r\n")}\r\n`);
+      if (alliances.length > 0) {
+        term.write(`\r\x1b[2K\r`);
+        term.write(`\r\nAlliances:\r\n${alliances.join("\r\n")}\r\n`);
+      } else {
+        term.write(`\r\x1b[2K\r`);
+        term.write(`\r\nYou have no alliances.\r\n`);
+      }
       renderPrompt();
     });
   }

@@ -1,4 +1,3 @@
-// allianceHandlers.js
 import {
   getUsers,
   setUsers,

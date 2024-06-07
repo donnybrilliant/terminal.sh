@@ -1,4 +1,3 @@
-// index.js
 import { Server } from "socket.io";
 import { setupChatHandlers } from "./chatHandlers.js";
 import { setupAllianceHandlers } from "./allianceHandlers.js";
