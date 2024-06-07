@@ -1,3 +1,4 @@
+// chatHandlers.js
 import { logMessage, logAction } from "../utils/logger.js";
 
 export function setupChatHandlers(socket, chatNamespace) {
@@ -10,28 +11,17 @@ export function setupChatHandlers(socket, chatNamespace) {
   });
 
   socket.on("joinRoom", (room) => {
-    const previousRoom = socket.currentRoom;
-    if (previousRoom) {
-      socket.leave(previousRoom);
-      chatNamespace
-        .to(previousRoom)
-        .emit("message", `${socket.username} has left the chat`);
+    if (socket.currentRoom) {
+      socket.leave(socket.currentRoom);
     }
     socket.join(room);
     socket.currentRoom = room;
-    chatNamespace
-      .to(room)
-      .emit("message", `${socket.username} has joined the chat`);
     socket.emit("message", `You have joined the room: ${room}`);
   });
 
   socket.on("leaveRoom", () => {
-    const previousRoom = socket.currentRoom;
-    if (previousRoom && previousRoom !== "general") {
-      socket.leave(previousRoom);
-      chatNamespace
-        .to(previousRoom)
-        .emit("message", `${socket.username} has left the chat`);
+    if (socket.currentRoom) {
+      socket.leave(socket.currentRoom);
       socket.currentRoom = "general";
       socket.join("general");
       socket.emit(
