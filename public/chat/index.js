@@ -1,3 +1,4 @@
+// index.js
 import { term, loginManager } from "../terminal/index.js";
 
 // Chat-specific socket
@@ -15,6 +16,12 @@ const chatCommandMap = {
     if (room) {
       currentChatRoom = room;
       chatNamespace.emit("joinRoom", room);
+    }
+  },
+  leave: () => {
+    if (currentChatRoom) {
+      chatNamespace.emit("leaveRoom");
+      currentChatRoom = "general";
     }
   },
   alliances: () => {
@@ -54,6 +61,12 @@ export function setupChat() {
       // Clear the current line and move cursor to the beginning
       term.write(`\r\x1b[2K\r`);
       term.write(`\r\nUsers:\r\n${users.join("\r\n")}\r\n`);
+      renderPrompt();
+    });
+
+    chatNamespace.on("listAlliances", (alliances) => {
+      term.write(`\r\x1b[2K\r`);
+      term.write(`\r\nAlliances:\r\n${alliances.join("\r\n")}\r\n`);
       renderPrompt();
     });
   }

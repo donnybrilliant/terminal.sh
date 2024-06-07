@@ -1,3 +1,4 @@
+// index.js
 import { Server } from "socket.io";
 import { setupChatHandlers } from "./chatHandlers.js";
 import { setupAllianceHandlers } from "./allianceHandlers.js";
@@ -58,7 +59,6 @@ export async function setupSocket(io) {
         .to("general")
         .emit("message", `${username} has left the chat`);
       logAction(username, "Disconnected");
-      //await saveUsers(); // Ensure users are saved after modification
     };
 
     socket.on("disconnect", handleDisconnectOrExit);

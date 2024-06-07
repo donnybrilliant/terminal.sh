@@ -1,5 +1,4 @@
 - Initialization
-- No user can be named guest(Guest)
 - Guest resctrictions (no alliances etc)
 - fix alliance (should not work without args)
 - README is not present when initializing when authenticated

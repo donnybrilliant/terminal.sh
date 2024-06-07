@@ -1,3 +1,4 @@
+// chatHandlers.js
 import { logMessage, logAction } from "../utils/logger.js";
 
 export function setupChatHandlers(socket, chatNamespace) {
@@ -16,5 +17,17 @@ export function setupChatHandlers(socket, chatNamespace) {
     socket.join(room);
     socket.currentRoom = room;
     socket.emit("message", `You have joined the room: ${room}`);
+  });
+
+  socket.on("leaveRoom", () => {
+    if (socket.currentRoom) {
+      socket.leave(socket.currentRoom);
+      socket.currentRoom = "general";
+      socket.join("general");
+      socket.emit(
+        "message",
+        "You have left the current room and joined the general room."
+      );
+    }
   });
 }

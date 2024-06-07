@@ -1,3 +1,4 @@
+// allianceHandlers.js
 import {
   getUsers,
   setUsers,
@@ -54,9 +55,9 @@ export function setupAllianceHandlers(socket, chatNamespace) {
     const users = await getUsers();
     const user = users.find((u) => u.username === socket.username);
     if (user && user.alliance) {
-      socket.emit("message", `Your alliances: ${user.alliance.join(", ")}`);
+      socket.emit("listAlliances", user.alliance);
     } else {
-      socket.emit("message", "You have no alliances.");
+      socket.emit("listAlliances", []);
     }
   });
 }
