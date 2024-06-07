@@ -34,19 +34,26 @@ export class LoginManager {
         await loadFileSystem(this.apiUrl);
       }
     } catch (error) {
-      console.log(`Failed to check login status: ${error.message}`);
+      console.error(`Failed to check login status: ${error.message}`);
     }
   }
 
   async login(username, password) {
-    const status = await this.checkAuthStatus();
-    if (status.data.authenticated) {
+    try {
+      const status = await this.checkAuthStatus();
+      if (status.data.authenticated) {
+        this.term.write(
+          `\r\nUser already logged in as ${status.data.user.username}\r\n`
+        );
+      } else {
+        const result = await this.authenticateUser(username, password);
+        this.term.write(`\r\n${result.message}\r\n`);
+      }
+    } catch (error) {
+      console.error(`Failed to log in: ${error.message}`);
       this.term.write(
-        `\r\nUser already logged in as ${status.data.user.username}\r\n`
+        `\r\nUnable to verify login status. Please try logging in again.\r\n`
       );
-    } else {
-      const result = await this.authenticateUser(username, password);
-      this.term.write(`\r\n${result.message}\r\n`);
     }
   }
 
@@ -91,7 +98,12 @@ export class LoginManager {
       this.term.write(
         `\r\nError checking authentication status: ${error.message}\r\n`
       );
+      console.error(
+        `Silent check for authentication status failed: ${error.message}`
+      );
+
       throw error;
+      //return { data: { authenticated: false } }; // Provide a default response to handle error states gracefully
     }
   }
 }
