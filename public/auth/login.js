@@ -1,4 +1,4 @@
-import { loadFileSystem } from "./fileSystem.js";
+import { loadFileSystem } from "../terminal/fileSystem.js";
 import { fetchWithTimeout } from "../utils/fetch.js";
 
 export class LoginManager {
@@ -28,33 +28,25 @@ export class LoginManager {
       if (status.data.authenticated) {
         this.setUsername(status.data.user.username);
         await loadFileSystem(this.apiUrl);
-        this.term.write(
-          `\r\nLogged in as ${status.data.user.username}\r\n${status.data.user.username}$ `
-        );
+        // return this?
+        console.log(`Logged in as ${status.data.user.username}`);
       } else {
         await loadFileSystem(this.apiUrl);
       }
     } catch (error) {
-      this.term.write(`\r\nFailed to check login status: ${error.message}\r\n`);
+      console.log(`Failed to check login status: ${error.message}`);
     }
   }
 
   async login(username, password) {
-    try {
-      const status = await this.checkAuthStatus();
-      if (status.data.authenticated) {
-        this.term.write(
-          `\r\nUser already logged in as ${status.data.user.username}\r\n`
-        );
-      } else {
-        const data = await this.authenticateUser(username, password);
-        console.log(data);
-        this.term.write(`\r\n${data.message}\r\n`);
-      }
-    } catch (error) {
+    const status = await this.checkAuthStatus();
+    if (status.data.authenticated) {
       this.term.write(
-        `\r\nError checking authentication status: ${error.message}\r\n`
+        `\r\nUser already logged in as ${status.data.user.username}\r\n`
       );
+    } else {
+      const result = await this.authenticateUser(username, password);
+      this.term.write(`\r\n${result.message}\r\n`);
     }
   }
 
@@ -70,8 +62,7 @@ export class LoginManager {
       }
       return data;
     } catch (error) {
-      this.term.write(`\r\nError logging in: ${error.message}\r\n`);
-      throw error;
+      return error;
     }
   }
 

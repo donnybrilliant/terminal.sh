@@ -11,7 +11,12 @@ router.post("/login", function (req, res, next) {
       return next(err); // Errors will be caught by errorHandler
     }
     if (!user) {
-      return sendResponse(res, 401, {}, "Authentication failed");
+      return sendResponse(
+        res,
+        401,
+        {},
+        info.message || "Authentication failed"
+      );
     }
     req.logIn(user, function (err) {
       if (err) {

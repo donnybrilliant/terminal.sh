@@ -1,7 +1,7 @@
 import processCommand from "./commandProcessor.js";
 import handleKeyInput from "./keyInputHandler.js";
 import ascii from "./ascii.js";
-import { LoginManager } from "./login.js";
+import { LoginManager } from "../auth/login.js";
 
 export const term = new Terminal({ cursorBlink: true });
 export const loginManager = new LoginManager("http://localhost:3000");

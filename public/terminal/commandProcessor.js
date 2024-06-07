@@ -9,7 +9,11 @@ import {
   appendToEditedContent,
   getEditedContent,
 } from "./edit.js";
-import { initializeChat, isInChatMode, handleChatCommand } from "./chat.js";
+import {
+  initializeChat,
+  isInChatMode,
+  handleChatCommand,
+} from "../chat/index.js";
 import { loginManager } from "./index.js";
 
 // Command map

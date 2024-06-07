@@ -1,4 +1,4 @@
-import { term, loginManager } from "./index.js";
+import { term, loginManager } from "../terminal/index.js";
 
 // Chat-specific socket
 let chatNamespace;

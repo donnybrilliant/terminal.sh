@@ -1,8 +1,12 @@
 import { stopMatrix } from "./random.js";
 import { loginManager } from "./index.js";
 import { isInEditMode } from "./edit.js";
-import { isInChatMode, handleChatCommand, getChatCommandList } from "./chat.js";
-import { getCommandList } from "./commandProcessor.js"; // Import getCommandList
+import {
+  isInChatMode,
+  handleChatCommand,
+  getChatCommandList,
+} from "../chat/index.js";
+import { getCommandList } from "./commandProcessor.js";
 
 // Buffer to hold the current command being typed by the user.
 let commandBuffer = "";
