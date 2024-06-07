@@ -53,6 +53,16 @@ passport.use(
           return done(null, false, { message: "Incorrect password." });
         }
       } else {
+        const lowercaseUsername = username.toLowerCase();
+        if (
+          lowercaseUsername === "admin" ||
+          lowercaseUsername === "user" ||
+          lowercaseUsername === "guest"
+        ) {
+          return done(null, false, {
+            message: "Username cannot be 'admin', 'user', or 'guest'.",
+          });
+        }
         // No user found, create new user
         const hashedPassword = await bcrypt.hash(password, 10);
         user = {
