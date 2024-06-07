@@ -1,4 +1,4 @@
-import { loadFileSystem } from "./fileSystem.js";
+import { loadFileSystem } from "../terminal/fileSystem.js";
 import { fetchWithTimeout } from "../utils/fetch.js";
 
 export class LoginManager {
