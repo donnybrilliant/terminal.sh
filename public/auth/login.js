@@ -28,14 +28,13 @@ export class LoginManager {
       if (status.data.authenticated) {
         this.setUsername(status.data.user.username);
         await loadFileSystem(this.apiUrl);
-        /*      this.term.write(
-          `\r\nLogged in as ${status.data.user.username}\r\n${status.data.user.username}$ `
-        ); */
+        // return this?
+        console.log(`Logged in as ${status.data.user.username}`);
       } else {
         await loadFileSystem(this.apiUrl);
       }
     } catch (error) {
-      this.term.write(`\r\nFailed to check login status: ${error.message}\r\n`);
+      console.log(`Failed to check login status: ${error.message}`);
     }
   }
 
@@ -63,7 +62,6 @@ export class LoginManager {
       }
       return data;
     } catch (error) {
-      console.log(error);
       return error;
     }
   }
