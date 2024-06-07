@@ -5,8 +5,8 @@ import {
   isInChatMode,
   handleChatCommand,
   getChatCommandList,
-} from "../chat/chat.js";
-import { getCommandList } from "./commandProcessor.js"; // Import getCommandList
+} from "../chat/index.js";
+import { getCommandList } from "./commandProcessor.js";
 
 // Buffer to hold the current command being typed by the user.
 let commandBuffer = "";

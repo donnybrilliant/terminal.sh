@@ -13,7 +13,7 @@ import {
   initializeChat,
   isInChatMode,
   handleChatCommand,
-} from "../chat/chat.js";
+} from "../chat/index.js";
 import { loginManager } from "./index.js";
 
 // Command map
