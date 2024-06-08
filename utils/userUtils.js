@@ -66,3 +66,7 @@ export function findUserSocket(username, namespace) {
   }
   return null;
 }
+
+export function getUserByUsername(username) {
+  return users.find((user) => user.username === username);
+}
