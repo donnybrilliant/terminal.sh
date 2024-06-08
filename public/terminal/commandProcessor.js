@@ -1,5 +1,5 @@
 import { commands } from "./shell.js";
-import { term } from "./index.js";
+import { term, socket } from "./index.js";
 import { loadtest, chars, hack, startMatrix, getClientInfo } from "./random.js";
 import {
   editFile,
@@ -80,19 +80,28 @@ const commandMap = {
     return await loginManager.login(args[0], args[1]);
   },
   logout: async () => await loginManager.logout(),
+  scanIP: async (args) => {
+    if (args.length !== 1) {
+      return "Usage: scanIP <targetIP>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    socket.emit("scanIP", { username, targetIP: args[0] });
+    return `Scanning IP ${args[0]}...`;
+  },
+  hackIP: async (args) => {
+    if (args.length !== 1) {
+      return "Usage: hackIP <targetIP>";
+    }
+    const username = loginManager.getUsername();
+    socket.emit("hackIP", { username, targetIP: args[0] });
+    return `Attempting to hack IP ${args[0]}...`;
+  },
 };
 
 export function getCommandList() {
   return Object.keys(commandMap);
 }
 
-/**
- * Main function to process terminal commands.
- * Delegates work to individual command functions from the command map.
- *
- * @param {string} command - The command entered by the user.
- * @returns {string} - The output of the command.
- */
 export default async function processCommand(command) {
   const [cmd, ...args] = command.split(" ");
 

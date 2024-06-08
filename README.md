@@ -1,4 +1,6 @@
-- Initialization
+- Initialization (good?)
+- From fetch to socket
+- Check over gameHandlers, they might not do what i want
 - Guest resctrictions (no alliances done - what more?)
 - README is not present when initializing when authenticated
 - Better response system with colors - line breaks etc
@@ -9,3 +11,4 @@
 - unique names generator for alliances?
 - autocomplete for /join with available user.alliance[] or the way socket keeps track of the rooms.
 - tab suggestions on multiple lines causes rerender on new lines...
+- test edit mode
