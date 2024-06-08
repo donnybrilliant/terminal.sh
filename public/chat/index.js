@@ -20,8 +20,15 @@ const chatCommandMap = {
     }
   },
   leave: () => {
-    chatNamespace.emit("leaveRoom");
-    currentChatRoom = "general";
+    if (currentChatRoom === "general") {
+      term.write(
+        `\r\nYou are in the general room. Use ':exit' to leave the chat.\r\n`
+      );
+      renderPrompt();
+    } else {
+      chatNamespace.emit("leaveRoom");
+      currentChatRoom = "general";
+    }
   },
   alliances: () => {
     chatNamespace.emit("listAlliances");
@@ -72,6 +79,11 @@ export function setupChat() {
         term.write(`\r\nYou have no alliances.\r\n`);
       }
       renderPrompt();
+    });
+
+    // Listen for room change confirmation and update currentChatRoom
+    chatNamespace.on("roomChanged", (newRoom) => {
+      currentChatRoom = newRoom;
     });
   }
 

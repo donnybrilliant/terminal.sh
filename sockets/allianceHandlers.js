@@ -57,6 +57,7 @@ export function setupAllianceHandlers(socket, chatNamespace) {
         "message",
         `You have been moved to the new alliance room: ${allianceRoom}`
       );
+      creatorSocket.emit("roomChanged", allianceRoom); // Notify client of the room change
     }
   });
 
