@@ -13,10 +13,12 @@ export function setupChatHandlers(socket, chatNamespace) {
     if (socket.currentRoom) {
       const oldRoom = socket.currentRoom;
       socket.leave(oldRoom);
-      // Notify others in the old room that the user has left
-      socket.broadcast
-        .to(oldRoom)
-        .emit("message", `${socket.username} has left the room.`);
+      // Notify others in the old room that the user has left, except if the old room is "general"
+      if (oldRoom !== "general") {
+        socket.broadcast
+          .to(oldRoom)
+          .emit("message", `${socket.username} has left the room.`);
+      }
     }
     socket.join(room);
     socket.currentRoom = room;
