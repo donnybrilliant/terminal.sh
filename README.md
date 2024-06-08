@@ -1,7 +1,5 @@
 - Initialization
-- Guest resctrictions (no alliances etc)
-- fix alliance (should not work without args)
-- cant join rooms not in alliance
+- Guest resctrictions (no alliances done - what more?)
 - only one alliance with same set of users.
 - README is not present when initializing when authenticated
 - Better response system with colors - line breaks etc

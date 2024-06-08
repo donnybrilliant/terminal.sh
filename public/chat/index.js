@@ -8,7 +8,11 @@ let currentChatRoom = "general";
 // Chat command map
 const chatCommandMap = {
   alliance: (args, user) => {
-    chatNamespace.emit("createAlliance", { usernames: args, creator: user });
+    if (args.length === 0) {
+      term.write(`\r\nNo username(s) provided.\r\n`);
+    } else {
+      chatNamespace.emit("createAlliance", { usernames: args, creator: user });
+    }
   },
   join: (args) => {
     const room = args[0];

@@ -21,9 +21,23 @@ export function setupAllianceHandlers(socket, chatNamespace) {
     // Sort the usernames
     usernames.sort();
 
+    const users = await getUsers();
+
+    // Check if all provided usernames exist in users.json
+    const invalidUsernames = usernames.filter(
+      (username) => !users.some((u) => u.username === username)
+    );
+
+    if (invalidUsernames.length > 0) {
+      socket.emit(
+        "message",
+        `The following usernames do not exist: ${invalidUsernames.join(", ")}`
+      );
+      return;
+    }
+
     const allianceRoom = `alliance-${usernames.join("-")}`;
 
-    const users = await getUsers();
     for (const username of usernames) {
       const user = users.find((u) => u.username === username);
       if (user) {
