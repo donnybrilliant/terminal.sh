@@ -13,8 +13,19 @@ const chatCommandMap = {
   join: (args) => {
     const room = args[0];
     if (room) {
-      currentChatRoom = room;
       chatNamespace.emit("joinRoom", room);
+    } else {
+      chatNamespace.emit("listAlliances");
+    }
+  },
+  leave: () => {
+    if (currentChatRoom === "general") {
+      term.write(
+        `\r\nYou are in the general room. Use ':exit' to leave the chat.\r\n`
+      );
+      renderPrompt();
+    } else {
+      chatNamespace.emit("leaveRoom");
     }
   },
   alliances: () => {
@@ -22,7 +33,6 @@ const chatCommandMap = {
   },
   exit: (user) => {
     chatMode = false;
-    currentChatRoom = "general";
     chatNamespace.emit("exit", user);
     renderPrompt();
     return "Exiting chat mode.";
@@ -55,6 +65,22 @@ export function setupChat() {
       term.write(`\r\x1b[2K\r`);
       term.write(`\r\nUsers:\r\n${users.join("\r\n")}\r\n`);
       renderPrompt();
+    });
+
+    chatNamespace.on("listAlliances", (alliances) => {
+      if (alliances.length > 0) {
+        term.write(`\r\x1b[2K\r`);
+        term.write(`\r\nAlliances:\r\n${alliances.join("\r\n")}\r\n`);
+      } else {
+        term.write(`\r\x1b[2K\r`);
+        term.write(`\r\nYou have no alliances.\r\n`);
+      }
+      renderPrompt();
+    });
+
+    // Listen for room change confirmation and update currentChatRoom
+    chatNamespace.on("roomChanged", (newRoom) => {
+      currentChatRoom = newRoom;
     });
   }
 

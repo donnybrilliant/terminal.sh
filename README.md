@@ -1,7 +1,8 @@
 - Initialization
-- No user can be named guest(Guest)
 - Guest resctrictions (no alliances etc)
 - fix alliance (should not work without args)
+- cant join rooms not in alliance
+- only one alliance with same set of users.
 - README is not present when initializing when authenticated
 - Better response system with colors - line breaks etc
 - term.write system (also change everything to (eol?) and writeln)

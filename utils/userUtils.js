@@ -7,6 +7,9 @@ let guestCount = 0;
 export async function loadUsers() {
   try {
     users = await readJSONFile(USERS_FILE_PATH);
+    users.forEach((user) => {
+      user.username = String(user.username); // Ensure usernames are strings
+    });
   } catch (err) {
     console.error("Error loading users:", err);
     users = [];

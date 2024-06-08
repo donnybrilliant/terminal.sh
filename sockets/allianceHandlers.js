@@ -8,11 +8,15 @@ import {
 export function setupAllianceHandlers(socket, chatNamespace) {
   socket.on("createAlliance", async (data) => {
     let { usernames, creator } = data;
-    const allianceRoom = `alliance-${creator}-${Date.now()}`;
 
     if (!usernames.includes(creator)) {
       usernames.push(creator);
     }
+
+    // Sort the usernames
+    usernames.sort();
+
+    const allianceRoom = `alliance-${usernames.join("-")}`;
 
     const users = await getUsers();
     for (const username of usernames) {
@@ -21,7 +25,13 @@ export function setupAllianceHandlers(socket, chatNamespace) {
         if (!user.alliance) {
           user.alliance = [];
         }
-        user.alliance.push(allianceRoom);
+        // Check if the allianceRoom already exists
+        if (!user.alliance.includes(allianceRoom)) {
+          user.alliance.push(allianceRoom);
+        } else {
+          // If the allianceRoom already exists, return or throw an error
+          return;
+        }
       }
     }
 
@@ -47,6 +57,7 @@ export function setupAllianceHandlers(socket, chatNamespace) {
         "message",
         `You have been moved to the new alliance room: ${allianceRoom}`
       );
+      creatorSocket.emit("roomChanged", allianceRoom); // Notify client of the room change
     }
   });
 
@@ -54,9 +65,9 @@ export function setupAllianceHandlers(socket, chatNamespace) {
     const users = await getUsers();
     const user = users.find((u) => u.username === socket.username);
     if (user && user.alliance) {
-      socket.emit("message", `Your alliances: ${user.alliance.join(", ")}`);
+      socket.emit("listAlliances", user.alliance);
     } else {
-      socket.emit("message", "You have no alliances.");
+      socket.emit("listAlliances", []);
     }
   });
 }
