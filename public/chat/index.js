@@ -15,13 +15,13 @@ const chatCommandMap = {
     if (room) {
       currentChatRoom = room;
       chatNamespace.emit("joinRoom", room);
+    } else {
+      chatNamespace.emit("listAlliances");
     }
   },
   leave: () => {
-    if (currentChatRoom !== "general") {
-      chatNamespace.emit("leaveRoom");
-      currentChatRoom = "general";
-    }
+    chatNamespace.emit("leaveRoom");
+    currentChatRoom = "general";
   },
   alliances: () => {
     chatNamespace.emit("listAlliances");

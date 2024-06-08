@@ -20,10 +20,11 @@ export function setupChatHandlers(socket, chatNamespace) {
   });
 
   socket.on("leaveRoom", () => {
+    console.log(socket.currentRoom);
     if (socket.currentRoom) {
       socket.leave(socket.currentRoom);
-      socket.currentRoom = "general";
       socket.join("general");
+      socket.currentRoom = "general";
       socket.emit(
         "message",
         "You have left the current room and joined the general room."
