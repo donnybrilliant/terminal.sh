@@ -26,7 +26,7 @@ export async function setupSocket(io) {
     socket.on("joinGeneral", async (providedUsername) => {
       if (username) return;
 
-      username = providedUsername;
+      username = String(providedUsername); // Ensure username is a string
       socket.username = username;
       socket.join("general");
 
@@ -54,8 +54,9 @@ export async function setupSocket(io) {
         removeOnlineUser(username);
       }
 
+      const currentRoom = socket.currentRoom || "general";
       socket.broadcast
-        .to("general")
+        .to(currentRoom)
         .emit("message", `${username} has left the chat`);
       logAction(username, "Disconnected");
     };

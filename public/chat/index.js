@@ -18,7 +18,7 @@ const chatCommandMap = {
     }
   },
   leave: () => {
-    if (currentChatRoom) {
+    if (currentChatRoom !== "general") {
       chatNamespace.emit("leaveRoom");
       currentChatRoom = "general";
     }
