@@ -1,4 +1,6 @@
-- Initialization
+- Initialization (good?)
+- From fetch to socket
+- Check over gameHandlers, they might not do what i want
 - Guest resctrictions (no alliances done - what more?)
 - README is not present when initializing when authenticated
 - Better response system with colors - line breaks etc
