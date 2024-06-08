@@ -18,7 +18,6 @@ export function setupChatHandlers(socket, chatNamespace) {
       if (socket.currentRoom) {
         const oldRoom = socket.currentRoom;
         socket.leave(oldRoom);
-        // Notify others in the old room that the user has left, except if the old room is "general"
         if (oldRoom !== "general") {
           socket.broadcast
             .to(oldRoom)
@@ -28,11 +27,9 @@ export function setupChatHandlers(socket, chatNamespace) {
       socket.join(room);
       socket.currentRoom = room;
       socket.emit("message", `You have joined the room: ${room}`);
-      // Notify others in the new room that the user has joined
       socket.broadcast
         .to(room)
         .emit("message", `${socket.username} has joined the room.`);
-      // Emit roomChanged event to update the client
       socket.emit("roomChanged", room);
     } else {
       socket.emit("message", "You do not have access to this room.");
@@ -43,7 +40,6 @@ export function setupChatHandlers(socket, chatNamespace) {
     if (socket.currentRoom) {
       const room = socket.currentRoom;
       socket.leave(room);
-      // Notify others in the room that the user has left
       socket.broadcast
         .to(room)
         .emit("message", `${socket.username} has left the room.`);
@@ -53,7 +49,6 @@ export function setupChatHandlers(socket, chatNamespace) {
         "message",
         "You have left the room and joined the general room."
       );
-      // Emit roomChanged event to update the client
       socket.emit("roomChanged", "general");
     }
   });

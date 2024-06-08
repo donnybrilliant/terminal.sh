@@ -21,6 +21,7 @@ export async function setupSocket(io) {
 
   chatNamespace.on("connection", (socket) => {
     let username;
+    let hasDisconnected = false;
     socket.currentRoom = "general";
 
     socket.on("joinGeneral", async (providedUsername) => {
@@ -45,8 +46,21 @@ export async function setupSocket(io) {
     setupChatHandlers(socket, chatNamespace);
     setupAllianceHandlers(socket, chatNamespace);
 
-    const handleDisconnectOrExit = async () => {
-      if (!username) return;
+    const handleDisconnectOrExit = async (reason) => {
+      if (!username || hasDisconnected) return;
+      hasDisconnected = true;
+
+      const currentRoom = socket.currentRoom || "general";
+      if (currentRoom !== "general") {
+        socket.leave(currentRoom);
+        socket.broadcast
+          .to(currentRoom)
+          .emit("message", `${username} has left the room.`);
+        socket.join("general");
+      }
+      socket.broadcast
+        .to("general")
+        .emit("message", `${username} has left the chat`);
 
       if (username === "Guest") {
         decrementGuestCount();
@@ -54,15 +68,12 @@ export async function setupSocket(io) {
         removeOnlineUser(username);
       }
 
-      const currentRoom = socket.currentRoom || "general";
-      socket.broadcast
-        .to(currentRoom)
-        .emit("message", `${username} has left the chat`);
-      logAction(username, "Disconnected");
+      logAction(username, `Disconnected: ${reason}`);
+      socket.disconnect(true); // Disconnect the socket
     };
 
-    socket.on("disconnect", handleDisconnectOrExit);
-    socket.on("exit", handleDisconnectOrExit);
+    socket.on("disconnect", (reason) => handleDisconnectOrExit(reason));
+    socket.on("exit", () => handleDisconnectOrExit("exit"));
 
     socket.on("listUsers", async () => {
       const users = await getUsers();

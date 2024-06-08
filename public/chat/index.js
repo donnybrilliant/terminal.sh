@@ -38,8 +38,9 @@ const chatCommandMap = {
   exit: (user) => {
     chatMode = false;
     chatNamespace.emit("exit", user);
+    chatNamespace = null; // Ensure the namespace is set to null for reconnection
+    term.write(`\r\nExited chat.\r\n`);
     renderPrompt();
-    return "Exiting chat mode.";
   },
   list: () => {
     chatNamespace.emit("listUsers");
