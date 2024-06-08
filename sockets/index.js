@@ -91,7 +91,7 @@ export async function setupSocket(io) {
 
     logAction(username, "User connected");
 
-    //setupGameHandlers(socket, io);
+    setupGameHandlers(socket, io);
 
     socket.on("disconnect", () => {
       logAction(username, "User disconnected");

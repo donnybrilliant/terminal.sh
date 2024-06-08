@@ -9,3 +9,4 @@
 - unique names generator for alliances?
 - autocomplete for /join with available user.alliance[] or the way socket keeps track of the rooms.
 - tab suggestions on multiple lines causes rerender on new lines...
+- test edit mode
