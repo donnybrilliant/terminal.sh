@@ -13,7 +13,6 @@ const chatCommandMap = {
   join: (args) => {
     const room = args[0];
     if (room) {
-      currentChatRoom = room;
       chatNamespace.emit("joinRoom", room);
     } else {
       chatNamespace.emit("listAlliances");
@@ -27,7 +26,6 @@ const chatCommandMap = {
       renderPrompt();
     } else {
       chatNamespace.emit("leaveRoom");
-      currentChatRoom = "general";
     }
   },
   alliances: () => {
@@ -35,7 +33,6 @@ const chatCommandMap = {
   },
   exit: (user) => {
     chatMode = false;
-    currentChatRoom = "general";
     chatNamespace.emit("exit", user);
     renderPrompt();
     return "Exiting chat mode.";

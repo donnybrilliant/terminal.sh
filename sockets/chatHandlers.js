@@ -27,6 +27,8 @@ export function setupChatHandlers(socket, chatNamespace) {
     socket.broadcast
       .to(room)
       .emit("message", `${socket.username} has joined the room.`);
+    // Emit roomChanged event to update the client
+    socket.emit("roomChanged", room);
   });
 
   socket.on("leaveRoom", () => {
@@ -43,6 +45,8 @@ export function setupChatHandlers(socket, chatNamespace) {
         "message",
         "You have left the room and joined the general room."
       );
+      // Emit roomChanged event to update the client
+      socket.emit("roomChanged", "general");
     }
   });
 }
