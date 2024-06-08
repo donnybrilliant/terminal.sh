@@ -22,8 +22,13 @@ let mainHistoryIndex = -1;
 let chatHistoryIndex = -1;
 
 // List of available commands for auto-completion
-const availableCommands = getCommandList();
-const chatCommands = getChatCommandList();
+let availableCommands;
+let chatCommands;
+
+function initializeCommandLists() {
+  availableCommands = getCommandList();
+  chatCommands = getChatCommandList();
+}
 
 function clearSuggestions(term) {
   if (isShowingSuggestions) {
@@ -53,20 +58,25 @@ function render(term) {
   }
 }
 
-/**
- * Handles individual key inputs from the user for the terminal.
- *
- * @param {Object} param0 - Destructured parameter object.
- * @param {string} param0.key - The character representation of the key pressed.
- * @param {Object} param0.domEvent - The original key event object.
- * @param {Object} term - The xterm.js terminal object.
- * @param {function} processCommand - The function to process the full command once Enter is pressed.
- */
+export function saveCommandBuffer() {
+  return { commandBuffer, cursorPosition };
+}
+
+export function restoreCommandBuffer(term, state) {
+  commandBuffer = state.commandBuffer;
+  cursorPosition = state.cursorPosition;
+  render(term);
+}
+
 export default async function handleKeyInput(
   { key, domEvent },
   term,
   processCommand
 ) {
+  if (!availableCommands) {
+    initializeCommandLists();
+  }
+
   const keyCode = domEvent.keyCode || domEvent.which;
   const history = isInChatMode() ? chatCommandHistory : mainCommandHistory;
   let historyIndex = isInChatMode() ? chatHistoryIndex : mainHistoryIndex;
