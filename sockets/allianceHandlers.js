@@ -14,12 +14,25 @@ export function setupAllianceHandlers(socket, chatNamespace) {
       return;
     }
 
+    if (usernames.length === 0) {
+      socket.emit("message", "No usernames provided for the alliance.");
+      return;
+    }
+
     if (!usernames.includes(creator)) {
       usernames.push(creator);
     }
 
-    // Sort the usernames
-    usernames.sort();
+    // Sort and remove duplicates
+    usernames = [...new Set(usernames)].sort();
+
+    if (usernames.length === 1) {
+      socket.emit(
+        "message",
+        "You cannot create an alliance with just yourself."
+      );
+      return;
+    }
 
     const users = await getUsers();
 
@@ -38,19 +51,28 @@ export function setupAllianceHandlers(socket, chatNamespace) {
 
     const allianceRoom = `alliance-${usernames.join("-")}`;
 
+    let allianceAlreadyExists = false;
     for (const username of usernames) {
       const user = users.find((u) => u.username === username);
       if (user) {
         if (!user.alliance) {
           user.alliance = [];
         }
-        // Check if the allianceRoom already exists
-        if (!user.alliance.includes(allianceRoom)) {
-          user.alliance.push(allianceRoom);
-        } else {
-          // If the allianceRoom already exists, return or throw an error
-          return;
+        if (user.alliance.includes(allianceRoom)) {
+          allianceAlreadyExists = true;
         }
+      }
+    }
+
+    if (allianceAlreadyExists) {
+      socket.emit("message", `The alliance '${allianceRoom}' already exists.`);
+      return;
+    }
+
+    for (const username of usernames) {
+      const user = users.find((u) => u.username === username);
+      if (user) {
+        user.alliance.push(allianceRoom);
       }
     }
 
