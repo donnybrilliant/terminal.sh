@@ -1,4 +1,8 @@
 import { term, loginManager } from "../terminal/index.js";
+import {
+  saveCommandBuffer,
+  restoreCommandBuffer,
+} from "../terminal/keyInputHandler.js";
 
 // Chat-specific socket
 let chatNamespace;
@@ -59,10 +63,11 @@ export function setupChat() {
     chatNamespace = io("/chat");
 
     chatNamespace.on("message", (message) => {
+      const state = saveCommandBuffer();
       // Clear the current line and move cursor to the beginning
       term.write(`\r\x1b[2K\r`);
       term.write(`${message}\r\n`);
-      renderPrompt();
+      restoreCommandBuffer(term, state);
     });
 
     chatNamespace.on("userList", (users) => {
@@ -73,6 +78,7 @@ export function setupChat() {
     });
 
     chatNamespace.on("listAlliances", (alliances) => {
+      const state = saveCommandBuffer();
       if (alliances.length > 0) {
         term.write(`\r\x1b[2K\r`);
         term.write(`\r\nAlliances:\r\n${alliances.join("\r\n")}\r\n`);
@@ -80,7 +86,8 @@ export function setupChat() {
         term.write(`\r\x1b[2K\r`);
         term.write(`\r\nYou have no alliances.\r\n`);
       }
-      renderPrompt();
+      //renderPrompt() - save/restoreCommandBuffer vs renderPrompt here?
+      restoreCommandBuffer(term, state);
     });
 
     // Listen for room change confirmation and update currentChatRoom
