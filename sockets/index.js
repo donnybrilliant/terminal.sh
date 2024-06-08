@@ -1,18 +1,13 @@
-import { Server } from "socket.io";
 import { setupChatHandlers } from "./chatHandlers.js";
 import { setupAllianceHandlers } from "./allianceHandlers.js";
+import { setupGameHandlers } from "./gameHandlers.js";
 import { logAction } from "../utils/logger.js";
 import {
   getUsers,
-  setUsers,
-  getOnlineUsers,
-  getGuestCount,
-  incrementGuestCount,
-  decrementGuestCount,
   addOnlineUser,
   removeOnlineUser,
-  findUserSocket,
-  saveUsers,
+  incrementGuestCount,
+  decrementGuestCount,
 } from "../utils/userUtils.js";
 
 export async function setupSocket(io) {
@@ -68,7 +63,7 @@ export async function setupSocket(io) {
         removeOnlineUser(username);
       }
 
-      logAction(username, `Disconnected: ${reason}`);
+      logAction(username, `Disconnected from chat: ${reason}`);
       socket.disconnect(true); // Disconnect the socket
     };
 
@@ -92,6 +87,14 @@ export async function setupSocket(io) {
   });
 
   io.on("connection", (socket) => {
-    // General and game-related socket handling can be added here
+    let username = "guest";
+
+    logAction(username, "User connected");
+
+    //setupGameHandlers(socket, io);
+
+    socket.on("disconnect", () => {
+      logAction(username, "User disconnected");
+    });
   });
 }

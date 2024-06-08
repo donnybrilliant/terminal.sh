@@ -10,6 +10,10 @@ const DATA_DIR = path.join(__dirname, "../data");
 const MESSAGES_DIR = path.join(__dirname, "../data/messages");
 const USERS_FILE_PATH = path.join(DATA_DIR, "users.json");
 const FILE_SYSTEM_PATH = path.join(DATA_DIR, "filesystem.json");
+const INTERNET_FILE_PATH = path.join(DATA_DIR, "internet.json");
+const TOOLS_FILE_PATH = path.join(DATA_DIR, "tools.json");
+const STORE_FILE_PATH = path.join(DATA_DIR, "store.json");
+const RESOURCES_FILE_PATH = path.join(DATA_DIR, "resources.json");
 const LOG_FILE_PATH = path.join(DATA_DIR, "logs.json");
 
 const lock = new AsyncLock();
@@ -46,4 +50,8 @@ export {
   FILE_SYSTEM_PATH,
   LOG_FILE_PATH,
   MESSAGES_DIR,
+  INTERNET_FILE_PATH,
+  TOOLS_FILE_PATH,
+  STORE_FILE_PATH,
+  RESOURCES_FILE_PATH,
 };
