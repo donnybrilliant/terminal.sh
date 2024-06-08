@@ -9,6 +9,11 @@ export function setupAllianceHandlers(socket, chatNamespace) {
   socket.on("createAlliance", async (data) => {
     let { usernames, creator } = data;
 
+    if (creator.toLowerCase() === "guest") {
+      socket.emit("message", "Guests cannot create alliances. Please log in.");
+      return;
+    }
+
     if (!usernames.includes(creator)) {
       usernames.push(creator);
     }
