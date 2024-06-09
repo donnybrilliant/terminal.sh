@@ -4,6 +4,13 @@ import { setupChatHandlers } from "./chatHandlers.js";
 import { setupAllianceHandlers } from "./allianceHandlers.js";
 import { setupGameHandlers } from "./gameHandlers.js";
 import { logAction } from "../utils/logger.js";
+import {
+  getUsers,
+  addOnlineUser,
+  removeOnlineUser,
+  incrementGuestCount,
+  decrementGuestCount,
+} from "../utils/userUtils.js";
 
 export function setupSocket(io) {
   io.on("connection", (socket) => {
