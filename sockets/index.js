@@ -1,41 +1,18 @@
-// sockets/index.js
-import passport from "passport";
 import { setupAuthHandlers } from "./authHandlers.js";
 import { setupFileSystemHandlers } from "./fileSystemHandlers.js";
 import { setupChatHandlers } from "./chatHandlers.js";
 import { setupAllianceHandlers } from "./allianceHandlers.js";
 import { setupGameHandlers } from "./gameHandlers.js";
 import { logAction } from "../utils/logger.js";
-import {
-  getUsers,
-  addOnlineUser,
-  removeOnlineUser,
-  incrementGuestCount,
-  decrementGuestCount,
-} from "../utils/userUtils.js";
 
-function onlyForHandshake(middleware) {
-  return (req, res, next) => {
-    // Apply middleware only for new handshakes (no session ID)
-    const isHandshake = req._query.sid === undefined;
-    if (isHandshake) {
-      middleware(req, res, next);
-    } else {
-      next();
-    }
-  };
-}
-
-export function setupSocket(io, sessionMiddleware) {
-  io.engine.use(onlyForHandshake(sessionMiddleware));
-  io.engine.use(onlyForHandshake(passport.session()));
-
+export function setupSocket(io) {
   io.on("connection", (socket) => {
-    let username = "guest";
+    // Initially connected as guest
+    console.log("Guest connected");
 
+    const username = socket.user ? socket.user.username : "guest";
     logAction(username, "User connected");
-
-    setupAuthHandlers(socket, io);
+    setupAuthHandlers(socket);
     setupFileSystemHandlers(socket, io);
     setupGameHandlers(socket, io);
 
@@ -69,6 +46,7 @@ export function setupSocket(io, sessionMiddleware) {
         .to("general")
         .emit("message", `${username} has joined the chat`);
     });
+
     setupChatHandlers(socket, chatNamespace);
     setupAllianceHandlers(socket, chatNamespace);
 

@@ -5,7 +5,8 @@ import { LoginManager } from "../auth/login.js";
 import { initializeGame } from "../game/index.js"; // Import initializeGame function
 
 export const term = new Terminal({ cursorBlink: true });
-export const socket = io();
+//export const socket = io();
+export const socket = io("http://localhost:3000");
 export const loginManager = new LoginManager(socket, "http://localhost:3000");
 
 document.addEventListener("DOMContentLoaded", async function () {
@@ -30,7 +31,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   // Initialize the login state and load filesystem if logged in
   await loginManager.initializeLoginState();
-
+  //loginManager.checkAuthStatus();
   // Initialize the game
   initializeGame();
 
