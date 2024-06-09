@@ -1,22 +1,18 @@
-import fs from "fs";
-import path from "path";
+// auth.js
 import passport from "passport";
 import LocalStrategy from "passport-local";
 import bcrypt from "bcryptjs";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
 import { v4 as uuidv4 } from "uuid"; // Import uuid library
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const DATA_DIR = path.join(__dirname, "data");
-const USERS_FILE_PATH = path.join(DATA_DIR, "users.json");
-const FILE_SYSTEM_PATH = path.join(DATA_DIR, "filesystem.json");
+import {
+  readJSONFile,
+  writeJSONFile,
+  USERS_FILE_PATH,
+  FILE_SYSTEM_PATH,
+} from "./utils/fileUtils.js"; // Import the utility functions
 
 passport.serializeUser(function (user, cb) {
   process.nextTick(function () {
-    cb(null, { id: user.id, username: user.username });
+    cb(null, user);
   });
 });
 
@@ -41,13 +37,14 @@ function generateUniqueIP(users) {
 passport.use(
   new LocalStrategy(async (username, password, done) => {
     try {
-      let users = JSON.parse(fs.readFileSync(USERS_FILE_PATH, "utf-8"));
+      let users = await readJSONFile(USERS_FILE_PATH);
       let user = users.find((u) => u.username === username);
 
       if (user) {
         // User exists, check password
         const match = await bcrypt.compare(password, user.password);
         if (match) {
+          console.log("User authenticated:", user);
           return done(null, user);
         } else {
           return done(null, false, { message: "Incorrect password." });
@@ -73,13 +70,14 @@ passport.use(
           home: {},
         };
         users.push(user);
-        fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(users, null, 2));
+        await writeJSONFile(USERS_FILE_PATH, users);
 
-        // Update filesystem.json
-        let fileSystem = JSON.parse(fs.readFileSync(FILE_SYSTEM_PATH, "utf-8"));
+        /*         // Update filesystem.json
+        let fileSystem = await readJSONFile(FILE_SYSTEM_PATH);
         fileSystem.root.home.users.push(username);
-        fs.writeFileSync(FILE_SYSTEM_PATH, JSON.stringify(fileSystem, null, 2));
+        await writeJSONFile(FILE_SYSTEM_PATH, fileSystem); */
 
+        console.log("New user created:", user);
         return done(null, user);
       }
     } catch (error) {
