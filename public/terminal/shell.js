@@ -76,13 +76,7 @@ function createHyperlink(text, url) {
  * @param {string} filename - Name of the file to display.
  * @returns {string} - Content of the file or an error message.
  */
-/**
- * Mocked ShellJS 'cat' command.
- * Displays the contents of a file.
- *
- * @param {string} filename - Name of the file to display.
- * @returns {string} - Content of the file or an error message.
- */
+
 function cat(filename) {
   const currentDir = getCurrentDir();
   if (filename in currentDir) {
@@ -154,10 +148,6 @@ function help() {
     `${ANSI_COLORS.green}logout${ANSI_COLORS.reset}                   - Log out\r\n` +
     `${ANSI_COLORS.green}help${ANSI_COLORS.reset}                     - Display this help menu`
   );
-}
-
-function handleSetName(newName) {
-  return setName(newName);
 }
 
 function remove(args = []) {
@@ -253,7 +243,6 @@ export const commands = {
   cd: cd,
   pwd: pwd,
   help: help,
-  name: handleSetName,
   rm: remove,
   clear: clear,
   mkdir: mkdir,
