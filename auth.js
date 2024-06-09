@@ -1,27 +1,29 @@
-// auth.js
 import passport from "passport";
-import LocalStrategy from "passport-local";
+import { Strategy as LocalStrategy } from "passport-local";
+import { Strategy as JwtStrategy, ExtractJwt } from "passport-jwt";
 import bcrypt from "bcryptjs";
-import { v4 as uuidv4 } from "uuid"; // Import uuid library
+import jwt from "jsonwebtoken";
+import { v4 as uuidv4 } from "uuid";
 import {
   readJSONFile,
   writeJSONFile,
   USERS_FILE_PATH,
   FILE_SYSTEM_PATH,
-} from "./utils/fileUtils.js"; // Import the utility functions
+} from "./utils/fileUtils.js";
 
-passport.serializeUser(function (user, cb) {
-  process.nextTick(function () {
-    cb(null, user);
-  });
+const JWT_SECRET = "your_jwt_secret"; // Use a strong secret key in production
+
+passport.serializeUser((user, cb) => {
+  cb(null, user.id);
 });
 
-passport.deserializeUser(function (user, cb) {
-  process.nextTick(function () {
-    return cb(null, user);
-  });
+passport.deserializeUser(async (id, cb) => {
+  const users = await readJSONFile(USERS_FILE_PATH);
+  const user = users.find((u) => u.id === id);
+  cb(null, user);
 });
 
+// should be in a util
 function generateUniqueIP(users) {
   const usedIPs = new Set(users.map((user) => user.ip));
   let ip;
@@ -44,7 +46,7 @@ passport.use(
         // User exists, check password
         const match = await bcrypt.compare(password, user.password);
         if (match) {
-          console.log("User authenticated:", user);
+          //console.log("User authenticated:", user);
           return done(null, user);
         } else {
           return done(null, false, { message: "Incorrect password." });
@@ -72,12 +74,12 @@ passport.use(
         users.push(user);
         await writeJSONFile(USERS_FILE_PATH, users);
 
-        /*         // Update filesystem.json
+        // Update filesystem.json
         let fileSystem = await readJSONFile(FILE_SYSTEM_PATH);
         fileSystem.root.home.users.push(username);
-        await writeJSONFile(FILE_SYSTEM_PATH, fileSystem); */
+        await writeJSONFile(FILE_SYSTEM_PATH, fileSystem);
 
-        console.log("New user created:", user);
+        //console.log("New user created:", user);
         return done(null, user);
       }
     } catch (error) {
@@ -85,5 +87,33 @@ passport.use(
     }
   })
 );
+
+passport.use(
+  new JwtStrategy(
+    {
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      secretOrKey: JWT_SECRET,
+    },
+    async (payload, done) => {
+      try {
+        const users = await readJSONFile(USERS_FILE_PATH);
+        const user = users.find((u) => u.id === payload.id);
+        if (user) {
+          return done(null, user);
+        } else {
+          return done(null, false);
+        }
+      } catch (err) {
+        return done(err);
+      }
+    }
+  )
+);
+
+export const generateToken = (user) => {
+  return jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, {
+    expiresIn: "1h",
+  });
+};
 
 export default passport;
