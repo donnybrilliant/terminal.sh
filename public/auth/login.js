@@ -87,4 +87,24 @@ export class LoginManager {
     await this.initializeLoginState();
     this.term.write(`\r\nLogged out successfully.\r\n`);
   }
+  async checkAuth() {
+    try {
+      const token = localStorage.getItem("jwtToken");
+      const localUsername = this.getUsername();
+      if (!token || !localUsername) {
+        // No JWT token or username, consider as not authenticated
+        return false;
+      }
+      const isAuthenticated = await new Promise((resolve) => {
+        this.socket.emit("check-auth");
+        this.socket.on("auth-status", (data) => {
+          resolve(data.authenticated);
+        });
+      });
+      return isAuthenticated;
+    } catch (error) {
+      console.error(`Authentication check error: ${error.message}`);
+      return false;
+    }
+  }
 }
