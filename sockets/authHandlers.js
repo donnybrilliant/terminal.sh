@@ -12,7 +12,7 @@ export function setupAuthHandlers(socket) {
       }
       socket.user = decoded;
       callback({ success: true, user: socket.user });
-      console.log("User authenticated:", socket.user);
+      //console.log("User authenticated:", socket.user);
     });
   });
 

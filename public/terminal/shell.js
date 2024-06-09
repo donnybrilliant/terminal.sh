@@ -2,7 +2,6 @@ import {
   setCurrentDir,
   getCurrentDir,
   getCurrentPath,
-  setName,
   saveUserHome,
 } from "./fileSystem.js";
 import { ANSI_COLORS } from "./colors.js";

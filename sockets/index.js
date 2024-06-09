@@ -14,9 +14,6 @@ import {
 
 export function setupSocket(io) {
   io.on("connection", (socket) => {
-    // Initially connected as guest
-    console.log("Guest connected");
-
     const username = socket.user ? socket.user.username : "guest";
     logAction(username, "User connected");
     setupAuthHandlers(socket);

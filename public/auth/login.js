@@ -1,10 +1,11 @@
+import { loadFileSystem } from "../terminal/fileSystem.js";
 import { fetchWithTimeout } from "../utils/fetch.js";
 
 export class LoginManager {
   constructor(socket, apiUrl) {
     this.socket = socket;
     this.apiUrl = apiUrl;
-    this.username = null;
+    this.username = "";
   }
 
   setTerminal(term) {
@@ -21,21 +22,29 @@ export class LoginManager {
 
   async initializeLoginState() {
     this.socket.connect();
-    const token = localStorage.getItem("jwtToken");
-    if (token) {
-      this.authenticateSocket(token);
-    }
+    this.socket.on("connect", async () => {
+      const token = localStorage.getItem("jwtToken");
+      if (token) {
+        await this.authenticateSocket(token);
+      } else {
+        await loadFileSystem();
+      }
+    });
   }
 
   async authenticateSocket(token) {
-    this.socket.emit("authenticate", token, (response) => {
-      if (response.success) {
-        this.setUsername(response.user.username);
-        console.log(`Authenticated as ${response.user.username}`);
-      } else {
-        console.log(response.message);
-        localStorage.removeItem("jwtToken");
-      }
+    return new Promise((resolve) => {
+      this.socket.emit("authenticate", token, async (response) => {
+        if (response.success) {
+          this.setUsername(response.user.username);
+          console.log(`Authenticated as ${response.user.username}`);
+        } else {
+          console.log(response.message);
+          localStorage.removeItem("jwtToken");
+        }
+        await loadFileSystem();
+        resolve();
+      });
     });
   }
 
@@ -51,7 +60,7 @@ export class LoginManager {
         method: "POST",
         body: JSON.stringify({ username, password }),
       });
-      console.log(result);
+
       if (result.success) {
         const { token, user } = result.data;
         localStorage.setItem("jwtToken", token);
@@ -68,12 +77,12 @@ export class LoginManager {
 
   async logout() {
     localStorage.removeItem("jwtToken");
-    this.socket.emit("authenticate", null, () => {
+    this.socket.emit("authenticate", null, async () => {
       this.socket.auth = {};
-      this.setUsername(null);
+      this.setUsername("");
       this.term.write(`\r\nLogged out successfully.\r\n`);
       this.socket.disconnect();
+      await this.initializeLoginState();
     });
-    await this.initializeLoginState();
   }
 }
