@@ -5,8 +5,8 @@ import { LoginManager } from "../auth/login.js";
 import { initializeGame } from "../game/index.js"; // Import initializeGame function
 
 export const term = new Terminal({ cursorBlink: true });
-export const loginManager = new LoginManager("http://localhost:3000");
 export const socket = io();
+export const loginManager = new LoginManager(socket, "http://localhost:3000");
 
 document.addEventListener("DOMContentLoaded", async function () {
   const terminalContainer = document.getElementById("terminal-container");
@@ -28,10 +28,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     fitAddon.fit();
   });
 
-  // Handle key input
-  term.onKey((eventData) => handleKeyInput(eventData, term, processCommand));
-
-  loginManager.clearUsername();
   // Initialize the login state and load filesystem if logged in
   await loginManager.initializeLoginState();
 
@@ -41,6 +37,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   // Print the ascii art
   ascii(term);
   // Should ascii be awaited?
+
+  // Handle key input
+  term.onKey((eventData) => handleKeyInput(eventData, term, processCommand));
 
   term.focus();
 });
