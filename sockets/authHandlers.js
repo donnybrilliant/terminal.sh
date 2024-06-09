@@ -1,9 +1,10 @@
 import jwt from "jsonwebtoken";
 
 // should be in a .env? how does that work serving static like this?
-const JWT_SECRET = "SATAN I HELVETTE"; // Use a strong secret key in production
+const JWT_SECRET = "your_jwt_secret"; // Use a strong secret key in production
 
 export function setupAuthHandlers(socket) {
+  // Authenticate user after initial connection
   socket.on("authenticate", (token, callback) => {
     jwt.verify(token, JWT_SECRET, (err, decoded) => {
       if (err) {

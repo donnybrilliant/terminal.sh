@@ -20,35 +20,22 @@ export class LoginManager {
   }
 
   async initializeLoginState() {
-    this.socket.connect(); // Connect as a guest initially
+    this.socket.connect();
     const token = localStorage.getItem("jwtToken");
     if (token) {
-      await this.authenticateSocket(token);
+      this.authenticateSocket(token);
     }
   }
 
   async authenticateSocket(token) {
-    const response = await this.emitSocketEvent("authenticate", token);
-    if (response.success) {
-      this.setUsername(response.user.username);
-      console.log(`Authenticated as ${response.user.username}`);
-    } else {
-      console.log(response.message);
-      localStorage.removeItem("jwtToken");
-      throw new Error(response.message);
-    }
-    // load file system?
-  }
-
-  emitSocketEvent(event, data) {
-    return new Promise((resolve, reject) => {
-      this.socket.emit(event, data, (response) => {
-        if (response) {
-          resolve(response);
-        } else {
-          reject(new Error("No response from socket event"));
-        }
-      });
+    this.socket.emit("authenticate", token, (response) => {
+      if (response.success) {
+        this.setUsername(response.user.username);
+        console.log(`Authenticated as ${response.user.username}`);
+      } else {
+        console.log(response.message);
+        localStorage.removeItem("jwtToken");
+      }
     });
   }
 
@@ -56,18 +43,15 @@ export class LoginManager {
     const token = localStorage.getItem("jwtToken");
     if (token) {
       this.term.write(`\r\nAlready logged in.\r\n`);
-      return;
+      return; // Exit if already logged in
     }
 
     try {
       const result = await fetchWithTimeout(`${this.apiUrl}/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ username, password }),
       });
-
+      console.log(result);
       if (result.success) {
         const { token, user } = result.data;
         localStorage.setItem("jwtToken", token);
@@ -84,11 +68,12 @@ export class LoginManager {
 
   async logout() {
     localStorage.removeItem("jwtToken");
-    await this.emitSocketEvent("authenticate", null);
-    this.socket.auth = {};
-    this.setUsername(null);
-    this.term.write(`\r\nLogged out successfully.\r\n`);
-    this.socket.disconnect();
+    this.socket.emit("authenticate", null, () => {
+      this.socket.auth = {};
+      this.setUsername(null);
+      this.term.write(`\r\nLogged out successfully.\r\n`);
+      this.socket.disconnect();
+    });
     await this.initializeLoginState();
   }
 }
