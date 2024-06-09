@@ -36,7 +36,7 @@ router.post("/logout", function (req, res) {
   });
 });
 
-router.get("/auth-status", (req, res) => {
+/* router.get("/auth-status", (req, res) => {
   if (req.isAuthenticated()) {
     sendResponse(
       res,
@@ -52,7 +52,7 @@ router.get("/auth-status", (req, res) => {
       "User is not authenticated"
     );
   }
-});
+}); */
 
 router.use(errorHandler);
 
