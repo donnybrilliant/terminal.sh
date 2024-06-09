@@ -1,3 +1,7 @@
+// sockets/index.js
+import passport from "passport";
+import { setupAuthHandlers } from "./authHandlers.js";
+import { setupFileSystemHandlers } from "./fileSystemHandlers.js";
 import { setupChatHandlers } from "./chatHandlers.js";
 import { setupAllianceHandlers } from "./allianceHandlers.js";
 import { setupGameHandlers } from "./gameHandlers.js";
@@ -10,8 +14,36 @@ import {
   decrementGuestCount,
 } from "../utils/userUtils.js";
 
-export async function setupSocket(io) {
-  await getUsers();
+function onlyForHandshake(middleware) {
+  return (req, res, next) => {
+    // Apply middleware only for new handshakes (no session ID)
+    const isHandshake = req._query.sid === undefined;
+    if (isHandshake) {
+      middleware(req, res, next);
+    } else {
+      next();
+    }
+  };
+}
+
+export function setupSocket(io, sessionMiddleware) {
+  io.engine.use(onlyForHandshake(sessionMiddleware));
+  io.engine.use(onlyForHandshake(passport.session()));
+
+  io.on("connection", (socket) => {
+    let username = "guest";
+
+    logAction(username, "User connected");
+
+    setupAuthHandlers(socket, io);
+    setupFileSystemHandlers(socket, io);
+    setupGameHandlers(socket, io);
+
+    socket.on("disconnect", () => {
+      logAction(username, "User disconnected");
+    });
+  });
+
   const chatNamespace = io.of("/chat");
 
   chatNamespace.on("connection", (socket) => {
@@ -37,7 +69,6 @@ export async function setupSocket(io) {
         .to("general")
         .emit("message", `${username} has joined the chat`);
     });
-
     setupChatHandlers(socket, chatNamespace);
     setupAllianceHandlers(socket, chatNamespace);
 
@@ -83,18 +114,6 @@ export async function setupSocket(io) {
       }
 
       socket.emit("userList", usersList);
-    });
-  });
-
-  io.on("connection", (socket) => {
-    let username = "guest";
-
-    logAction(username, "User connected");
-
-    setupGameHandlers(socket, io);
-
-    socket.on("disconnect", () => {
-      logAction(username, "User disconnected");
     });
   });
 }
