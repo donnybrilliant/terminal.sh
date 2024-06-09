@@ -33,19 +33,21 @@ export class LoginManager {
   }
 
   async authenticateSocket(token) {
-    return new Promise((resolve) => {
-      this.socket.emit("authenticate", token, async (response) => {
-        if (response.success) {
-          this.setUsername(response.user.username);
-          console.log(`Authenticated as ${response.user.username}`);
-        } else {
-          console.log(response.message);
-          localStorage.removeItem("jwtToken");
-        }
-        await loadFileSystem();
-        resolve();
+    try {
+      const response = await new Promise((resolve) => {
+        this.socket.emit("authenticate", token, resolve);
       });
-    });
+      if (response.success) {
+        this.setUsername(response.user.username);
+        console.log(`Authenticated as ${response.user.username}`);
+      } else {
+        console.log(response.message);
+        localStorage.removeItem("jwtToken");
+      }
+      await loadFileSystem();
+    } catch (error) {
+      console.error(`Authentication error: ${error.message}`);
+    }
   }
 
   async login(username, password) {
@@ -80,9 +82,9 @@ export class LoginManager {
     this.socket.emit("authenticate", null, async () => {
       this.socket.auth = {};
       this.setUsername("");
-      this.term.write(`\r\nLogged out successfully.\r\n`);
       this.socket.disconnect();
-      await this.initializeLoginState();
     });
+    await this.initializeLoginState();
+    this.term.write(`\r\nLogged out successfully.\r\n`);
   }
 }

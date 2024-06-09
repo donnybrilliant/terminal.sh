@@ -5,47 +5,53 @@ let pathStack = ["root", "home", "users", "guest"]; // Default path for unauthen
 
 // Function to load the filesystem data from server
 async function loadFileSystem() {
-  return new Promise((resolve, reject) => {
-    socket.emit("loadFileSystem", (response) => {
-      if (response.success) {
-        fileData = response.data;
-        const username = loginManager.getUsername();
-        if (username && fileData.root.home.users[username]) {
-          pathStack = ["root", "home", "users", username];
-        } else {
-          pathStack = ["root", "home", "users", "guest"];
-          if (!fileData.root.home.users.guest) {
-            fileData.root.home.users.guest = {
-              README: "You are not logged in.",
-            };
-          }
-        }
-        resolve("Filesystem loaded successfully.");
-      } else {
-        reject(`Error loading filesystem: ${response.message}`);
-      }
+  try {
+    const response = await new Promise((resolve) => {
+      socket.emit("loadFileSystem", resolve);
     });
-  });
+    if (response.success) {
+      fileData = response.data;
+      const username = loginManager.getUsername();
+      if (username && fileData.root.home.users[username]) {
+        pathStack = ["root", "home", "users", username];
+      } else {
+        pathStack = ["root", "home", "users", "guest"];
+        if (!fileData.root.home.users.guest) {
+          fileData.root.home.users.guest = {
+            README: "You are not logged in.",
+          };
+        }
+      }
+      return "Filesystem loaded successfully.";
+    } else {
+      throw new Error(`Error loading filesystem: ${response.message}`);
+    }
+  } catch (error) {
+    throw new Error(`Error loading filesystem: ${error.message}`);
+  }
 }
 
 // Function to save the user's home directory
 async function saveUserHome() {
   const username = loginManager.getUsername();
   if (username && fileData.root.home.users[username]) {
-    return new Promise((resolve, reject) => {
-      const { README, ...filteredHomeData } =
-        fileData.root.home.users[username]; // Exclude README
+    const { README, ...filteredHomeData } = fileData.root.home.users[username]; // Exclude README
 
-      socket.emit("saveUserHome", filteredHomeData, (response) => {
-        if (response.success) {
-          resolve(response.message);
-        } else {
-          reject(`Error saving user home: ${response.message}`);
-        }
+    try {
+      const response = await new Promise((resolve) => {
+        socket.emit("saveUserHome", filteredHomeData, resolve);
       });
-    });
+
+      if (response.success) {
+        return response.message;
+      } else {
+        throw new Error(`Error saving user home: ${response.message}`);
+      }
+    } catch (error) {
+      throw new Error(error.message);
+    }
   } else {
-    return Promise.reject("User not recognized or missing home directory.");
+    throw new Error("User not recognized or missing home directory.");
   }
 }
 
