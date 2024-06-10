@@ -149,7 +149,7 @@ function help() {
   );
 }
 
-function remove(args = []) {
+async function remove(args = []) {
   if (args.length !== 2) {
     return "Usage: rm <filename> or rm -r <folder>";
   }
@@ -175,7 +175,7 @@ function remove(args = []) {
 
   // If everything checks out, delete the target
   delete currentDir[target];
-  saveUserHome();
+  await saveUserHome();
   return `${target} removed successfully`;
 }
 
@@ -184,27 +184,27 @@ function clear() {
   return "";
 }
 
-function mkdir(dirname) {
+async function mkdir(dirname) {
   const currentDir = getCurrentDir();
   if (currentDir[dirname]) {
     return `mkdir: ${dirname}: File or directory already exists`;
   }
   currentDir[dirname] = {};
-  saveUserHome();
+  await saveUserHome();
   return `Directory '${dirname}' created`;
 }
 
-function touch(filename) {
+async function touch(filename) {
   const currentDir = getCurrentDir();
   if (currentDir[filename]) {
     return `touch: ${filename}: File already exists`;
   }
   currentDir[filename] = "";
-  saveUserHome();
+  await saveUserHome();
   return `File '${filename}' created`;
 }
 
-function cp(source, destination) {
+async function cp(source, destination) {
   const currentDir = getCurrentDir();
 
   // Use the "in" operator to check for property existence
@@ -215,11 +215,11 @@ function cp(source, destination) {
     return `cp: ${destination}: File or directory already exists`;
   }
   currentDir[destination] = currentDir[source];
-  saveUserHome();
+  await saveUserHome();
   return `File '${source}' copied to '${destination}'`;
 }
 
-function mv(source, destination) {
+async function mv(source, destination) {
   const currentDir = getCurrentDir();
 
   // Use the "in" operator to check for property existence
@@ -231,7 +231,7 @@ function mv(source, destination) {
   }
   currentDir[destination] = currentDir[source];
   delete currentDir[source];
-  saveUserHome();
+  await saveUserHome();
   return `File '${source}' moved to '${destination}'`;
 }
 
