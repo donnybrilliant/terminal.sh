@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node --watch index.js",
     "clean": "node utils/clean.js",
-    "dev": "npm run clean && npm run start"
+    "reset": "npm run clean && npm run start"
   },
   "author": "",
   "license": "ISC",
