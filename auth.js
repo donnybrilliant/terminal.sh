@@ -69,6 +69,22 @@ passport.use(
           password: hashedPassword,
           ip: generateUniqueIP(users),
           home: {},
+          level: 0,
+          experience: 0,
+          resources: {
+            cpu: 200,
+            bandwidth: 300,
+            crypto: 15.0,
+            data: 1200,
+            ram: 24,
+          },
+          tools: [],
+          achievements: [],
+          inventory: {
+            items: [],
+            currency: 500,
+          },
+          activeMiners: [],
         };
         users.push(user);
 
