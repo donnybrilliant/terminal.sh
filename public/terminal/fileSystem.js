@@ -5,6 +5,7 @@ let pathStack = ["root", "home", "users", "guest"]; // Default path for unauthen
 
 // Function to load the filesystem data from server
 async function loadFileSystem() {
+  // fun place to do some reboot graphics?
   try {
     const response = await new Promise((resolve) => {
       socket.emit("loadFileSystem", resolve);
@@ -12,7 +13,11 @@ async function loadFileSystem() {
     if (response.success) {
       fileData = response.data;
       const username = loginManager.getUsername();
-      if (username && fileData.root.home.users[username]) {
+      if (
+        username &&
+        username.trim() !== "" &&
+        fileData.root.home.users[username]
+      ) {
         pathStack = ["root", "home", "users", username];
       } else {
         pathStack = ["root", "home", "users", "guest"];
@@ -109,30 +114,6 @@ export {
   getCurrentPath,
   loadFileSystem,
   saveUserHome,
+  pathStack,
+  fileData,
 };
-
-// Update the user's name
-/* function setName(socket, newName, callback) {
-  const oldName = loginManager.getUsername(); // Directly use socket.request.user
-
-  if (fileData.root.home.users[newName]) {
-    callback("Username already exists. Please choose a different name.");
-    return;
-  }
-
-  // Send the newName and oldName to the server for updating
-  socket.emit("set-name", { oldName, newName }, (response) => {
-    if (response.success) {
-      updateLocalFileSystemUser(oldName, newName); // Update local filesystem
-      callback(`Name updated to ${newName}`, response.user);
-    } else {
-      callback(`Error updating name: ${response.message}`);
-    }
-  });
-}
-
-function updateLocalFileSystemUser(oldName, newName) {
-  fileData.root.home.users[newName] = { ...fileData.root.home.users[oldName] };
-  delete fileData.root.home.users[oldName];
-  pathStack = ["root", "home", "users", newName];
-} */

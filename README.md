@@ -15,4 +15,7 @@
 after refactor broken:
 
 - setname (name)
-- line breaks
+
+FIX ASAP:
+SET NAME
+ASCII renders first prompt without username..

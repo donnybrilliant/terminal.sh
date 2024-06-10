@@ -43,4 +43,28 @@ document.addEventListener("DOMContentLoaded", async function () {
   term.onKey((eventData) => handleKeyInput(eventData, term, processCommand));
 
   term.focus();
+  /* 
+  console.log(navigator.hardwareConcurrency);
+  console.log(navigator.userAgent);
+  function bytesToGB(bytes, decimals = 2) {
+    const GB = 1024 * 1024 * 1024;
+    return (bytes / GB).toFixed(decimals) + " GB";
+  }
+
+  // Example usage
+  navigator.storage.estimate().then(({ quota }) => {
+    console.log(`Quota: ${bytesToGB(quota)}`);
+  });
+
+  // no safari
+  console.log(navigator);
+  console.log(navigator.deviceMemory);
+  console.log(navigator.userAgentData);
+  //console.log(navigator.userAgentData.platform);
+  //console.log(navigator.userAgentData.brands[0].brand);
+
+  // safari
+  console.log(navigator.platform);
+  console.log(navigator.vendor);
+  console.log(navigator.appCodeName, navigator.appName); */
 });

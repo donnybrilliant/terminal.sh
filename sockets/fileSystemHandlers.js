@@ -49,47 +49,6 @@ export function setupFileSystemHandlers(socket, io) {
     }
   });
 
-  /*   socket.on("set-name", async (data, callback) => {
-    const { oldName, newName } = data;
-    try {
-      const users = await readJSONFile(USERS_FILE_PATH);
-      const fileSystem = await readJSONFile(FILE_SYSTEM_PATH);
-      const user = users.find((u) => u.username === oldName);
-
-      if (!user) {
-        callback({ success: false, message: "User not found" });
-        return;
-      }
-
-      if (users.some((u) => u.username === newName)) {
-        callback({ success: false, message: "Username already exists" });
-        return;
-      }
-
-      // Update username in users
-      user.username = newName;
-      await writeJSONFile(USERS_FILE_PATH, users);
-
-      // Update username in filesystem
-      if (fileSystem.root.home.users[oldName]) {
-        fileSystem.root.home.users[newName] = {
-          ...fileSystem.root.home.users[oldName],
-          README: "Welcome, " + newName,
-        };
-        delete fileSystem.root.home.users[oldName];
-        await writeJSONFile(FILE_SYSTEM_PATH, fileSystem);
-      }
-
-      callback({
-        success: true,
-        message: `Name updated to ${newName}`,
-        user: { username: newName },
-      });
-    } catch (error) {
-      callback({ success: false, message: error.message });
-    }
-  }); */
-
   socket.on("saveUserHome", async (homeData, callback) => {
     const username = socket.user ? socket.user.username : null;
     if (!username) {

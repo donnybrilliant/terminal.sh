@@ -1,4 +1,4 @@
-import { loadFileSystem } from "../terminal/fileSystem.js";
+import { loadFileSystem, pathStack, fileData } from "../terminal/fileSystem.js";
 import { fetchWithTimeout } from "../utils/fetch.js";
 
 export class LoginManager {
@@ -39,7 +39,6 @@ export class LoginManager {
       });
       if (response.success) {
         this.setUsername(response.user.username);
-        console.log(`Authenticated as ${response.user.username}`);
       } else {
         console.log(response.message);
         localStorage.removeItem("jwtToken");
@@ -54,7 +53,7 @@ export class LoginManager {
     const token = localStorage.getItem("jwtToken");
     if (token) {
       this.term.write(`\r\nAlready logged in.\r\n`);
-      return; // Exit if already logged in
+      return;
     }
 
     try {
@@ -83,9 +82,9 @@ export class LoginManager {
       this.socket.auth = {};
       this.setUsername("");
       this.socket.disconnect();
+      await this.initializeLoginState();
+      this.term.write(`\r\nLogged out successfully.\r\n`);
     });
-    await this.initializeLoginState();
-    this.term.write(`\r\nLogged out successfully.\r\n`);
   }
   async checkAuth() {
     try {
@@ -106,5 +105,47 @@ export class LoginManager {
       console.error(`Authentication check error: ${error.message}`);
       return false;
     }
+  }
+  async setName(newName) {
+    const oldName = this.getUsername();
+    if (!oldName) {
+      this.term.write(`\r\nError updating name: No user logged in\r\n`);
+      return;
+    }
+
+    if (fileData.root.home.users[newName]) {
+      this.term.write(
+        `\r\nError updating name: Username ${newName} already exists\r\n`
+      );
+      return;
+    }
+
+    if (!fileData.root.home.users[oldName]) {
+      this.term.write(
+        `\r\nError updating name: Username ${oldName} not found\r\n`
+      );
+      return;
+    }
+
+    this.socket.emit("setName", { oldName, newName }, (response) => {
+      if (response.success) {
+        this.setUsername(newName);
+        try {
+          fileData.root.home.users[newName] = {
+            ...fileData.root.home.users[oldName],
+          };
+          delete fileData.root.home.users[oldName];
+          pathStack.length = 0;
+          pathStack.push("root", "home", "users", newName);
+          this.term.write(`\r\nName updated to ${newName}\r\n`);
+        } catch (error) {
+          this.term.write(
+            `\r\nError updating local filesystem: ${error.message}\r\n`
+          );
+        }
+      } else {
+        this.term.write(`\r\nError updating name: ${response.message}\r\n`);
+      }
+    });
   }
 }

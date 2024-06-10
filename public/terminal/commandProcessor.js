@@ -44,7 +44,8 @@ const commandMap = {
     if (args.length !== 1) {
       return "Usage: name <newName>";
     }
-    return await loginManager.setName(args[0]);
+    await loginManager.setName(args[0]);
+    return "";
   },
   rm: (args) => commands.rm(args),
   clear: () => commands.clear(),
