@@ -42,6 +42,7 @@ export class LoginManager {
       } else {
         console.log(response.message);
         localStorage.removeItem("jwtToken");
+        this.setUsername("");
       }
       await loadFileSystem();
     } catch (error) {
