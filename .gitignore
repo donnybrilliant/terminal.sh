@@ -1,5 +1,8 @@
 /node_modules
-/data
+/data/logs.json
+/data/messages
+/data/users.json
+/data/filesystem.json
 .DS_Store
 .env
 *.idea

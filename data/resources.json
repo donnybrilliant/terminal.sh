@@ -1,0 +1,11 @@
+{
+  "cpu": {
+    "description": "CPU power for running attacks and scripts."
+  },
+  "bandwidth": {
+    "description": "Bandwidth for data transfer and network operations."
+  },
+  "crypto": {
+    "description": "Cryptocurrency used for transactions and purchasing tools."
+  }
+}
