@@ -12,11 +12,6 @@ export function setupFileSystemHandlers(socket, io) {
       let baseFileSystem = await readJSONFile(FILE_SYSTEM_PATH);
       let users = await readJSONFile(USERS_FILE_PATH);
 
-      // Ensure users directory is an object
-      if (Array.isArray(baseFileSystem.root.home.users)) {
-        baseFileSystem.root.home.users = {};
-      }
-
       // Dynamically add user directories to the filesystem
       users.forEach((user) => {
         baseFileSystem.root.home.users[user.username] = {
