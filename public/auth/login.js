@@ -1,9 +1,11 @@
-import { loadFileSystem } from "../terminal/fileSystem.js";
+import { loadFileSystem, pathStack, fileData } from "../terminal/fileSystem.js";
 import { fetchWithTimeout } from "../utils/fetch.js";
 
 export class LoginManager {
-  constructor(apiUrl) {
+  constructor(socket, apiUrl) {
+    this.socket = socket;
     this.apiUrl = apiUrl;
+    this.username = "";
   }
 
   setTerminal(term) {
@@ -11,99 +13,140 @@ export class LoginManager {
   }
 
   setUsername(username) {
-    sessionStorage.setItem("username", username);
+    this.username = username;
   }
 
   getUsername() {
-    return sessionStorage.getItem("username") || "";
-  }
-
-  clearUsername() {
-    sessionStorage.removeItem("username");
+    return this.username;
   }
 
   async initializeLoginState() {
-    try {
-      const status = await this.checkAuthStatus();
-      if (status.data.authenticated) {
-        this.setUsername(status.data.user.username);
-        await loadFileSystem(this.apiUrl);
-        // return this?
-        console.log(`Logged in as ${status.data.user.username}`);
+    this.socket.connect();
+    this.socket.on("connect", async () => {
+      const token = localStorage.getItem("jwtToken");
+      if (token) {
+        await this.authenticateSocket(token);
       } else {
-        await loadFileSystem(this.apiUrl);
+        await loadFileSystem();
       }
+    });
+  }
+
+  async authenticateSocket(token) {
+    try {
+      const response = await new Promise((resolve) => {
+        this.socket.emit("authenticate", token, resolve);
+      });
+      if (response.success) {
+        this.setUsername(response.user.username);
+      } else {
+        console.log(response.message);
+        localStorage.removeItem("jwtToken");
+        this.setUsername("");
+      }
+      await loadFileSystem();
     } catch (error) {
-      console.error(`Failed to check login status: ${error.message}`);
+      console.error(`Authentication error: ${error.message}`);
     }
   }
 
   async login(username, password) {
+    const token = localStorage.getItem("jwtToken");
+    if (token) {
+      this.term.write(`\r\nAlready logged in.\r\n`);
+      return;
+    }
+
     try {
-      const status = await this.checkAuthStatus();
-      if (status.data.authenticated) {
-        this.term.write(
-          `\r\nUser already logged in as ${status.data.user.username}\r\n`
-        );
+      const result = await fetchWithTimeout(`${this.apiUrl}/login`, {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (result.success) {
+        const { token, user } = result.data;
+        localStorage.setItem("jwtToken", token);
+        await this.authenticateSocket(token);
+        this.term.write(`\r\n${result.message}\r\n`);
       } else {
-        const result = await this.authenticateUser(username, password);
         this.term.write(`\r\n${result.message}\r\n`);
       }
     } catch (error) {
       console.error(`Failed to log in: ${error.message}`);
-      this.term.write(
-        `\r\nUnable to verify login status. Please try logging in again.\r\n`
-      );
-    }
-  }
-
-  async authenticateUser(username, password) {
-    try {
-      const data = await fetchWithTimeout(`${this.apiUrl}/login`, {
-        method: "POST",
-        body: JSON.stringify({ username, password }),
-      });
-      if (data.success) {
-        this.setUsername(username);
-        await loadFileSystem(this.apiUrl);
-      }
-      return data;
-    } catch (error) {
-      return error;
+      this.term.write(`\r\nFailed to log in: ${error.message}\r\n`);
     }
   }
 
   async logout() {
+    localStorage.removeItem("jwtToken");
+    this.socket.emit("authenticate", null, async () => {
+      this.socket.auth = {};
+      this.setUsername("");
+      this.socket.disconnect();
+      await this.initializeLoginState();
+      this.term.write(`\r\nLogged out successfully.\r\n`);
+    });
+  }
+  async checkAuth() {
     try {
-      const status = await this.checkAuthStatus();
-      if (status.data.authenticated) {
-        const data = await fetchWithTimeout(`${this.apiUrl}/logout`, {
-          method: "POST",
-        });
-        this.clearUsername();
-        await loadFileSystem(this.apiUrl);
-        this.term.write(`\r\n${data.message}\r\n`);
-      } else {
-        this.term.write(`\r\nYou are not logged in.`);
+      const token = localStorage.getItem("jwtToken");
+      const localUsername = this.getUsername();
+      if (!token || !localUsername) {
+        // No JWT token or username, consider as not authenticated
+        return false;
       }
+      const isAuthenticated = await new Promise((resolve) => {
+        this.socket.emit("check-auth");
+        this.socket.on("auth-status", (data) => {
+          resolve(data.authenticated);
+        });
+      });
+      return isAuthenticated;
     } catch (error) {
-      this.term.write(`\r\nError logging out: ${error.message}\r\n`);
+      console.error(`Authentication check error: ${error.message}`);
+      return false;
     }
   }
-
-  async checkAuthStatus() {
-    try {
-      return await fetchWithTimeout(`${this.apiUrl}/auth-status`);
-    } catch (error) {
-      this.term.write(
-        `\r\nError checking authentication status: ${error.message}\r\n`
-      );
-      console.error(
-        `Silent check for authentication status failed: ${error.message}`
-      );
-
-      throw error;
-      //return { data: { authenticated: false } }; // Provide a default response to handle error states gracefully
+  async setName(newName) {
+    const oldName = this.getUsername();
+    if (!oldName) {
+      this.term.write(`\r\nError updating name: No user logged in\r\n`);
+      return;
     }
+
+    if (fileData.root.home.users[newName]) {
+      this.term.write(
+        `\r\nError updating name: Username ${newName} already exists\r\n`
+      );
+      return;
+    }
+
+    if (!fileData.root.home.users[oldName]) {
+      this.term.write(
+        `\r\nError updating name: Username ${oldName} not found\r\n`
+      );
+      return;
+    }
+
+    this.socket.emit("setName", { oldName, newName }, (response) => {
+      if (response.success) {
+        this.setUsername(newName);
+        try {
+          fileData.root.home.users[newName] = {
+            ...fileData.root.home.users[oldName],
+          };
+          delete fileData.root.home.users[oldName];
+          pathStack.length = 0;
+          pathStack.push("root", "home", "users", newName);
+          this.term.write(`\r\nName updated to ${newName}\r\n`);
+        } catch (error) {
+          this.term.write(
+            `\r\nError updating local filesystem: ${error.message}\r\n`
+          );
+        }
+      } else {
+        this.term.write(`\r\nError updating name: ${response.message}\r\n`);
+      }
+    });
   }
 }

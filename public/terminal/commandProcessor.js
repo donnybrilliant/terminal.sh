@@ -1,5 +1,5 @@
 import { commands } from "./shell.js";
-import { term, socket } from "./index.js";
+import { term, socket, loginManager } from "./index.js";
 import { loadtest, chars, hack, startMatrix, getClientInfo } from "./random.js";
 import {
   editFile,
@@ -14,7 +14,6 @@ import {
   isInChatMode,
   handleChatCommand,
 } from "../chat/index.js";
-import { loginManager } from "./index.js";
 
 // Command map
 const commandMap = {
@@ -41,7 +40,13 @@ const commandMap = {
   hack: () => hack(term),
   matrix: () => startMatrix(term),
   info: () => getClientInfo(),
-  name: (args) => commands.name(args.join(" ")),
+  name: async (args) => {
+    if (args.length !== 1) {
+      return "Usage: name <newName>";
+    }
+    await loginManager.setName(args[0]);
+    return "";
+  },
   rm: (args) => commands.rm(args),
   clear: () => commands.clear(),
   mkdir: (args) => {
@@ -80,7 +85,7 @@ const commandMap = {
     return await loginManager.login(args[0], args[1]);
   },
   logout: async () => await loginManager.logout(),
-  scanIP: async (args) => {
+  scanIP: (args) => {
     if (args.length !== 1) {
       return "Usage: scanIP <targetIP>";
     }
@@ -88,7 +93,7 @@ const commandMap = {
     socket.emit("scanIP", { username, targetIP: args[0] });
     return `Scanning IP ${args[0]}...`;
   },
-  hackIP: async (args) => {
+  hackIP: (args) => {
     if (args.length !== 1) {
       return "Usage: hackIP <targetIP>";
     }

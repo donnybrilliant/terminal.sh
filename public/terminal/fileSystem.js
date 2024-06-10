@@ -1,29 +1,69 @@
-import { fetchWithTimeout } from "../utils/fetch.js";
-import { loginManager } from "./index.js";
+import { loginManager, socket } from "./index.js";
 
 let fileData = {};
 let pathStack = ["root", "home", "users", "guest"]; // Default path for unauthenticated access
 
 // Function to load the filesystem data from server
-async function loadFileSystem(apiUrl) {
+async function loadFileSystem() {
+  // fun place to do some reboot graphics?
   try {
-    const response = await fetchWithTimeout(`${apiUrl}/filesystem`);
-    fileData = response.data; // Load the complete filesystem
-
-    // Setup pathStack based on if the user is logged in
-    const username = loginManager.getUsername(); // Assuming this function retrieves the authenticated user's username
-    if (username && fileData.root.home.users[username]) {
-      pathStack = ["root", "home", "users", username];
-    } else {
-      pathStack = ["root", "home", "users", "guest"];
-      if (!fileData.root.home.users.guest) {
-        fileData.root.home.users.guest = { README: "You are not logged in." };
+    const response = await new Promise((resolve) => {
+      socket.emit("loadFileSystem", resolve);
+    });
+    if (response.success) {
+      fileData = response.data;
+      const username = loginManager.getUsername();
+      if (
+        username &&
+        username.trim() !== "" &&
+        fileData.root.home.users[username]
+      ) {
+        pathStack = ["root", "home", "users", username];
+      } else {
+        pathStack = ["root", "home", "users", "guest"];
+        if (!fileData.root.home.users.guest) {
+          fileData.root.home.users.guest = {
+            README: "You are not logged in.",
+          };
+        }
       }
+      return "Filesystem loaded successfully.";
+    } else {
+      throw new Error(`Error loading filesystem: ${response.message}`);
     }
-
-    return "Filesystem loaded successfully.";
   } catch (error) {
-    return `Error loading filesystem: ${error.message}`;
+    throw new Error(`Error loading filesystem: ${error.message}`);
+  }
+}
+
+// Function to save the user's home directory
+async function saveUserHome() {
+  const username = loginManager.getUsername();
+  if (
+    username &&
+    username.trim() !== "" &&
+    fileData.root.home.users[username]
+  ) {
+    const { README, ...filteredHomeData } = fileData.root.home.users[username]; // Exclude README
+
+    try {
+      const response = await new Promise((resolve) => {
+        socket.emit("saveUserHome", filteredHomeData, resolve);
+      });
+
+      if (response.success) {
+        return response.message;
+      } else {
+        throw new Error(`Error saving user home: ${response.message}`);
+      }
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  } else {
+    console.log(
+      "Skipping save operation: User not recognized or missing home directory."
+    );
+    return "Skipping save operation: User not recognized or missing home directory.";
   }
 }
 
@@ -74,63 +114,22 @@ function getCurrentPath() {
   return "/" + pathStack.join("/");
 }
 
-// Update the user's name
-async function setName(newName) {
-  const oldName = loginManager.getUsername(); // Fetch the current username from session or a similar method
-
-  if (fileData.root.home.users[newName]) {
-    return "Username already exists. Please choose a different name.";
-  }
-
-  // Send the newName and oldName to the server for updating
-  try {
-    const response = await fetchWithTimeout("/set-name", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ oldName, newName }),
-    });
-
-    if (response.success) {
-      loginManager.setUsername(newName); // Update username in session storage
-      updateLocalFileSystemUser(oldName, newName); // Update local filesystem
-      return `Name updated to ${newName}`;
-    }
-  } catch (error) {
-    return `Error updating name: ${error.message}`;
-  }
+// Function to get directory names for autocompletion
+function getDirectoryNames() {
+  const currentDir = getCurrentDir();
+  return Object.keys(currentDir).filter(
+    (key) => typeof currentDir[key] === "object"
+  );
 }
 
-function updateLocalFileSystemUser(oldName, newName) {
-  fileData.root.home.users[newName] = { ...fileData.root.home.users[oldName] };
-  delete fileData.root.home.users[oldName];
-  pathStack = ["root", "home", "users", newName];
-}
-
-async function saveUserHome() {
-  const username = loginManager.getUsername(); // Assume we retrieve the current user name from session
-  //pathStack.includes(username) instead?
-  if (username !== "" && fileData.root.home.users[username]) {
-    try {
-      const response = await fetchWithTimeout("/update-user-home", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ home: fileData.root.home.users[username] }),
-      });
-
-      return response.message;
-    } catch (error) {
-      return `Error saving user home: ${error.message}`;
-    }
-  } else {
-    return "User not recognized or missing home directory.";
-  }
-}
-
+// Export necessary functions
 export {
   getCurrentDir,
   setCurrentDir,
   getCurrentPath,
-  setName,
+  getDirectoryNames,
   loadFileSystem,
   saveUserHome,
+  pathStack,
+  fileData,
 };

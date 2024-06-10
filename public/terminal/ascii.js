@@ -1,4 +1,6 @@
+import { loginManager } from "./index.js";
 export default function ascii(term) {
+  const username = loginManager.getUsername();
   // Welcome message
   const ASCII_TERMINAL = [
     "  _                      _             _       _     ",
@@ -49,7 +51,7 @@ export default function ascii(term) {
             term.write("\x1B[1;1H"); // Reset cursor to top-left
             term.write("Welcome to the terminal.\r\n");
             term.write("Type 'help' to get started.\r\n\r\n");
-            term.write("$ ");
+            term.write(`${username}$ `);
           }, 0); // Reduced post-animation wait time to 800ms
         }
       }

@@ -4,9 +4,7 @@ import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import path, { dirname } from "path";
 import passport from "./auth.js";
-import session from "express-session";
-import authRoutes from "./routes/auth.js";
-import toolRoutes from "./routes/tools.js";
+import authRoutes from "./routes/auth.js"; // Assuming you have a routes/auth.js file
 import morgan from "morgan";
 import errorHandler from "./utils/errorHandler.js";
 import { setupSocket } from "./sockets/index.js";
@@ -18,31 +16,20 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+app.use(passport.initialize());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.static(__dirname + "/node_modules/@xterm/"));
 
-app.use(
-  session({
-    secret: "keyboard cat",
-    resave: false,
-    saveUninitialized: false,
-    store: new session.MemoryStore(),
-  })
-);
-
-app.use(passport.authenticate("session"));
-
+app.use(morgan("dev"));
 app.use(authRoutes);
-app.use(toolRoutes);
+app.use(errorHandler);
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.use(morgan("combined"));
-app.use(errorHandler);
-
+// Initialize the socket setup
 setupSocket(io);
 
 server.listen(3000, () => {

@@ -1,3 +1,5 @@
+import { setupAuthHandlers } from "./authHandlers.js";
+import { setupFileSystemHandlers } from "./fileSystemHandlers.js";
 import { setupChatHandlers } from "./chatHandlers.js";
 import { setupAllianceHandlers } from "./allianceHandlers.js";
 import { setupGameHandlers } from "./gameHandlers.js";
@@ -10,8 +12,19 @@ import {
   decrementGuestCount,
 } from "../utils/userUtils.js";
 
-export async function setupSocket(io) {
-  await getUsers();
+export function setupSocket(io) {
+  io.on("connection", (socket) => {
+    const username = socket.user ? socket.user.username : "guest";
+    logAction(username, "User connected");
+    setupAuthHandlers(socket);
+    setupFileSystemHandlers(socket, io);
+    setupGameHandlers(socket, io);
+
+    socket.on("disconnect", () => {
+      logAction(username, "User disconnected");
+    });
+  });
+
   const chatNamespace = io.of("/chat");
 
   chatNamespace.on("connection", (socket) => {
@@ -83,18 +96,6 @@ export async function setupSocket(io) {
       }
 
       socket.emit("userList", usersList);
-    });
-  });
-
-  io.on("connection", (socket) => {
-    let username = "guest";
-
-    logAction(username, "User connected");
-
-    setupGameHandlers(socket, io);
-
-    socket.on("disconnect", () => {
-      logAction(username, "User disconnected");
     });
   });
 }
