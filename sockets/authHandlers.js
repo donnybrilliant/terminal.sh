@@ -3,7 +3,6 @@ import {
   readJSONFile,
   writeJSONFile,
   USERS_FILE_PATH,
-  FILE_SYSTEM_PATH,
 } from "../utils/fileUtils.js";
 
 // should be in a .env? how does that work serving static like this?
@@ -18,7 +17,6 @@ export function setupAuthHandlers(socket) {
       }
       socket.user = decoded;
       callback({ success: true, user: socket.user });
-      //console.log("User authenticated:", socket.user);
     });
   });
 
@@ -33,7 +31,6 @@ export function setupAuthHandlers(socket) {
     const { oldName, newName } = data;
     try {
       const users = await readJSONFile(USERS_FILE_PATH);
-      const fileSystem = await readJSONFile(FILE_SYSTEM_PATH);
       const user = users.find((u) => u.username === oldName);
 
       if (!user) {
@@ -49,28 +46,7 @@ export function setupAuthHandlers(socket) {
       // Update username in users
       user.username = newName;
 
-      const userIndex = fileSystem.root.home.users.indexOf(oldName);
-      if (userIndex !== -1) {
-        fileSystem.root.home.users[userIndex] = newName;
-
-        // Update the home directory of the user
-        user.home = {
-          ...user.home,
-          README: "Welcome, " + newName,
-        };
-      } else {
-        callback({
-          success: false,
-          message: `Old username ${oldName} not found in filesystem`,
-        });
-        return;
-      }
-
-      // Write changes to files atomically
-      await Promise.all([
-        writeJSONFile(USERS_FILE_PATH, users),
-        writeJSONFile(FILE_SYSTEM_PATH, fileSystem),
-      ]);
+      await writeJSONFile(USERS_FILE_PATH, users);
 
       callback({
         success: true,

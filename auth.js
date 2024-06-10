@@ -8,7 +8,6 @@ import {
   readJSONFile,
   writeJSONFile,
   USERS_FILE_PATH,
-  FILE_SYSTEM_PATH,
 } from "./utils/fileUtils.js";
 
 const JWT_SECRET = "your_jwt_secret"; // Use a strong secret key in production
@@ -73,15 +72,7 @@ passport.use(
         };
         users.push(user);
 
-        // Add user to filesystem.json
-        let fileSystem = await readJSONFile(FILE_SYSTEM_PATH);
-        fileSystem.root.home.users.push(username);
-
-        // Write changes to both USERS_FILE_PATH and FILE_SYSTEM_PATH
-        await Promise.all([
-          writeJSONFile(USERS_FILE_PATH, users),
-          writeJSONFile(FILE_SYSTEM_PATH, fileSystem),
-        ]);
+        await writeJSONFile(USERS_FILE_PATH, users);
 
         return done(null, user);
       }
