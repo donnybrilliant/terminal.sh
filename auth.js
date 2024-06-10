@@ -46,7 +46,6 @@ passport.use(
         // User exists, check password
         const match = await bcrypt.compare(password, user.password);
         if (match) {
-          //console.log("User authenticated:", user);
           return done(null, user);
         } else {
           return done(null, false, { message: "Incorrect password." });
@@ -62,24 +61,28 @@ passport.use(
             message: "Username cannot be 'admin', 'user', or 'guest'.",
           });
         }
+
         // No user found, create new user
         const hashedPassword = await bcrypt.hash(password, 10);
         user = {
-          id: uuidv4(), // Generate a unique ID for the user
+          id: uuidv4(),
           username,
           password: hashedPassword,
           ip: generateUniqueIP(users),
           home: {},
         };
         users.push(user);
-        await writeJSONFile(USERS_FILE_PATH, users);
 
-        // Update filesystem.json
+        // Add user to filesystem.json
         let fileSystem = await readJSONFile(FILE_SYSTEM_PATH);
         fileSystem.root.home.users.push(username);
-        await writeJSONFile(FILE_SYSTEM_PATH, fileSystem);
 
-        //console.log("New user created:", user);
+        // Write changes to both USERS_FILE_PATH and FILE_SYSTEM_PATH
+        await Promise.all([
+          writeJSONFile(USERS_FILE_PATH, users),
+          writeJSONFile(FILE_SYSTEM_PATH, fileSystem),
+        ]);
+
         return done(null, user);
       }
     } catch (error) {
