@@ -15,6 +15,7 @@
 - refactor data/.json handling/structure
 - move fileData handling from login.js to fileSystem.js?
 - send more data from tool on save - should content be description?
+- steal data
 
 FIX ASAP:
 I should use utils more places getUsers etc
@@ -54,11 +55,38 @@ DB:
 
 - firebase? realtime. easy auth.
 - Idle time should happens serverless?
+- actual logs on the servers in internet.json
+- MAKE EVERYTHING MORE REAL!
+
+STORY
+
+- start with scan? find portscanner free online.
+- log into local network for direct practice
+- log into neighbors network with sniffer (do fun stuff)
+-
 
 OTHER
 
 - ai chat bots
 - ai players
+- command that creates new dynamic servers?
+- other players have dynamic ports open?
+- set up fake "wifi" / server for phishing etc
+
+WORKFLOWS:
+
+- scan
+- scan ip
+  - security scanner
+  - network sniffer
+  - analyze data
+- exploit
+- password
+- post:
+  - rootkit, backdoors, etc.
+  - steal data
+  - network sniffer etc.
+  - clean logs
 
 Actions:
 
@@ -187,3 +215,44 @@ More powerful tools should consume more resources, limiting the number of simult
 Bandwidth:
 Bandwidth-intensive operations should consume more bandwidth, requiring players to balance their network usage.
 Stealing bandwidth can temporarily boost a player's capabilities but should be balanced against other operations.
+
+Attack:
+Network Scanning
+
+Tool: port_scanner
+Action: Scan the network to identify active IP addresses and open ports.
+Objective: Identify potential targets on the network.
+Service and Port Scanning
+
+Tool: port_scanner
+Action: Scan specific IP addresses for open ports and running services.
+Objective: Identify services running on the target IP that are susceptible to weak passwords.
+Identify Vulnerabilities
+
+Tool: security_scanner (optional)
+Action: Scan the identified services for known vulnerabilities.
+Objective: Confirm the presence of vulnerabilities such as weak passwords.
+Exploit Vulnerabilities
+
+Tool: exploit_kit
+Action: Use an exploit kit to gain initial access if vulnerabilities other than weak passwords are found.
+Objective: Gain initial access to the target system.
+Brute Force Passwords
+
+Tool: password_cracker
+Action: Use the password cracker tool to brute force login credentials for the identified services.
+Objective: Gain authenticated access to the target service.
+Elevate Privileges and Establish Persistence
+
+Tool: rootkit
+Action: Install a rootkit or other malware to maintain access.
+Objective: Ensure continued access to the system.
+Post-Exploitation Actions
+
+Tools: Various (e.g., data_exfiltrator, crypto_miner, network_sniffer)
+Actions:
+Data Exfiltration: Steal sensitive data.
+Resource Stealing: Utilize the system's resources for mining cryptocurrency.
+Browse Filesystem: Explore and manipulate files and directories.
+Clean Logs: Use log_cleaner to erase traces of the attack.
+Objective: Achieve the attacker's goals (data theft, resource exploitation, etc.).

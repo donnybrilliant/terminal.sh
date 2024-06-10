@@ -7,9 +7,23 @@
       "crypto": 10,
       "data": 5000
     },
-    "tools": ["advanced_exploit_kit"],
-    "connectedIPs": ["192.168.0.4"],
+    "tools": ["exploit_kit"],
+    "connectedIPs": ["192.168.0.1"],
     "services": [
+      {
+        "name": "ssh",
+        "description": "Secure Shell",
+        "port": 22,
+        "vulnerable": true,
+        "vulnerabilities": ["weak_password"]
+      },
+      {
+        "name": "http",
+        "description": "Hypertext Transfer Protocol",
+        "port": 80,
+        "vulnerable": true,
+        "vulnerabilities": ["xss", "sql_injection"]
+      },
       {
         "name": "rdp",
         "port": 3389,
@@ -61,7 +75,7 @@
       "data": 500
     },
     "tools": ["password_cracker"],
-    "connectedIPs": ["192.168.0.2", "192.168.0.3"],
+    "connectedIPs": ["192.168.0.2", "192.168.0.3", "1.1.1.1"],
     "services": [
       {
         "name": "ssh",

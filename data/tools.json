@@ -7,7 +7,8 @@
         "cpu": 10,
         "bandwidth": 0.1,
         "ram": 2
-      }
+      },
+      "exploits": ["weak_password"]
     },
     "port_scanner": {
       "name": "Port Scanner",
@@ -34,7 +35,8 @@
         "cpu": 20,
         "bandwidth": 0.5,
         "ram": 8
-      }
+      },
+      "exploits": ["remote_code_execution", "buffer_overflow", "sql_injection"]
     },
     "advanced_exploit_kit": {
       "name": "Advanced Exploit Kit",
@@ -43,36 +45,63 @@
         "cpu": 50,
         "bandwidth": 1.0,
         "ram": 16
-      }
+      },
+      "exploits": [
+        "remote_code_execution",
+        "buffer_overflow",
+        "sql_injection",
+        "zero_day"
+      ]
     },
-    "crypto_miner": {
-      "name": "Crypto Miner",
-      "function": "Mines cryptocurrency from compromised systems.",
+    "sql_injector": {
+      "name": "SQL Injector",
+      "function": "Performs SQL injection attacks to manipulate databases.",
+      "resources": {
+        "cpu": 15,
+        "bandwidth": 0.3,
+        "ram": 4
+      },
+      "exploits": ["sql_injection"]
+    },
+    "xss_exploit": {
+      "name": "XSS Exploit",
+      "function": "Exploits cross-site scripting vulnerabilities.",
+      "resources": {
+        "cpu": 10,
+        "bandwidth": 0.2,
+        "ram": 2
+      },
+      "exploits": ["cross_site_scripting"]
+    },
+    "buffer_overflow_exploit": {
+      "name": "Buffer Overflow Exploit",
+      "function": "Exploits buffer overflow vulnerabilities to execute arbitrary code.",
       "resources": {
         "cpu": 25,
-        "bandwidth": 0.2,
-        "ram": 1
+        "bandwidth": 0.5,
+        "ram": 8
       },
-      "special": "Generates passive income over time."
+      "exploits": ["buffer_overflow"]
     },
-    "ai_hacker_bot": {
-      "name": "AI Hacker Bot",
-      "function": "An AI-powered bot that automates hacking tasks and learns over time.",
+    "remote_code_execution_exploit": {
+      "name": "Remote Code Execution Exploit",
+      "function": "Executes arbitrary code on a remote system.",
       "resources": {
-        "cpu": 100,
-        "bandwidth": 2.0,
-        "ram": 32
+        "cpu": 30,
+        "bandwidth": 0.6,
+        "ram": 12
       },
-      "special": "Improves efficiency with use, reducing resource costs by 10% for each successful hack."
+      "exploits": ["remote_code_execution"]
     },
-    "quantum_decryptor": {
-      "name": "Quantum Decryptor",
-      "function": "Uses quantum computing to decrypt highly secure communications.",
+    "privilege_escalation_tool": {
+      "name": "Privilege Escalation Tool",
+      "function": "Gains higher privileges than normally allowed.",
       "resources": {
-        "cpu": 200,
-        "bandwidth": 5.0,
-        "ram": 64
-      }
+        "cpu": 20,
+        "bandwidth": 0.4,
+        "ram": 6
+      },
+      "exploits": ["privilege_escalation"]
     },
     "zero_day_exploit": {
       "name": "Zero-Day Exploit",
@@ -81,35 +110,8 @@
         "cpu": 75,
         "bandwidth": 3.0,
         "ram": 24
-      }
-    },
-    "ddos_cannon": {
-      "name": "DDoS Cannon",
-      "function": "Launches a Distributed Denial of Service attack to overwhelm a target.",
-      "resources": {
-        "cpu": 30,
-        "bandwidth": 0.5,
-        "ram": 8
-      }
-    },
-    "bandwidth_miner": {
-      "name": "Bandwidth Miner",
-      "function": "Mines bandwidth currency from compromised systems.",
-      "resources": {
-        "cpu": 25,
-        "bandwidth": 0.2,
-        "ram": 4
       },
-      "special": "Generates passive income over time."
-    },
-    "data_exfiltrator": {
-      "name": "Data Exfiltrator",
-      "function": "Extracts large volumes of data from a target system.",
-      "resources": {
-        "cpu": 15,
-        "bandwidth": 0.3,
-        "ram": 8
-      }
+      "exploits": ["zero_day"]
     },
     "rootkit": {
       "name": "Rootkit",
@@ -118,6 +120,15 @@
         "cpu": 20,
         "bandwidth": 0.4,
         "ram": 4
+      }
+    },
+    "data_exfiltrator": {
+      "name": "Data Exfiltrator",
+      "function": "Extracts large volumes of data from a target system.",
+      "resources": {
+        "cpu": 15,
+        "bandwidth": 0.3,
+        "ram": 8
       }
     },
     "log_cleaner": {
@@ -265,6 +276,54 @@
         "cpu": 70,
         "bandwidth": 1.5,
         "ram": 32
+      }
+    },
+    "ddos_cannon": {
+      "name": "DDoS Cannon",
+      "function": "Launches a Distributed Denial of Service attack to overwhelm a target.",
+      "resources": {
+        "cpu": 30,
+        "bandwidth": 0.5,
+        "ram": 8
+      }
+    },
+    "bandwidth_miner": {
+      "name": "Bandwidth Miner",
+      "function": "Mines bandwidth currency from compromised systems.",
+      "resources": {
+        "cpu": 25,
+        "bandwidth": 0.2,
+        "ram": 4
+      },
+      "special": "Generates passive income over time."
+    },
+    "crypto_miner": {
+      "name": "Crypto Miner",
+      "function": "Mines cryptocurrency from compromised systems.",
+      "resources": {
+        "cpu": 25,
+        "bandwidth": 0.2,
+        "ram": 1
+      },
+      "special": "Generates passive income over time."
+    },
+    "ai_hacker_bot": {
+      "name": "AI Hacker Bot",
+      "function": "An AI-powered bot that automates hacking tasks and learns over time.",
+      "resources": {
+        "cpu": 100,
+        "bandwidth": 2.0,
+        "ram": 32
+      },
+      "special": "Improves efficiency with use, reducing resource costs by 10% for each successful hack."
+    },
+    "quantum_decryptor": {
+      "name": "Quantum Decryptor",
+      "function": "Uses quantum computing to decrypt highly secure communications.",
+      "resources": {
+        "cpu": 200,
+        "bandwidth": 5.0,
+        "ram": 64
       }
     }
   }
