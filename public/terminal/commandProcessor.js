@@ -97,9 +97,18 @@ const commandMap = {
     if (args.length !== 1) {
       return "Usage: hackIP <targetIP>";
     }
-    const username = loginManager.getUsername();
+    const username = loginManager.getUsername() || "Guest";
     socket.emit("hackIP", { username, targetIP: args[0] });
     return `Attempting to hack IP ${args[0]}...`;
+  },
+  server: () => {
+    socket.emit("requestHardwareInfo");
+    socket.on("hardwareInfo", (data) => {
+      console.log("Received hardware info:", data);
+
+      // Use this information as needed
+    });
+    return "Hardware info received. Check the console.";
   },
 };
 

@@ -10,7 +10,10 @@ import {
   removeOnlineUser,
   incrementGuestCount,
   decrementGuestCount,
+  getGuestCount,
+  getOnlineUsers,
 } from "../utils/userUtils.js";
+import { setupSystemHandlers } from "./systemHandlers.js";
 
 export function setupSocket(io) {
   io.on("connection", (socket) => {
@@ -19,6 +22,7 @@ export function setupSocket(io) {
     setupAuthHandlers(socket);
     setupFileSystemHandlers(socket, io);
     setupGameHandlers(socket, io);
+    setupSystemHandlers(socket, io);
 
     socket.on("disconnect", () => {
       logAction(username, "User disconnected");
