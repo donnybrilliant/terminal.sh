@@ -14,7 +14,7 @@ export function setupGameHandlers(socket, io) {
     } else {
       socket.emit("scanResult", {
         success: false,
-        message: null,
+        message: "Scan failed",
         error: "IP not found",
         data: null,
       });
@@ -51,15 +51,15 @@ export function setupGameHandlers(socket, io) {
         } else {
           socket.emit("hackResult", {
             success: false,
-            message: null,
-            error: "Hack failed",
+            message: "Hack failed",
+            error: "Insufficient resources",
             data: null,
           });
         }
       } else {
         socket.emit("hackResult", {
           success: false,
-          message: null,
+          message: "Hack failed",
           error: "IP not found",
           data: null,
         });
@@ -73,7 +73,7 @@ export function setupGameHandlers(socket, io) {
     if (!user) {
       return socket.emit("miningResult", {
         success: false,
-        message: null,
+        message: "Mining failed",
         error: "User not found",
         data: null,
       });
@@ -84,7 +84,7 @@ export function setupGameHandlers(socket, io) {
     if (!targetServer) {
       return socket.emit("miningResult", {
         success: false,
-        message: null,
+        message: "Mining failed",
         error: "Target server not found",
         data: null,
       });
@@ -95,7 +95,7 @@ export function setupGameHandlers(socket, io) {
     ) {
       return socket.emit("miningResult", {
         success: false,
-        message: null,
+        message: "Mining failed",
         error: "Not enough resources on target server",
         data: null,
       });
