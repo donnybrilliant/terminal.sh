@@ -30,6 +30,10 @@ function initializeCommandLists() {
   chatCommands = getChatCommandList();
 }
 
+export function updateCommandList() {
+  availableCommands = getCommandList();
+}
+
 function clearSuggestions(term) {
   if (isShowingSuggestions) {
     term.write(`\x1b[1B\r\x1b[2K`); // Move down one line and clear it

@@ -14,6 +14,7 @@ import {
   isInChatMode,
   handleChatCommand,
 } from "../chat/index.js";
+import { fileData } from "./fileSystem.js";
 
 // Command map
 const commandMap = {
@@ -131,10 +132,24 @@ const commandMap = {
     });
     return "Hardware info received. Check the console.";
   },
+  password_cracker: () => {
+    console.log("Password Cracker executed");
+    return "Password Cracker executed";
+  },
 };
 
 export function getCommandList() {
-  return Object.keys(commandMap);
+  const baseCommands = Object.keys(commandMap);
+  const username = loginManager.getUsername();
+  if (
+    username &&
+    fileData.root.home.users[username] &&
+    fileData.root.home.users[username].bin
+  ) {
+    const userCommands = Object.keys(fileData.root.home.users[username].bin);
+    return [...new Set([...baseCommands, ...userCommands])];
+  }
+  return baseCommands;
 }
 
 export default async function processCommand(command) {

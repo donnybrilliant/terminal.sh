@@ -2,6 +2,7 @@ import { term, loginManager, socket } from "../terminal/index.js";
 import {
   saveCommandBuffer,
   restoreCommandBuffer,
+  updateCommandList,
 } from "../terminal/keyInputHandler.js";
 import { appendToolToFileData } from "../terminal/fileSystem.js";
 
@@ -29,6 +30,7 @@ function handleGameMessage(data) {
     if (toolName) {
       console.log(toolName);
       appendToolToFileData(toolName);
+      updateCommandList();
     }
   }
 

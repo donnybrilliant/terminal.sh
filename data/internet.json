@@ -1,4 +1,57 @@
 {
+  "1.1.1.1": {
+    "securityLevel": 0,
+    "resources": {
+      "cpu": 300,
+      "bandwidth": 1000,
+      "crypto": 10,
+      "data": 5000
+    },
+    "tools": ["advanced_exploit_kit"],
+    "connectedIPs": ["192.168.0.4"],
+    "services": [
+      {
+        "name": "rdp",
+        "port": 3389,
+        "vulnerable": true
+      },
+      {
+        "name": "oracle_db",
+        "port": 1521,
+        "vulnerable": true
+      }
+    ],
+    "logs": [
+      {
+        "timestamp": "2024-06-10T06:00:00Z",
+        "event": "RDP session initiated from 192.168.0.4"
+      },
+      {
+        "timestamp": "2024-06-10T13:00:00Z",
+        "event": "Oracle DB accessed from 192.168.0.2"
+      }
+    ],
+    "fileSystem": {
+      "home": {
+        "superuser": {
+          "README.txt": "Superuser home directory."
+        }
+      },
+      "etc": {
+        "oracle": {
+          "config": "Oracle database configuration file."
+        }
+      },
+      "var": {
+        "log": {
+          "rdp.log": "Remote Desktop Protocol log contents.",
+          "oracle.log": "Oracle database log contents."
+        }
+      }
+    },
+    "activeMiners": 0
+  },
+
   "192.168.0.1": {
     "securityLevel": 3,
     "resources": {
@@ -7,13 +60,8 @@
       "crypto": 0.5,
       "data": 500
     },
-    "tools": [
-      "password_cracker"
-    ],
-    "connectedIPs": [
-      "192.168.0.2",
-      "192.168.0.3"
-    ],
+    "tools": ["password_cracker"],
+    "connectedIPs": ["192.168.0.2", "192.168.0.3"],
     "services": [
       {
         "name": "ssh",
@@ -62,13 +110,8 @@
       "crypto": 1,
       "data": 1200
     },
-    "tools": [
-      "port_scanner"
-    ],
-    "connectedIPs": [
-      "192.168.0.1",
-      "192.168.0.4"
-    ],
+    "tools": ["port_scanner"],
+    "connectedIPs": ["192.168.0.1", "192.168.0.4"],
     "services": [
       {
         "name": "ftp",
@@ -119,12 +162,8 @@
       "crypto": 0.2,
       "data": 300
     },
-    "tools": [
-      "network_sniffer"
-    ],
-    "connectedIPs": [
-      "192.168.0.1"
-    ],
+    "tools": ["network_sniffer"],
+    "connectedIPs": ["192.168.0.1"],
     "services": [
       {
         "name": "telnet",
@@ -173,13 +212,8 @@
       "crypto": 5,
       "data": 2500
     },
-    "tools": [
-      "exploit_kit"
-    ],
-    "connectedIPs": [
-      "192.168.0.2",
-      "192.168.0.5"
-    ],
+    "tools": ["exploit_kit"],
+    "connectedIPs": ["192.168.0.2", "192.168.0.5"],
     "services": [
       {
         "name": "smtp",
@@ -228,12 +262,8 @@
       "crypto": 10,
       "data": 5000
     },
-    "tools": [
-      "advanced_exploit_kit"
-    ],
-    "connectedIPs": [
-      "192.168.0.4"
-    ],
+    "tools": ["advanced_exploit_kit"],
+    "connectedIPs": ["192.168.0.4"],
     "services": [
       {
         "name": "rdp",

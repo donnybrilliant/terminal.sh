@@ -14,7 +14,7 @@
 - autocomplete on file handling (edit etc)
 - refactor data/.json handling/structure
 - move fileData handling from login.js to fileSystem.js?
-- render tools to /bin on filesystem load instead of keeping one reference there and one in user.tools?
+- send more data from tool on save - should content be description?
 
 FIX ASAP:
 I should use utils more places getUsers etc
@@ -24,8 +24,8 @@ FOR TESTING:
 some lines does not follow with a prompt..
 
 - set name
--
--
+- password_cracker downloaded successfully
+- logged out successfully
 
 GAMEPLAY:
 
