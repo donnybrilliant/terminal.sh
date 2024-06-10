@@ -101,7 +101,7 @@ const commandMap = {
     socket.emit("hackIP", { username, targetIP: args[0] });
     return `Attempting to hack IP ${args[0]}...`;
   },
-  mine: () => {
+  mine: (args) => {
     if (args.length !== 1) {
       return "Usage: mine <targetIP>";
     }

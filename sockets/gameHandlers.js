@@ -1,3 +1,12 @@
+import {
+  readJSONFile,
+  writeJSONFile,
+  INTERNET_FILE_PATH,
+  USERS_FILE_PATH,
+} from "../utils/fileUtils.js";
+import { getUsers, getUserByUsername, saveUsers } from "../utils/userUtils.js";
+import { logAction } from "../utils/logger.js";
+
 export function setupGameHandlers(socket, io) {
   socket.on("scanIP", async ({ username, targetIP }) => {
     const internet = await readJSONFile(INTERNET_FILE_PATH);
@@ -89,6 +98,8 @@ export function setupGameHandlers(socket, io) {
         data: null,
       });
     }
+    console.log(Math.floor(targetServer.resources.cpu / 25));
+    console.log(targetServer.activeMiners);
 
     if (
       targetServer.activeMiners >= Math.floor(targetServer.resources.cpu / 25)
