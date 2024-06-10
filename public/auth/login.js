@@ -1,3 +1,4 @@
+// login.js
 import { loadFileSystem, pathStack, fileData } from "../terminal/fileSystem.js";
 import { fetchWithTimeout } from "../utils/fetch.js";
 
@@ -87,6 +88,7 @@ export class LoginManager {
       this.term.write(`\r\nLogged out successfully.\r\n`);
     });
   }
+
   async checkAuth() {
     try {
       const token = localStorage.getItem("jwtToken");
@@ -107,6 +109,7 @@ export class LoginManager {
       return false;
     }
   }
+
   async setName(newName) {
     const oldName = this.getUsername();
     if (!oldName) {
@@ -134,6 +137,7 @@ export class LoginManager {
         try {
           fileData.root.home.users[newName] = {
             ...fileData.root.home.users[oldName],
+            README: `User directory for ${newName}`,
           };
           delete fileData.root.home.users[oldName];
           pathStack.length = 0;

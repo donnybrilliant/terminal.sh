@@ -26,11 +26,12 @@ export function setupFileSystemHandlers(socket, io) {
 
       if (socket.user) {
         const user = users.find((u) => u.id === socket.user.id);
-        const userHomeData = {
-          ...user.home,
-          README: "Welcome, " + user.username,
-        };
-        baseFileSystem.root.home.users[user.username] = userHomeData;
+        if (user) {
+          const userHomeData = {
+            ...user.home,
+          };
+          baseFileSystem.root.home.users[user.username] = userHomeData;
+        }
       } else {
         if (!baseFileSystem.root.home.users.guest) {
           baseFileSystem.root.home.users.guest = {
