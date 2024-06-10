@@ -2,8 +2,9 @@
   "1.1.1.1": {
     "securityLevel": 0,
     "resources": {
-      "cpu": 300,
-      "bandwidth": 1000,
+      "cpu": 2500,
+      "bandwidth": 500,
+      "ram": 4,
       "crypto": 10,
       "data": 5000
     },
@@ -15,24 +16,53 @@
         "description": "Secure Shell",
         "port": 22,
         "vulnerable": true,
-        "vulnerabilities": ["weak_password"]
+        "vulnerabilities": [
+          {
+            "type": "password",
+            "strength": "weak",
+            "level": 1
+          }
+        ]
       },
       {
         "name": "http",
         "description": "Hypertext Transfer Protocol",
         "port": 80,
         "vulnerable": true,
-        "vulnerabilities": ["xss", "sql_injection"]
+        "vulnerabilities": [
+          {
+            "type": "xss",
+            "level": 20
+          },
+          {
+            "type": "sql_injection",
+            "level": 40
+          }
+        ]
       },
       {
         "name": "rdp",
+        "description": "Remote Desktop Protocol",
         "port": 3389,
-        "vulnerable": true
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "remote_code_execution",
+            "level": 20
+          }
+        ]
       },
       {
         "name": "oracle_db",
+        "description": "Oracle Database",
         "port": 1521,
-        "vulnerable": true
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "sql_injection",
+            "level": 40
+          }
+        ]
       }
     ],
     "logs": [
@@ -67,25 +97,41 @@
   },
 
   "192.168.0.1": {
-    "securityLevel": 3,
+    "securityLevel": 1,
     "resources": {
-      "cpu": 50,
-      "bandwidth": 100,
+      "cpu": 2000,
+      "bandwidth": 500,
+      "ram": 8,
       "crypto": 0.5,
-      "data": 500
+      "data": 1000
     },
     "tools": ["password_cracker"],
     "connectedIPs": ["192.168.0.2", "192.168.0.3", "1.1.1.1"],
     "services": [
       {
         "name": "ssh",
+        "description": "Secure Shell",
         "port": 22,
-        "vulnerable": true
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "password",
+            "strength": "weak",
+            "level": 1
+          }
+        ]
       },
       {
         "name": "http",
+        "description": "Hypertext Transfer Protocol",
         "port": 80,
-        "vulnerable": false
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "xss",
+            "level": 20
+          }
+        ]
       }
     ],
     "logs": [
@@ -117,10 +163,11 @@
     "activeMiners": 0
   },
   "192.168.0.2": {
-    "securityLevel": 5,
+    "securityLevel": 2,
     "resources": {
-      "cpu": 100,
-      "bandwidth": 200,
+      "cpu": 1800,
+      "bandwidth": 3000,
+      "ram": 16,
       "crypto": 1,
       "data": 1200
     },
@@ -129,11 +176,20 @@
     "services": [
       {
         "name": "ftp",
+        "description": "File Transfer Protocol",
         "port": 21,
-        "vulnerable": true
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "password",
+            "strength": "weak",
+            "level": 1
+          }
+        ]
       },
       {
         "name": "https",
+        "description": "Hypertext Transfer Protocol Secure",
         "port": 443,
         "vulnerable": false
       }
@@ -169,10 +225,11 @@
     "activeMiners": 0
   },
   "192.168.0.3": {
-    "securityLevel": 2,
+    "securityLevel": 3,
     "resources": {
-      "cpu": 30,
-      "bandwidth": 50,
+      "cpu": 1500,
+      "bandwidth": 500,
+      "ram": 8,
       "crypto": 0.2,
       "data": 300
     },
@@ -181,13 +238,28 @@
     "services": [
       {
         "name": "telnet",
+        "description": "Telnet",
         "port": 23,
-        "vulnerable": true
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "password",
+            "strength": "weak",
+            "level": 1
+          }
+        ]
       },
       {
         "name": "http",
+        "description": "Hypertext Transfer Protocol",
         "port": 8080,
-        "vulnerable": true
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "xss",
+            "level": 20
+          }
+        ]
       }
     ],
     "logs": [
@@ -219,10 +291,11 @@
     "activeMiners": 0
   },
   "192.168.0.4": {
-    "securityLevel": 8,
+    "securityLevel": 5,
     "resources": {
-      "cpu": 200,
-      "bandwidth": 500,
+      "cpu": 2500,
+      "bandwidth": 6000,
+      "ram": 24,
       "crypto": 5,
       "data": 2500
     },
@@ -231,13 +304,27 @@
     "services": [
       {
         "name": "smtp",
+        "description": "Simple Mail Transfer Protocol",
         "port": 25,
-        "vulnerable": false
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "xss",
+            "level": 20
+          }
+        ]
       },
       {
         "name": "mysql",
+        "description": "MySQL Database",
         "port": 3306,
-        "vulnerable": true
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "sql_injection",
+            "level": 40
+          }
+        ]
       }
     ],
     "logs": [
@@ -271,8 +358,9 @@
   "192.168.0.5": {
     "securityLevel": 10,
     "resources": {
-      "cpu": 300,
-      "bandwidth": 1000,
+      "cpu": 4500,
+      "bandwidth": 10000,
+      "ram": 32,
       "crypto": 10,
       "data": 5000
     },
@@ -281,13 +369,27 @@
     "services": [
       {
         "name": "rdp",
+        "description": "Remote Desktop Protocol",
         "port": 3389,
-        "vulnerable": true
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "remote_code_execution",
+            "level": 60
+          }
+        ]
       },
       {
         "name": "oracle_db",
+        "description": "Oracle Database",
         "port": 1521,
-        "vulnerable": true
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "sql_injection",
+            "level": 80
+          }
+        ]
       }
     ],
     "logs": [

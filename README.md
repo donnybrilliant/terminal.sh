@@ -72,6 +72,7 @@ OTHER
 - command that creates new dynamic servers?
 - other players have dynamic ports open?
 - set up fake "wifi" / server for phishing etc
+- make randomly generated file system for servers. ai?
 
 WORKFLOWS:
 

@@ -8,7 +8,22 @@
         "bandwidth": 0.1,
         "ram": 2
       },
-      "exploits": ["weak_password"]
+      "exploits": [
+        {
+          "type": "password",
+          "level": 1
+        },
+        {
+          "type": "password",
+
+          "level": 50
+        },
+        {
+          "type": "password",
+
+          "level": 100
+        }
+      ]
     },
     "port_scanner": {
       "name": "Port Scanner",
@@ -36,7 +51,20 @@
         "bandwidth": 0.5,
         "ram": 8
       },
-      "exploits": ["remote_code_execution", "buffer_overflow", "sql_injection"]
+      "exploits": [
+        {
+          "type": "remote_code_execution",
+          "level": 20
+        },
+        {
+          "type": "buffer_overflow",
+          "level": 30
+        },
+        {
+          "type": "sql_injection",
+          "level": 40
+        }
+      ]
     },
     "advanced_exploit_kit": {
       "name": "Advanced Exploit Kit",
@@ -47,10 +75,22 @@
         "ram": 16
       },
       "exploits": [
-        "remote_code_execution",
-        "buffer_overflow",
-        "sql_injection",
-        "zero_day"
+        {
+          "type": "remote_code_execution",
+          "level": 60
+        },
+        {
+          "type": "buffer_overflow",
+          "level": 70
+        },
+        {
+          "type": "sql_injection",
+          "level": 80
+        },
+        {
+          "type": "zero_day",
+          "level": 90
+        }
       ]
     },
     "sql_injector": {
@@ -61,7 +101,12 @@
         "bandwidth": 0.3,
         "ram": 4
       },
-      "exploits": ["sql_injection"]
+      "exploits": [
+        {
+          "type": "sql_injection",
+          "level": 40
+        }
+      ]
     },
     "xss_exploit": {
       "name": "XSS Exploit",
@@ -71,7 +116,12 @@
         "bandwidth": 0.2,
         "ram": 2
       },
-      "exploits": ["cross_site_scripting"]
+      "exploits": [
+        {
+          "type": "xss",
+          "level": 20
+        }
+      ]
     },
     "buffer_overflow_exploit": {
       "name": "Buffer Overflow Exploit",
@@ -81,7 +131,12 @@
         "bandwidth": 0.5,
         "ram": 8
       },
-      "exploits": ["buffer_overflow"]
+      "exploits": [
+        {
+          "type": "buffer_overflow",
+          "level": 30
+        }
+      ]
     },
     "remote_code_execution_exploit": {
       "name": "Remote Code Execution Exploit",
@@ -91,7 +146,12 @@
         "bandwidth": 0.6,
         "ram": 12
       },
-      "exploits": ["remote_code_execution"]
+      "exploits": [
+        {
+          "type": "remote_code_execution",
+          "level": 50
+        }
+      ]
     },
     "privilege_escalation_tool": {
       "name": "Privilege Escalation Tool",
@@ -101,7 +161,12 @@
         "bandwidth": 0.4,
         "ram": 6
       },
-      "exploits": ["privilege_escalation"]
+      "exploits": [
+        {
+          "type": "privilege_escalation",
+          "level": 60
+        }
+      ]
     },
     "zero_day_exploit": {
       "name": "Zero-Day Exploit",
@@ -111,7 +176,12 @@
         "bandwidth": 3.0,
         "ram": 24
       },
-      "exploits": ["zero_day"]
+      "exploits": [
+        {
+          "type": "zero_day",
+          "level": 90
+        }
+      ]
     },
     "rootkit": {
       "name": "Rootkit",
