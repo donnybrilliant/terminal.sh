@@ -110,6 +110,18 @@ const commandMap = {
     socket.emit("startMining", { username, targetIP });
     return `Mining IP ${targetIP}...`;
   },
+  download: (args) => {
+    if (args.length !== 2) {
+      return "Usage: download <targetIP> <toolName>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    socket.emit("download", {
+      username,
+      targetIP: args[0],
+      toolName: args[1],
+    });
+    return `Downloading ${args[1]} from IP ${args[0]}...`;
+  },
   server: () => {
     socket.emit("requestHardwareInfo");
     socket.on("hardwareInfo", (data) => {

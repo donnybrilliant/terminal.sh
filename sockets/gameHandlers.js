@@ -126,4 +126,41 @@ export function setupGameHandlers(socket, io) {
       data: null,
     });
   });
+
+  // New download tool handler
+  socket.on("download", async ({ username, targetIP, toolName }) => {
+    const users = await readJSONFile(USERS_FILE_PATH);
+    const user = users.find((u) => u.username === username);
+    if (!user) {
+      return socket.emit("downloadResult", {
+        success: false,
+        message: "Download failed",
+        error: "User not found",
+      });
+    }
+
+    const internet = await readJSONFile(INTERNET_FILE_PATH);
+    const targetServer = internet[targetIP];
+    if (!targetServer || !targetServer.tools.includes(toolName)) {
+      return socket.emit("downloadResult", {
+        success: false,
+        message: "Download failed",
+        error: "Tool not found on target server",
+      });
+    }
+
+    // Add tool to user's tools and home directory
+    if (!user.tools.includes(toolName)) {
+      user.tools.push(toolName);
+      user.home.bin = user.home.bin || {};
+      user.home.bin[toolName] = toolName;
+    }
+
+    await writeJSONFile(USERS_FILE_PATH, users);
+    socket.emit("downloadResult", {
+      success: true,
+      message: `${toolName} downloaded successfully`,
+      toolName,
+    });
+  });
 }

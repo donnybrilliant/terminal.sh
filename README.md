@@ -13,6 +13,8 @@
 - test edit mode
 - autocomplete on file handling (edit etc)
 - refactor data/.json handling/structure
+- move fileData handling from login.js to fileSystem.js?
+- render tools to /bin on filesystem load instead of keeping one reference there and one in user.tools?
 
 FIX ASAP:
 I should use utils more places getUsers etc
@@ -35,6 +37,8 @@ STRUCTURE:
 
 UI:
 
+- PROGRESS BARS!
+- process dashboard!
 - more commands
 - list all kinds of info
 

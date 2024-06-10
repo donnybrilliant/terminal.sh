@@ -122,6 +122,16 @@ function getDirectoryNames() {
   );
 }
 
+function appendToolToFileData(toolName) {
+  const username = loginManager.getUsername();
+  if (username && username.trim() !== "") {
+    if (!fileData.root.home.users[username].bin) {
+      fileData.root.home.users[username].bin = {};
+    }
+    fileData.root.home.users[username].bin[toolName] = toolName;
+  }
+}
+
 // Export necessary functions
 export {
   getCurrentDir,
@@ -132,4 +142,5 @@ export {
   saveUserHome,
   pathStack,
   fileData,
+  appendToolToFileData,
 };
