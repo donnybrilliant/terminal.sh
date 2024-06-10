@@ -1,11 +1,3 @@
-import {
-  readJSONFile,
-  writeJSONFile,
-  INTERNET_FILE_PATH,
-} from "../utils/fileUtils.js";
-import { getUsers, getUserByUsername, saveUsers } from "../utils/userUtils.js";
-import { logAction } from "../utils/logger.js";
-
 export function setupGameHandlers(socket, io) {
   socket.on("scanIP", async ({ username, targetIP }) => {
     const internet = await readJSONFile(INTERNET_FILE_PATH);
@@ -13,11 +5,18 @@ export function setupGameHandlers(socket, io) {
 
     if (target) {
       logAction(username, `Scanned IP: ${targetIP}`);
-      io.to(socket.id).emit("scanResult", { targetIP, details: target });
+      socket.emit("scanResult", {
+        success: true,
+        message: `Scan result for ${targetIP}`,
+        error: null,
+        data: target,
+      });
     } else {
-      io.to(socket.id).emit("scanResult", {
-        targetIP,
+      socket.emit("scanResult", {
+        success: false,
+        message: null,
         error: "IP not found",
+        data: null,
       });
     }
   });
@@ -35,7 +34,6 @@ export function setupGameHandlers(socket, io) {
           user.tools.includes("exploit_kit") ||
           user.resources.cpu > target.securityLevel
         ) {
-          // Successful hack
           user.resources = {
             ...user.resources,
             ...target.resources,
@@ -44,30 +42,77 @@ export function setupGameHandlers(socket, io) {
 
           await saveUsers(users);
           logAction(username, `Hacked IP: ${targetIP}`);
-          io.to(socket.id).emit("hackResult", {
+          socket.emit("hackResult", {
             success: true,
-            targetIP,
-            details: target,
+            message: `Successfully hacked ${targetIP}`,
+            error: null,
+            data: target,
           });
         } else {
-          // Failed hack
-          io.to(socket.id).emit("hackResult", {
+          socket.emit("hackResult", {
             success: false,
-            targetIP,
+            message: null,
             error: "Hack failed",
+            data: null,
           });
         }
       } else {
-        io.to(socket.id).emit("hackResult", {
-          targetIP,
+        socket.emit("hackResult", {
+          success: false,
+          message: null,
           error: "IP not found",
+          data: null,
         });
       }
-    } else {
-      io.to(socket.id).emit("hackResult", {
-        targetIP,
-        error: "You are a guest",
+    }
+  });
+
+  socket.on("startMining", async ({ username, targetIP }) => {
+    const users = await readJSONFile(USERS_FILE_PATH);
+    const user = users.find((u) => u.username === username);
+    if (!user) {
+      return socket.emit("miningResult", {
+        success: false,
+        message: null,
+        error: "User not found",
+        data: null,
       });
     }
+
+    const internet = await readJSONFile(INTERNET_FILE_PATH);
+    const targetServer = internet[targetIP];
+    if (!targetServer) {
+      return socket.emit("miningResult", {
+        success: false,
+        message: null,
+        error: "Target server not found",
+        data: null,
+      });
+    }
+
+    if (
+      targetServer.activeMiners >= Math.floor(targetServer.resources.cpu / 25)
+    ) {
+      return socket.emit("miningResult", {
+        success: false,
+        message: null,
+        error: "Not enough resources on target server",
+        data: null,
+      });
+    }
+
+    user.activeMiners.push({ targetIP, startTime: Date.now() });
+    targetServer.activeMiners += 1;
+    await Promise.all([
+      writeJSONFile(USERS_FILE_PATH, users),
+      writeJSONFile(INTERNET_FILE_PATH, internet),
+    ]);
+
+    socket.emit("miningResult", {
+      success: true,
+      message: "Mining started on target server",
+      error: null,
+      data: null,
+    });
   });
 }
