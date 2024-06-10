@@ -11,11 +11,11 @@
 - autocomplete for /join with available user.alliance[] or the way socket keeps track of the rooms.
 - tab suggestions on multiple lines causes rerender on new lines...
 - test edit mode
+- autocomplete on file handling (edit etc)
 
-after refactor broken:
+FOR TESTING:
+some lines does not follow with a prompt..
 
-- setname (name)
-
-FIX ASAP:
-SET NAME
-ASCII renders first prompt without username..
+- set name
+-
+-

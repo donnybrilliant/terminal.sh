@@ -1,3 +1,5 @@
+// keyInputHandler.js
+
 import { stopMatrix } from "./random.js";
 import { loginManager } from "./index.js";
 import { isInEditMode } from "./edit.js";
@@ -7,21 +9,19 @@ import {
   getChatCommandList,
 } from "../chat/index.js";
 import { getCommandList } from "./commandProcessor.js";
+import { getDirectoryNames } from "./fileSystem.js";
 
-// Buffer to hold the current command being typed by the user.
 let commandBuffer = "";
 let cursorPosition = 0;
 
 let suggestions = [];
 let isShowingSuggestions = false;
 
-// Command history for the main terminal and chat
 const mainCommandHistory = [];
 const chatCommandHistory = [];
 let mainHistoryIndex = -1;
 let chatHistoryIndex = -1;
 
-// List of available commands for auto-completion
 let availableCommands;
 let chatCommands;
 
@@ -160,28 +160,54 @@ export default async function handleKeyInput(
 
   // Handle Tab key press for command auto-completion
   if (key === "Tab" || keyCode === 9) {
-    const commands = isInChatMode() ? chatCommands : availableCommands;
-    const possibleCommands = commands.filter((cmd) =>
-      cmd.startsWith(commandBuffer)
-    );
+    if (commandBuffer.startsWith("cd ")) {
+      const currentPath = commandBuffer.slice(3);
+      const directories = getDirectoryNames();
+      const possibleDirs = directories.filter((dir) =>
+        dir.startsWith(currentPath)
+      );
 
-    clearSuggestions(term);
+      clearSuggestions(term);
 
-    if (possibleCommands.length === 1) {
-      commandBuffer = possibleCommands[0] + " "; // Add a space after the completed command
-      cursorPosition = commandBuffer.length;
-      render(term);
-    } else if (possibleCommands.length > 1) {
-      suggestions = possibleCommands;
-      const savedCursorPosition = cursorPosition;
-      displaySuggestions(term, possibleCommands);
-      term.write(`\x1b[${savedCursorPosition + prompt.length + 1}G`);
+      if (possibleDirs.length === 1) {
+        commandBuffer = `cd ${possibleDirs[0]}`;
+        cursorPosition = commandBuffer.length;
+        render(term);
+      } else if (possibleDirs.length > 1) {
+        suggestions = possibleDirs;
+        console.log(suggestions);
+        displaySuggestions(term, possibleDirs);
+        term.write(`\x1b[${cursorPosition + prompt.length + 1}G`);
+      } else {
+        suggestions = [];
+        render(term);
+      }
+
+      domEvent.preventDefault(); // Prevent the default action of the Tab key
+      return;
     } else {
-      suggestions = [];
-      render(term);
+      const commands = isInChatMode() ? chatCommands : availableCommands;
+      const possibleCommands = commands.filter((cmd) =>
+        cmd.startsWith(commandBuffer)
+      );
+
+      clearSuggestions(term);
+
+      if (possibleCommands.length === 1) {
+        commandBuffer = possibleCommands[0] + " "; // Add a space after the completed command
+        cursorPosition = commandBuffer.length;
+        render(term);
+      } else if (possibleCommands.length > 1) {
+        suggestions = possibleCommands;
+        displaySuggestions(term, possibleCommands);
+        term.write(`\x1b[${cursorPosition + prompt.length + 1}G`);
+      } else {
+        suggestions = [];
+        render(term);
+      }
+      domEvent.preventDefault(); // Prevent the default action of the Tab key
+      return;
     }
-    domEvent.preventDefault(); // Prevent the default action of the Tab key
-    return;
   }
 
   // Handle Enter key press

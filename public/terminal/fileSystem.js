@@ -39,7 +39,11 @@ async function loadFileSystem() {
 // Function to save the user's home directory
 async function saveUserHome() {
   const username = loginManager.getUsername();
-  if (username && fileData.root.home.users[username]) {
+  if (
+    username &&
+    username.trim() !== "" &&
+    fileData.root.home.users[username]
+  ) {
     const { README, ...filteredHomeData } = fileData.root.home.users[username]; // Exclude README
 
     try {
@@ -56,7 +60,10 @@ async function saveUserHome() {
       throw new Error(error.message);
     }
   } else {
-    throw new Error("User not recognized or missing home directory.");
+    console.log(
+      "Skipping save operation: User not recognized or missing home directory."
+    );
+    return "Skipping save operation: User not recognized or missing home directory.";
   }
 }
 
@@ -107,11 +114,20 @@ function getCurrentPath() {
   return "/" + pathStack.join("/");
 }
 
+// Function to get directory names for autocompletion
+function getDirectoryNames() {
+  const currentDir = getCurrentDir();
+  return Object.keys(currentDir).filter(
+    (key) => typeof currentDir[key] === "object"
+  );
+}
+
 // Export necessary functions
 export {
   getCurrentDir,
   setCurrentDir,
   getCurrentPath,
+  getDirectoryNames,
   loadFileSystem,
   saveUserHome,
   pathStack,
