@@ -1,0 +1,400 @@
+{
+  "tools": {
+    "password_cracker": {
+      "name": "Password Cracker",
+      "function": "Cracks passwords using brute force.",
+      "resources": {
+        "cpu": 10,
+        "bandwidth": 0.1,
+        "ram": 2
+      },
+      "exploits": [
+        {
+          "type": "password",
+          "level": 1
+        },
+        {
+          "type": "password",
+
+          "level": 50
+        },
+        {
+          "type": "password",
+
+          "level": 100
+        }
+      ]
+    },
+    "port_scanner": {
+      "name": "Port Scanner",
+      "function": "Scans for open ports on a target IP.",
+      "resources": {
+        "cpu": 5,
+        "bandwidth": 0.05,
+        "ram": 1
+      }
+    },
+    "network_sniffer": {
+      "name": "Network Sniffer",
+      "function": "Sniffs network traffic to gather information.",
+      "resources": {
+        "cpu": 8,
+        "bandwidth": 0.08,
+        "ram": 4
+      }
+    },
+    "exploit_kit": {
+      "name": "Exploit Kit",
+      "function": "Exploits known vulnerabilities to gain access.",
+      "resources": {
+        "cpu": 20,
+        "bandwidth": 0.5,
+        "ram": 8
+      },
+      "exploits": [
+        {
+          "type": "remote_code_execution",
+          "level": 20
+        },
+        {
+          "type": "buffer_overflow",
+          "level": 30
+        },
+        {
+          "type": "sql_injection",
+          "level": 40
+        }
+      ]
+    },
+    "advanced_exploit_kit": {
+      "name": "Advanced Exploit Kit",
+      "function": "Exploits advanced vulnerabilities to gain access.",
+      "resources": {
+        "cpu": 50,
+        "bandwidth": 1.0,
+        "ram": 16
+      },
+      "exploits": [
+        {
+          "type": "remote_code_execution",
+          "level": 60
+        },
+        {
+          "type": "buffer_overflow",
+          "level": 70
+        },
+        {
+          "type": "sql_injection",
+          "level": 80
+        },
+        {
+          "type": "zero_day",
+          "level": 90
+        }
+      ]
+    },
+    "sql_injector": {
+      "name": "SQL Injector",
+      "function": "Performs SQL injection attacks to manipulate databases.",
+      "resources": {
+        "cpu": 15,
+        "bandwidth": 0.3,
+        "ram": 4
+      },
+      "exploits": [
+        {
+          "type": "sql_injection",
+          "level": 40
+        }
+      ]
+    },
+    "xss_exploit": {
+      "name": "XSS Exploit",
+      "function": "Exploits cross-site scripting vulnerabilities.",
+      "resources": {
+        "cpu": 10,
+        "bandwidth": 0.2,
+        "ram": 2
+      },
+      "exploits": [
+        {
+          "type": "xss",
+          "level": 20
+        }
+      ]
+    },
+    "buffer_overflow_exploit": {
+      "name": "Buffer Overflow Exploit",
+      "function": "Exploits buffer overflow vulnerabilities to execute arbitrary code.",
+      "resources": {
+        "cpu": 25,
+        "bandwidth": 0.5,
+        "ram": 8
+      },
+      "exploits": [
+        {
+          "type": "buffer_overflow",
+          "level": 30
+        }
+      ]
+    },
+    "remote_code_execution_exploit": {
+      "name": "Remote Code Execution Exploit",
+      "function": "Executes arbitrary code on a remote system.",
+      "resources": {
+        "cpu": 30,
+        "bandwidth": 0.6,
+        "ram": 12
+      },
+      "exploits": [
+        {
+          "type": "remote_code_execution",
+          "level": 50
+        }
+      ]
+    },
+    "privilege_escalation_tool": {
+      "name": "Privilege Escalation Tool",
+      "function": "Gains higher privileges than normally allowed.",
+      "resources": {
+        "cpu": 20,
+        "bandwidth": 0.4,
+        "ram": 6
+      },
+      "exploits": [
+        {
+          "type": "privilege_escalation",
+          "level": 60
+        }
+      ]
+    },
+    "zero_day_exploit": {
+      "name": "Zero-Day Exploit",
+      "function": "Uses an undisclosed vulnerability to gain access to a system.",
+      "resources": {
+        "cpu": 75,
+        "bandwidth": 3.0,
+        "ram": 24
+      },
+      "exploits": [
+        {
+          "type": "zero_day",
+          "level": 90
+        }
+      ]
+    },
+    "rootkit": {
+      "name": "Rootkit",
+      "function": "Installs hidden access to a system for ongoing control.",
+      "resources": {
+        "cpu": 20,
+        "bandwidth": 0.4,
+        "ram": 4
+      }
+    },
+    "data_exfiltrator": {
+      "name": "Data Exfiltrator",
+      "function": "Extracts large volumes of data from a target system.",
+      "resources": {
+        "cpu": 15,
+        "bandwidth": 0.3,
+        "ram": 8
+      }
+    },
+    "log_cleaner": {
+      "name": "Log Cleaner",
+      "function": "Erases traces of hacking activities from system logs.",
+      "resources": {
+        "cpu": 5,
+        "bandwidth": 0.1,
+        "ram": 2
+      }
+    },
+    "social_engineering_toolkit": {
+      "name": "Social Engineering Toolkit",
+      "function": "Uses social engineering tactics to gather information or access.",
+      "resources": {
+        "cpu": 10,
+        "bandwidth": 0.2,
+        "ram": 2
+      }
+    },
+    "honeypot_detector": {
+      "name": "Honeypot Detector",
+      "function": "Identifies and avoids honeypots set up to trap hackers.",
+      "resources": {
+        "cpu": 15,
+        "bandwidth": 0.3,
+        "ram": 4
+      }
+    },
+    "phishing_kit": {
+      "name": "Phishing Kit",
+      "function": "Creates convincing phishing campaigns to steal credentials.",
+      "resources": {
+        "cpu": 12,
+        "bandwidth": 0.2,
+        "ram": 4
+      }
+    },
+    "stealth_virus": {
+      "name": "Stealth Virus",
+      "function": "Infects systems without being detected by antivirus software.",
+      "resources": {
+        "cpu": 25,
+        "bandwidth": 0.5,
+        "ram": 8
+      }
+    },
+    "botnet_controller": {
+      "name": "Botnet Controller",
+      "function": "Manages a network of compromised devices to perform various attacks.",
+      "resources": {
+        "cpu": 50,
+        "bandwidth": 1.0,
+        "ram": 16
+      }
+    },
+    "encryption_breaker": {
+      "name": "Encryption Breaker",
+      "function": "Breaks through advanced encryption to access secured data.",
+      "resources": {
+        "cpu": 60,
+        "bandwidth": 1.2,
+        "ram": 24
+      }
+    },
+    "malware_injector": {
+      "name": "Malware Injector",
+      "function": "Injects malicious software into target systems.",
+      "resources": {
+        "cpu": 30,
+        "bandwidth": 0.6,
+        "ram": 8
+      }
+    },
+    "web_shell": {
+      "name": "Web Shell",
+      "function": "Provides remote access to a compromised web server.",
+      "resources": {
+        "cpu": 10,
+        "bandwidth": 0.2,
+        "ram": 2
+      }
+    },
+    "firmware_hacker": {
+      "name": "Firmware Hacker",
+      "function": "Modifies firmware to gain persistent low-level access.",
+      "resources": {
+        "cpu": 40,
+        "bandwidth": 0.8,
+        "ram": 16
+      }
+    },
+    "security_scanner": {
+      "name": "Security Scanner",
+      "function": "Scans for vulnerabilities in a target system's security setup.",
+      "resources": {
+        "cpu": 20,
+        "bandwidth": 0.4,
+        "ram": 8
+      }
+    },
+    "proxy_network": {
+      "name": "Proxy Network",
+      "function": "Uses a network of proxy servers to hide the hacker's location.",
+      "resources": {
+        "cpu": 5,
+        "bandwidth": 0.1,
+        "ram": 2
+      },
+      "special": "Reduces traceability by 50%."
+    },
+    "ai_defender_bot": {
+      "name": "AI Defender Bot",
+      "function": "Automates the defense of systems, identifying and neutralizing threats.",
+      "resources": {
+        "cpu": 80,
+        "bandwidth": 1.5,
+        "ram": 32
+      },
+      "special": "Automatically defends against detected attacks, reducing damage by 50%."
+    },
+    "signal_interceptor": {
+      "name": "Signal Interceptor",
+      "function": "Intercepts and analyzes wireless signals for data extraction.",
+      "resources": {
+        "cpu": 35,
+        "bandwidth": 0.7,
+        "ram": 16
+      }
+    },
+    "darknet_market_access": {
+      "name": "Darknet Market Access",
+      "function": "Provides access to a marketplace for buying and selling illegal goods.",
+      "resources": {
+        "cpu": 50,
+        "bandwidth": 1.0,
+        "ram": 8
+      },
+      "special": "Allows trade of rare tools and exploits."
+    },
+    "crypto_wallet_hacker": {
+      "name": "Crypto Wallet Hacker",
+      "function": "Targets cryptocurrency wallets to steal funds.",
+      "resources": {
+        "cpu": 70,
+        "bandwidth": 1.5,
+        "ram": 32
+      }
+    },
+    "ddos_cannon": {
+      "name": "DDoS Cannon",
+      "function": "Launches a Distributed Denial of Service attack to overwhelm a target.",
+      "resources": {
+        "cpu": 30,
+        "bandwidth": 0.5,
+        "ram": 8
+      }
+    },
+    "bandwidth_miner": {
+      "name": "Bandwidth Miner",
+      "function": "Mines bandwidth currency from compromised systems.",
+      "resources": {
+        "cpu": 25,
+        "bandwidth": 0.2,
+        "ram": 4
+      },
+      "special": "Generates passive income over time."
+    },
+    "crypto_miner": {
+      "name": "Crypto Miner",
+      "function": "Mines cryptocurrency from compromised systems.",
+      "resources": {
+        "cpu": 25,
+        "bandwidth": 0.2,
+        "ram": 1
+      },
+      "special": "Generates passive income over time."
+    },
+    "ai_hacker_bot": {
+      "name": "AI Hacker Bot",
+      "function": "An AI-powered bot that automates hacking tasks and learns over time.",
+      "resources": {
+        "cpu": 100,
+        "bandwidth": 2.0,
+        "ram": 32
+      },
+      "special": "Improves efficiency with use, reducing resource costs by 10% for each successful hack."
+    },
+    "quantum_decryptor": {
+      "name": "Quantum Decryptor",
+      "function": "Uses quantum computing to decrypt highly secure communications.",
+      "resources": {
+        "cpu": 200,
+        "bandwidth": 5.0,
+        "ram": 64
+      }
+    }
+  }
+}

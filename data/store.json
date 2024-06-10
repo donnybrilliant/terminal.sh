@@ -1,0 +1,82 @@
+{
+  "tools": [
+    {
+      "name": "Password Cracker",
+      "price": {
+        "currency": 100,
+        "crypto": 0.1
+      },
+      "stock": 10
+    },
+    {
+      "name": "Exploit Kit",
+      "price": {
+        "currency": 500,
+        "crypto": 0.5
+      },
+      "stock": 5
+    },
+    {
+      "id": "port_scanner",
+      "price": {
+        "cpu": 8,
+        "crypto": 0.1
+      }
+    },
+    {
+      "id": "network_sniffer",
+      "price": {
+        "cpu": 12,
+        "crypto": 0.15
+      }
+    },
+    {
+      "id": "advanced_exploit_kit",
+      "price": {
+        "cpu": 60,
+        "crypto": 1.2
+      }
+    }
+  ],
+  "trades": [
+    {
+      "seller": "player1",
+      "item": "Crypto Miner",
+      "price": {
+        "currency": 300,
+        "crypto": 0.3
+      }
+    }
+  ],
+  "auctions": [
+    {
+      "item": "Quantum Decryptor",
+      "startingPrice": {
+        "currency": 1000,
+        "crypto": 1.0
+      },
+      "currentBid": {
+        "bidder": "player2",
+        "price": {
+          "currency": 1200,
+          "crypto": 1.2
+        }
+      },
+      "endTime": "2024-06-11T10:00:00Z"
+    }
+  ],
+  "resources": [
+    {
+      "type": "cpu",
+      "price": {
+        "crypto": 0.01
+      }
+    },
+    {
+      "type": "bandwidth",
+      "price": {
+        "crypto": 0.005
+      }
+    }
+  ]
+}

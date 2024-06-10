@@ -9,7 +9,6 @@ const filesToEmpty = [
   path.join(dataDir, "users.json"),
   path.join(dataDir, "logs.json"), // Adding logs.json to the list
 ];
-const fileSystemPath = path.join(dataDir, "filesystem.json");
 
 // Function to overwrite specified files with an empty array
 const overwriteWithEmptyArray = (files) => {
@@ -38,20 +37,6 @@ const cleanMessagesDirectory = (dir) => {
   });
 };
 
-// Function to modify filesystem.json
-const updateFileSystemJson = (filePath) => {
-  fs.readFile(filePath, "utf8", (err, data) => {
-    if (err) return console.error(`Error reading ${filePath}: ${err}`);
-    let jsonData = JSON.parse(data);
-    jsonData.root.home.users = [];
-    fs.writeFile(filePath, JSON.stringify(jsonData, null, 2), (err) => {
-      if (err) return console.error(`Error writing to ${filePath}: ${err}`);
-      console.log(`Successfully updated ${filePath}.`);
-    });
-  });
-};
-
 // Execute the cleanup functions
 overwriteWithEmptyArray(filesToEmpty);
 cleanMessagesDirectory(messagesDir);
-updateFileSystemJson(fileSystemPath);

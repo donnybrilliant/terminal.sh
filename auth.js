@@ -8,7 +8,6 @@ import {
   readJSONFile,
   writeJSONFile,
   USERS_FILE_PATH,
-  FILE_SYSTEM_PATH,
 } from "./utils/fileUtils.js";
 
 const JWT_SECRET = "your_jwt_secret"; // Use a strong secret key in production
@@ -70,18 +69,26 @@ passport.use(
           password: hashedPassword,
           ip: generateUniqueIP(users),
           home: {},
+          level: 0,
+          experience: 0,
+          resources: {
+            cpu: 200,
+            bandwidth: 300,
+            crypto: 15.0,
+            data: 1200,
+            ram: 24,
+          },
+          tools: [],
+          achievements: [],
+          inventory: {
+            items: [],
+            currency: 500,
+          },
+          activeMiners: [],
         };
         users.push(user);
 
-        // Add user to filesystem.json
-        let fileSystem = await readJSONFile(FILE_SYSTEM_PATH);
-        fileSystem.root.home.users.push(username);
-
-        // Write changes to both USERS_FILE_PATH and FILE_SYSTEM_PATH
-        await Promise.all([
-          writeJSONFile(USERS_FILE_PATH, users),
-          writeJSONFile(FILE_SYSTEM_PATH, fileSystem),
-        ]);
+        await writeJSONFile(USERS_FILE_PATH, users);
 
         return done(null, user);
       }

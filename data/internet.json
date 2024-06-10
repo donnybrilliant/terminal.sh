@@ -1,0 +1,425 @@
+{
+  "1.1.1.1": {
+    "securityLevel": 0,
+    "resources": {
+      "cpu": 2500,
+      "bandwidth": 500,
+      "ram": 4,
+      "crypto": 10,
+      "data": 5000
+    },
+    "tools": ["exploit_kit"],
+    "connectedIPs": ["192.168.0.1"],
+    "services": [
+      {
+        "name": "ssh",
+        "description": "Secure Shell",
+        "port": 22,
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "password",
+            "strength": "weak",
+            "level": 1
+          }
+        ]
+      },
+      {
+        "name": "http",
+        "description": "Hypertext Transfer Protocol",
+        "port": 80,
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "xss",
+            "level": 20
+          },
+          {
+            "type": "sql_injection",
+            "level": 40
+          }
+        ]
+      },
+      {
+        "name": "rdp",
+        "description": "Remote Desktop Protocol",
+        "port": 3389,
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "remote_code_execution",
+            "level": 20
+          }
+        ]
+      },
+      {
+        "name": "oracle_db",
+        "description": "Oracle Database",
+        "port": 1521,
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "sql_injection",
+            "level": 40
+          }
+        ]
+      }
+    ],
+    "logs": [
+      {
+        "timestamp": "2024-06-10T06:00:00Z",
+        "event": "RDP session initiated from 192.168.0.4"
+      },
+      {
+        "timestamp": "2024-06-10T13:00:00Z",
+        "event": "Oracle DB accessed from 192.168.0.2"
+      }
+    ],
+    "fileSystem": {
+      "home": {
+        "superuser": {
+          "README.txt": "Superuser home directory."
+        }
+      },
+      "etc": {
+        "oracle": {
+          "config": "Oracle database configuration file."
+        }
+      },
+      "var": {
+        "log": {
+          "rdp.log": "Remote Desktop Protocol log contents.",
+          "oracle.log": "Oracle database log contents."
+        }
+      }
+    },
+    "activeMiners": 0
+  },
+
+  "192.168.0.1": {
+    "securityLevel": 1,
+    "resources": {
+      "cpu": 2000,
+      "bandwidth": 500,
+      "ram": 8,
+      "crypto": 0.5,
+      "data": 1000
+    },
+    "tools": ["password_cracker"],
+    "connectedIPs": ["192.168.0.2", "192.168.0.3", "1.1.1.1"],
+    "services": [
+      {
+        "name": "ssh",
+        "description": "Secure Shell",
+        "port": 22,
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "password",
+            "strength": "weak",
+            "level": 1
+          }
+        ]
+      },
+      {
+        "name": "http",
+        "description": "Hypertext Transfer Protocol",
+        "port": 80,
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "xss",
+            "level": 20
+          }
+        ]
+      }
+    ],
+    "logs": [
+      {
+        "timestamp": "2024-06-10T10:00:00Z",
+        "event": "Failed login attempt from 192.168.0.3"
+      },
+      {
+        "timestamp": "2024-06-10T11:00:00Z",
+        "event": "Successful login from 192.168.0.2"
+      }
+    ],
+    "fileSystem": {
+      "home": {
+        "admin": {
+          "README.txt": "Admin home directory."
+        }
+      },
+      "etc": {
+        "config": "System configuration details."
+      },
+      "var": {
+        "log": {
+          "syslog": "System log contents.",
+          "auth.log": "Authentication log contents."
+        }
+      }
+    },
+    "activeMiners": 0
+  },
+  "192.168.0.2": {
+    "securityLevel": 2,
+    "resources": {
+      "cpu": 1800,
+      "bandwidth": 3000,
+      "ram": 16,
+      "crypto": 1,
+      "data": 1200
+    },
+    "tools": ["port_scanner"],
+    "connectedIPs": ["192.168.0.1", "192.168.0.4"],
+    "services": [
+      {
+        "name": "ftp",
+        "description": "File Transfer Protocol",
+        "port": 21,
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "password",
+            "strength": "weak",
+            "level": 1
+          }
+        ]
+      },
+      {
+        "name": "https",
+        "description": "Hypertext Transfer Protocol Secure",
+        "port": 443,
+        "vulnerable": false
+      }
+    ],
+    "logs": [
+      {
+        "timestamp": "2024-06-10T09:00:00Z",
+        "event": "File uploaded to FTP from 192.168.0.1"
+      },
+      {
+        "timestamp": "2024-06-10T12:00:00Z",
+        "event": "Failed SSH attempt from 192.168.0.3"
+      }
+    ],
+    "fileSystem": {
+      "home": {
+        "user1": {
+          "README.txt": "User1 home directory."
+        }
+      },
+      "etc": {
+        "network": {
+          "interfaces": "Network interface configurations."
+        }
+      },
+      "var": {
+        "log": {
+          "ftp.log": "FTP log contents.",
+          "secure.log": "Security log contents."
+        }
+      }
+    },
+    "activeMiners": 0
+  },
+  "192.168.0.3": {
+    "securityLevel": 3,
+    "resources": {
+      "cpu": 1500,
+      "bandwidth": 500,
+      "ram": 8,
+      "crypto": 0.2,
+      "data": 300
+    },
+    "tools": ["network_sniffer"],
+    "connectedIPs": ["192.168.0.1"],
+    "services": [
+      {
+        "name": "telnet",
+        "description": "Telnet",
+        "port": 23,
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "password",
+            "strength": "weak",
+            "level": 1
+          }
+        ]
+      },
+      {
+        "name": "http",
+        "description": "Hypertext Transfer Protocol",
+        "port": 8080,
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "xss",
+            "level": 20
+          }
+        ]
+      }
+    ],
+    "logs": [
+      {
+        "timestamp": "2024-06-10T08:00:00Z",
+        "event": "Telnet connection from 192.168.0.2"
+      },
+      {
+        "timestamp": "2024-06-10T08:30:00Z",
+        "event": "Data exfiltration to 192.168.0.4"
+      }
+    ],
+    "fileSystem": {
+      "home": {
+        "guest": {
+          "README.txt": "Guest home directory."
+        }
+      },
+      "etc": {
+        "hosts": "Static hostnames to IP mappings."
+      },
+      "var": {
+        "log": {
+          "telnet.log": "Telnet log contents.",
+          "access.log": "HTTP access log contents."
+        }
+      }
+    },
+    "activeMiners": 0
+  },
+  "192.168.0.4": {
+    "securityLevel": 5,
+    "resources": {
+      "cpu": 2500,
+      "bandwidth": 6000,
+      "ram": 24,
+      "crypto": 5,
+      "data": 2500
+    },
+    "tools": ["exploit_kit"],
+    "connectedIPs": ["192.168.0.2", "192.168.0.5"],
+    "services": [
+      {
+        "name": "smtp",
+        "description": "Simple Mail Transfer Protocol",
+        "port": 25,
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "xss",
+            "level": 20
+          }
+        ]
+      },
+      {
+        "name": "mysql",
+        "description": "MySQL Database",
+        "port": 3306,
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "sql_injection",
+            "level": 40
+          }
+        ]
+      }
+    ],
+    "logs": [
+      {
+        "timestamp": "2024-06-10T07:00:00Z",
+        "event": "SMTP relay from 192.168.0.1"
+      },
+      {
+        "timestamp": "2024-06-10T11:30:00Z",
+        "event": "MySQL database accessed by 192.168.0.3"
+      }
+    ],
+    "fileSystem": {
+      "home": {
+        "dbadmin": {
+          "README.txt": "Database admin home directory."
+        }
+      },
+      "etc": {
+        "my.cnf": "MySQL configuration file."
+      },
+      "var": {
+        "log": {
+          "mysql.log": "MySQL log contents.",
+          "mail.log": "Mail server log contents."
+        }
+      }
+    },
+    "activeMiners": 0
+  },
+  "192.168.0.5": {
+    "securityLevel": 10,
+    "resources": {
+      "cpu": 4500,
+      "bandwidth": 10000,
+      "ram": 32,
+      "crypto": 10,
+      "data": 5000
+    },
+    "tools": ["advanced_exploit_kit"],
+    "connectedIPs": ["192.168.0.4"],
+    "services": [
+      {
+        "name": "rdp",
+        "description": "Remote Desktop Protocol",
+        "port": 3389,
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "remote_code_execution",
+            "level": 60
+          }
+        ]
+      },
+      {
+        "name": "oracle_db",
+        "description": "Oracle Database",
+        "port": 1521,
+        "vulnerable": true,
+        "vulnerabilities": [
+          {
+            "type": "sql_injection",
+            "level": 80
+          }
+        ]
+      }
+    ],
+    "logs": [
+      {
+        "timestamp": "2024-06-10T06:00:00Z",
+        "event": "RDP session initiated from 192.168.0.4"
+      },
+      {
+        "timestamp": "2024-06-10T13:00:00Z",
+        "event": "Oracle DB accessed from 192.168.0.2"
+      }
+    ],
+    "fileSystem": {
+      "home": {
+        "superuser": {
+          "README.txt": "Superuser home directory."
+        }
+      },
+      "etc": {
+        "oracle": {
+          "config": "Oracle database configuration file."
+        }
+      },
+      "var": {
+        "log": {
+          "rdp.log": "Remote Desktop Protocol log contents.",
+          "oracle.log": "Oracle database log contents."
+        }
+      }
+    },
+    "activeMiners": 0
+  }
+}
