@@ -14,6 +14,10 @@
 - autocomplete on file handling (edit etc)
 - refactor data/.json handling/structure
 
+FIX ASAP:
+I should use utils more places getUsers etc
+I should set up auth checks with checkAuth instead. (Should this return a username? or is it enough with the req.socket?)
+
 FOR TESTING:
 some lines does not follow with a prompt..
 
