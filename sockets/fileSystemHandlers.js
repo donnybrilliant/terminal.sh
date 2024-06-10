@@ -24,13 +24,15 @@ export function setupFileSystemHandlers(socket, io) {
         if (user) {
           const userHomeData = {
             ...user.home,
+            README: "Welcome, " + user.username,
           };
           baseFileSystem.root.home.users[user.username] = userHomeData;
         }
       } else {
         if (!baseFileSystem.root.home.users.guest) {
           baseFileSystem.root.home.users.guest = {
-            README: "You are not logged in.",
+            README:
+              "You are not logged in. There should be some information here...",
           };
         }
       }
