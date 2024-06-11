@@ -16,11 +16,20 @@
         "description": "Secure Shell",
         "port": 22,
         "vulnerable": true,
+        "level": 10,
         "vulnerabilities": [
           {
             "type": "password",
             "strength": "weak",
             "level": 1
+          },
+          {
+            "type": "remote_code_execution",
+            "level": 20
+          },
+          {
+            "type": "buffer_overflow",
+            "level": 30
           }
         ]
       },
@@ -29,6 +38,7 @@
         "description": "Hypertext Transfer Protocol",
         "port": 80,
         "vulnerable": true,
+        "level": 20,
         "vulnerabilities": [
           {
             "type": "xss",
@@ -45,6 +55,7 @@
         "description": "Remote Desktop Protocol",
         "port": 3389,
         "vulnerable": true,
+        "level": 30,
         "vulnerabilities": [
           {
             "type": "remote_code_execution",
@@ -57,12 +68,25 @@
         "description": "Oracle Database",
         "port": 1521,
         "vulnerable": true,
+        "level": 40,
         "vulnerabilities": [
           {
             "type": "sql_injection",
             "level": 40
           }
         ]
+      }
+    ],
+    "users": [
+      {
+        "username": "user",
+        "password": "pass",
+        "role": "user"
+      },
+      {
+        "username": "admin",
+        "password": "adminpass",
+        "role": "admin"
       }
     ],
     "logs": [
@@ -105,7 +129,7 @@
       "crypto": 0.5,
       "data": 1000
     },
-    "tools": ["password_cracker"],
+    "tools": ["password_cracker", "exploit_kit"],
     "connectedIPs": ["192.168.0.2", "192.168.0.3", "1.1.1.1"],
     "services": [
       {
