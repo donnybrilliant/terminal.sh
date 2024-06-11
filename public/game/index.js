@@ -12,6 +12,7 @@ export function initializeGame() {
   socket.on("hackResult", (data) => handleGameMessage(data));
   socket.on("miningResult", (data) => handleGameMessage(data));
   socket.on("downloadResult", (data) => handleGameMessage(data));
+  socket.on("sshExploitResult", (data) => handleGameMessage(data));
 }
 
 function handleGameMessage(data) {

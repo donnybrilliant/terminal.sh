@@ -27,6 +27,7 @@
     "ssh_exploit": {
       "name": "SSH Exploit",
       "function": "Exploits vulnerabilities in SSH to gain access.",
+      "services": "ssh",
       "resources": {
         "cpu": 20,
         "bandwidth": 0.3,

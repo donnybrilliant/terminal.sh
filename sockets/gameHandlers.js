@@ -3,6 +3,7 @@ import {
   writeJSONFile,
   INTERNET_FILE_PATH,
   USERS_FILE_PATH,
+  TOOLS_FILE_PATH,
 } from "../utils/fileUtils.js";
 import { getUsers, getUserByUsername, saveUsers } from "../utils/userUtils.js";
 import { logAction } from "../utils/logger.js";
@@ -174,6 +175,81 @@ export function setupGameHandlers(socket, io) {
       success: true,
       message: `${toolName} downloaded successfully`,
       toolName,
+    });
+  });
+
+  socket.on("ssh_exploit", async ({ username, targetIP }) => {
+    const users = await getUsers();
+    const user = getUserByUsername(username);
+
+    if (!user) {
+      socket.emit("sshExploitResult", {
+        success: false,
+        message: "Exploit failed",
+        error: "User not found",
+        data: null,
+      });
+      return;
+    }
+
+    const internet = await readJSONFile(INTERNET_FILE_PATH);
+    const target = internet[targetIP];
+    const tools = await readJSONFile(TOOLS_FILE_PATH);
+    const sshExploitTool = tools.tools.ssh_exploit;
+
+    if (!target) {
+      socket.emit("sshExploitResult", {
+        success: false,
+        message: "Exploit failed",
+        error: "Target IP not found",
+        data: null,
+      });
+      return;
+    }
+
+    const sshService = target.services.find(
+      (service) => service.name === sshExploitTool.services
+    );
+    if (!sshService) {
+      socket.emit("sshExploitResult", {
+        success: false,
+        message: "Exploit failed",
+        error: "SSH service not found",
+        data: null,
+      });
+      return;
+    }
+
+    const vulnerabilities = sshService.vulnerabilities;
+    const matchingExploit = sshExploitTool.exploits.find((exploit) => {
+      return vulnerabilities.some(
+        (vul) => vul.type === exploit.type && exploit.level >= vul.level
+      );
+    });
+
+    if (!matchingExploit) {
+      socket.emit("sshExploitResult", {
+        success: false,
+        message: "Exploit failed",
+        error: "No matching vulnerability found",
+        data: null,
+      });
+      return;
+    }
+
+    // Add reference to this server in the user's object
+    user.exploitedServers = user.exploitedServers || [];
+    if (!user.exploitedServers.includes(targetIP)) {
+      user.exploitedServers.push(targetIP);
+      await writeJSONFile(USERS_FILE_PATH, users);
+    }
+
+    logAction(username, `Exploited SSH on IP: ${targetIP}`);
+    socket.emit("sshExploitResult", {
+      success: true,
+      message: `Successfully exploited SSH on ${targetIP}`,
+      error: null,
+      data: target,
     });
   });
 }

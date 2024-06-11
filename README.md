@@ -33,6 +33,7 @@ some lines does not follow with a prompt..
 GAMEPLAY:
 
 - hidden files and a tool to find them (.files?) ls -a?
+- another way to upgrade tools?
 
 STRUCTURE:
 

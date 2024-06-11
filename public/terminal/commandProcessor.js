@@ -16,8 +16,8 @@ import {
 } from "../chat/index.js";
 import { fileData } from "./fileSystem.js";
 
-// Command map
-const commandMap = {
+// Base Command map
+const baseCommandMap = {
   nano: (args) => editFile(args[0]),
   vi: (args) => editFile(args[0]),
   edit: (args) => editFile(args[0]),
@@ -137,28 +137,54 @@ const commandMap = {
     });
     return "Hardware info received. Check the console.";
   },
+};
+
+// Tool-specific Command map
+const toolCommandMap = {
   password_cracker: () => {
     console.log("Password Cracker executed");
     return "Password Cracker executed";
   },
+  ssh_exploit: (args) => {
+    if (args.length !== 1) {
+      return "Usage: ssh_exploit <targetIP>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    socket.emit("ssh_exploit", { username, targetIP: args[0] });
+    return `Attempting to exploit SSH on IP ${args[0]}...`;
+  },
 };
 
-export function getCommandList() {
-  const baseCommands = Object.keys(commandMap);
+function getCombinedCommandMap() {
   const username = loginManager.getUsername();
+  let userTools = [];
+
   if (
     username &&
     fileData.root.home.users[username] &&
     fileData.root.home.users[username].bin
   ) {
-    const userCommands = Object.keys(fileData.root.home.users[username].bin);
-    return [...new Set([...baseCommands, ...userCommands])];
+    userTools = Object.keys(fileData.root.home.users[username].bin);
   }
-  return baseCommands;
+
+  const combinedCommandMap = { ...baseCommandMap };
+  userTools.forEach((tool) => {
+    if (toolCommandMap[tool]) {
+      combinedCommandMap[tool] = toolCommandMap[tool];
+    }
+  });
+
+  return combinedCommandMap;
+}
+
+export function getCommandList() {
+  const combinedCommandMap = getCombinedCommandMap();
+  return Object.keys(combinedCommandMap);
 }
 
 export default async function processCommand(command) {
   const [cmd, ...args] = command.split(" ");
+  const combinedCommandMap = getCombinedCommandMap();
 
   // Handle chat mode
   if (isInChatMode()) {
@@ -178,7 +204,7 @@ export default async function processCommand(command) {
   }
 
   // If not in edit mode, proceed with normal command processing
-  const commandFunction = commandMap[cmd];
+  const commandFunction = combinedCommandMap[cmd];
   if (commandFunction) {
     return await commandFunction(args);
   } else {
