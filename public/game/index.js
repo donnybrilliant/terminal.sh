@@ -7,7 +7,8 @@ import {
 import { appendToolToFileData } from "../terminal/fileSystem.js";
 
 export function initializeGame() {
-  socket.on("scanResult", (data) => handleGameMessage(data));
+  socket.on("scanInternetResult", (data) => handleGameMessage(data));
+  socket.on("scanIPResult", (data) => handleGameMessage(data));
   socket.on("hackResult", (data) => handleGameMessage(data));
   socket.on("miningResult", (data) => handleGameMessage(data));
   socket.on("downloadResult", (data) => handleGameMessage(data));

@@ -19,7 +19,7 @@
 
 FIX ASAP:
 
-- scan command, then follow workflow
+- scan command (flags to show different info)
   I should use utils more places getUsers etc
   I should set up auth checks with checkAuth instead. (Should this return a username? or is it enough with the req.socket?)
 

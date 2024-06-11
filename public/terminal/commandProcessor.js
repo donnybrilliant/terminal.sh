@@ -86,13 +86,18 @@ const commandMap = {
     return await loginManager.login(args[0], args[1]);
   },
   logout: async () => await loginManager.logout(),
-  scanIP: (args) => {
-    if (args.length !== 1) {
-      return "Usage: scanIP <targetIP>";
+  scan: (args) => {
+    if (args.length === 0) {
+      const username = loginManager.getUsername() || "Guest";
+      socket.emit("scanInternet", { username });
+      return "Scanning internet for IP addresses...";
+    } else if (args.length === 1) {
+      const username = loginManager.getUsername() || "Guest";
+      socket.emit("scanIP", { username, targetIP: args[0] });
+      return `Scanning IP ${args[0]} for services...`;
+    } else {
+      return "Usage: scan <targetIP>";
     }
-    const username = loginManager.getUsername() || "Guest";
-    socket.emit("scanIP", { username, targetIP: args[0] });
-    return `Scanning IP ${args[0]}...`;
   },
   hackIP: (args) => {
     if (args.length !== 1) {

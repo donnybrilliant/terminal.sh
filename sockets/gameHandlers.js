@@ -8,20 +8,33 @@ import { getUsers, getUserByUsername, saveUsers } from "../utils/userUtils.js";
 import { logAction } from "../utils/logger.js";
 
 export function setupGameHandlers(socket, io) {
+  socket.on("scanInternet", async ({ username }) => {
+    const internet = await readJSONFile(INTERNET_FILE_PATH);
+    const ipAddresses = Object.keys(internet);
+
+    logAction(username, "Scanned internet for IP addresses");
+    socket.emit("scanInternetResult", {
+      success: true,
+      message: "Scan result for internet",
+      error: null,
+      data: ipAddresses,
+    });
+  });
+
   socket.on("scanIP", async ({ username, targetIP }) => {
     const internet = await readJSONFile(INTERNET_FILE_PATH);
     const target = internet[targetIP];
 
     if (target) {
       logAction(username, `Scanned IP: ${targetIP}`);
-      socket.emit("scanResult", {
+      socket.emit("scanIPResult", {
         success: true,
         message: `Scan result for ${targetIP}`,
         error: null,
         data: target,
       });
     } else {
-      socket.emit("scanResult", {
+      socket.emit("scanIPResult", {
         success: false,
         message: "Scan failed",
         error: "IP not found",
