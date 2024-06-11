@@ -47,30 +47,6 @@ export function setupFileSystemHandlers(socket, io) {
     }
   });
 
-  socket.on("loadTargetFileSystem", async ({ targetIP }, callback) => {
-    try {
-      const internet = await readJSONFile(INTERNET_FILE_PATH);
-      const target = internet[targetIP];
-
-      if (!target) {
-        return callback({
-          success: false,
-          message: "Target IP not found",
-        });
-      }
-
-      callback({
-        success: true,
-        data: target.filesystem,
-      });
-    } catch (error) {
-      callback({
-        success: false,
-        message: `Error loading target filesystem: ${error.message}`,
-      });
-    }
-  });
-
   socket.on("saveUserHome", async (homeData, callback) => {
     const username = socket.user ? socket.user.username : null;
     if (!username) {

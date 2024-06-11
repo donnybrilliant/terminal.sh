@@ -6,6 +6,7 @@ import {
 } from "./fileSystem.js";
 import { ANSI_COLORS } from "./colors.js";
 import { term } from "./index.js";
+import { isInSSHMode } from "../ssh/index.js";
 
 /**
  * Mocked ShellJS 'ls' command with list flag support.
@@ -16,7 +17,7 @@ import { term } from "./index.js";
  * @returns {string} - Space-separated list of entries in the directory.
  */
 function ls(args = []) {
-  const path = getCurrentDir();
+  const path = getCurrentDir(isInSSHMode());
   const listFlag = args.includes("-l");
 
   const contents = Object.keys(path).filter(
@@ -77,7 +78,7 @@ function createHyperlink(text, url) {
  */
 
 function cat(filename) {
-  const currentDir = getCurrentDir();
+  const currentDir = getCurrentDir(isInSSHMode());
   if (filename in currentDir) {
     const file = currentDir[filename];
     if (typeof file === "object") {
@@ -97,9 +98,9 @@ function cat(filename) {
  * @returns {string} - Success or error message.
  */
 function cd(dir) {
-  if (setCurrentDir(dir)) {
+  if (setCurrentDir(dir, isInSSHMode())) {
     return pwd();
-  } else if (typeof getCurrentDir()[dir] === "string") {
+  } else if (typeof getCurrentDir(isInSSHMode())[dir] === "string") {
     return `Cannot cd into ${dir}. It's a file, not a directory.`;
   } else {
     return `cd: ${dir}: No such directory`;
@@ -113,7 +114,7 @@ function cd(dir) {
  * @returns {string} - The current directory path.
  */
 function pwd() {
-  return getCurrentPath();
+  return getCurrentPath(isInSSHMode());
 }
 
 /**
@@ -158,7 +159,7 @@ async function remove(args = []) {
   const options = args.filter((arg) => arg.startsWith("-"));
   const target = args.find((arg) => !arg.startsWith("-"));
 
-  const currentDir = getCurrentDir();
+  const currentDir = getCurrentDir(isInSSHMode());
 
   // If the target is not provided or does not exist in the current directory, return an error
   if (!target || !currentDir[target]) {
@@ -185,7 +186,7 @@ function clear() {
 }
 
 async function mkdir(dirname) {
-  const currentDir = getCurrentDir();
+  const currentDir = getCurrentDir(isInSSHMode());
   if (currentDir[dirname]) {
     return `mkdir: ${dirname}: File or directory already exists`;
   }
@@ -195,7 +196,7 @@ async function mkdir(dirname) {
 }
 
 async function touch(filename) {
-  const currentDir = getCurrentDir();
+  const currentDir = getCurrentDir(isInSSHMode());
   if (currentDir[filename]) {
     return `touch: ${filename}: File already exists`;
   }
@@ -205,7 +206,7 @@ async function touch(filename) {
 }
 
 async function cp(source, destination) {
-  const currentDir = getCurrentDir();
+  const currentDir = getCurrentDir(isInSSHMode());
 
   // Use the "in" operator to check for property existence
   if (!(source in currentDir)) {
@@ -220,7 +221,7 @@ async function cp(source, destination) {
 }
 
 async function mv(source, destination) {
-  const currentDir = getCurrentDir();
+  const currentDir = getCurrentDir(isInSSHMode());
 
   // Use the "in" operator to check for property existence
   if (!(source in currentDir)) {

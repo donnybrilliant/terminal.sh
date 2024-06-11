@@ -150,7 +150,21 @@
       "etc": {
         "oracle": {
           "config": "Oracle database configuration file."
-        }
+        },
+        "config": "System configuration details.",
+        "network": {
+          "interfaces": "Network interface configurations.",
+          "firewall": {
+            "rules": "Firewall rules and policies.",
+            "logs": "Firewall activity logs."
+          },
+          "dns": {
+            "resolv.conf": "DNS resolver configurations.",
+            "hosts": "Static hostnames to IP mappings."
+          }
+        },
+        "passwd": "User account information.",
+        "shadow": "Secure user account information."
       },
       "var": {
         "log": {

@@ -5,7 +5,7 @@ let fileData = {};
 let pathStack = ["root", "home", "users", "guest"]; // Default path for unauthenticated access
 
 let sshFileData = {};
-let sshPathStack = ["root"]; // Default path for SSH
+let sshPathStack = [""]; // Default path for SSH
 
 // Function to load the filesystem data from server
 async function loadFileSystem() {
@@ -41,29 +41,28 @@ async function loadFileSystem() {
 }
 
 // Function to load the target filesystem data for SSH
-async function loadTargetFileSystem(targetIP) {
-  const response = await new Promise((resolve) => {
-    socket.emit("loadTargetFileSystem", { targetIP }, resolve);
-  });
-  if (response.success) {
-    sshFileData = response.data;
-    sshPathStack = ["root"];
-    return "Target filesystem loaded successfully.";
-  } else {
-    throw new Error(`Error loading target filesystem: ${response.message}`);
-  }
+async function loadTargetFileSystem(targetData) {
+  sshFileData = targetData.fileSystem;
+  // set startdir in targetDir and set it here.
+  sshPathStack = [""];
+  // pipe this through?
+  return "Target filesystem loaded successfully.";
 }
 
 // General function to get the current directory
 function getCurrentDir(isSSH = false) {
   const currentData = isSSH ? sshFileData : fileData;
   const currentPathStack = isSSH ? sshPathStack : pathStack;
-  return (
-    currentPathStack.reduce(
-      (acc, dir) => (acc && acc[dir] ? acc[dir] : undefined),
-      currentData
-    ) || currentData
-  );
+
+  // Start from the root
+  let dir = currentData;
+  for (const part of currentPathStack) {
+    if (part && dir[part] && typeof dir[part] === "object") {
+      dir = dir[part];
+    }
+  }
+
+  return dir;
 }
 
 // General function to set the current directory
@@ -72,6 +71,7 @@ function setCurrentDir(dir, isSSH = false) {
   const currentPathStack = isSSH ? sshPathStack : pathStack;
 
   if (dir.startsWith("/")) {
+    // Absolute path
     let tmpDir = currentData; // Start from root
     const parts = dir.split("/").filter(Boolean);
 
@@ -84,12 +84,13 @@ function setCurrentDir(dir, isSSH = false) {
     }
 
     if (isSSH) {
-      sshPathStack = parts;
+      sshPathStack = parts.length ? parts : [""];
     } else {
-      pathStack = parts;
+      pathStack = parts.length ? parts : [""];
     }
     return true;
   } else {
+    // Relative path
     const currentDir = getCurrentDir(isSSH);
 
     if (dir === "..") {
@@ -108,7 +109,8 @@ function setCurrentDir(dir, isSSH = false) {
 // General function to get the full path as a string
 function getCurrentPath(isSSH = false) {
   const currentPathStack = isSSH ? sshPathStack : pathStack;
-  return "/" + currentPathStack.join("/");
+  const path = currentPathStack.filter(Boolean).join("/");
+  return path ? `/${path}` : "/";
 }
 
 // General function to get directory names for autocompletion

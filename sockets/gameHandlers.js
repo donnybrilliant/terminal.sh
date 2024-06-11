@@ -413,12 +413,12 @@ export function setupGameHandlers(socket, io) {
     }
   });
 
-  socket.on("ssh", async ({ username, targetIP }, callback) => {
+  socket.on("ssh", async ({ username, targetIP }) => {
     const users = await getUsers();
     const user = getUserByUsername(username);
 
     if (!user) {
-      callback({
+      socket.emit("sshResult", {
         success: false,
         message: "User not found",
       });
@@ -429,7 +429,7 @@ export function setupGameHandlers(socket, io) {
     const target = internet[targetIP];
 
     if (!target) {
-      callback({
+      socket.emit("sshResult", {
         success: false,
         message: "Target IP not found",
       });
@@ -441,7 +441,7 @@ export function setupGameHandlers(socket, io) {
     );
 
     if (!sshService) {
-      callback({
+      socket.emit("sshResult", {
         success: false,
         message: "SSH service not found",
       });
@@ -461,7 +461,7 @@ export function setupGameHandlers(socket, io) {
     );
 
     if (!allRequiredExploited) {
-      callback({
+      socket.emit("sshResult", {
         success: false,
         message: "Prerequisite vulnerabilities not exploited",
       });
@@ -469,9 +469,12 @@ export function setupGameHandlers(socket, io) {
     }
 
     logAction(username, `Connected to SSH on IP: ${targetIP}`);
-    callback({
+    socket.emit("sshResult", {
       success: true,
-      message: `Connecting to ${targetIP}...`,
+      message: `Connected to ${targetIP}...`,
+      data: target,
+      targetIP,
+      ssh: true,
     });
   });
 }

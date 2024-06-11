@@ -13,13 +13,11 @@ import { getCombinedCommandMap } from "../terminal/commandProcessor.js";
 let sshMode = false;
 let targetIP = "";
 
-export function startSSHSession(ip) {
+export function startSSHSession(ip, eventData) {
   sshMode = true;
   targetIP = ip;
-  loadTargetFileSystem(ip).then(() => {
-    term.write(`\r\nConnected to ${ip}. Type ':exit' to disconnect.\r\n`);
-    renderSSHPrompt();
-  });
+  loadTargetFileSystem(eventData);
+  renderSSHPrompt();
 }
 
 export function isInSSHMode() {

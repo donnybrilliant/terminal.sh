@@ -148,16 +148,8 @@ const baseCommandMap = {
     }
     const targetIP = args[0];
     const username = loginManager.getUsername();
-    return new Promise((resolve) => {
-      socket.emit("ssh", { username, targetIP }, (response) => {
-        if (response.success) {
-          startSSHSession(targetIP);
-          resolve(`Connected to ${targetIP}`);
-        } else {
-          resolve(response.message);
-        }
-      });
-    });
+    socket.emit("ssh", { username, targetIP });
+    return `Connecting to ${targetIP}...`;
   },
 };
 
@@ -220,7 +212,7 @@ export default async function processCommand(command) {
 
   // Handle SSH mode
   if (isInSSHMode()) {
-    return handleSSHCommand(command);
+    return await handleSSHCommand(command);
   }
 
   // Check if the system is in edit mode

@@ -21,7 +21,7 @@
 
 FIX ASAP:
 
-- ssh
+- ssh - empty dir before login - loadfilesystem on login
 - sniff for user roles
 - user roles list /etc/groups/ /etc/password
 - scan command (flags to show different info)
@@ -43,6 +43,7 @@ GAMEPLAY:
 STRUCTURE:
 
 - add user tools to /bin or something
+- shoult i be using socket.emit => callback instead of socket.on? With callback the user cant do aything while it works, which is good?
 
 UI:
 
