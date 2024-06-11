@@ -17,19 +17,23 @@
 - send more data from tool on save - should content be description?
 - steal data
 - tool information on server might not be the smartest.
-- need to check vulnerable boolean on server.services
+- need to check vulnerable boolean on server.services on connection to server
+- scan command (flags to show different info)
+- user roles list /etc/groups/ /etc/password
 
 FIX ASAP:
 
 - ssh - empty dir before login - loadfilesystem on login
 - sniff for user roles
-- user roles list /etc/groups/ /etc/password
-- scan command (flags to show different info)
+- password_cracker
+
+- PROMPT! especially on SSH should be ip>
+
   I should use utils more places getUsers etc
   I should set up auth checks with checkAuth instead. (Should this return a username? or is it enough with the req.socket?)
 
 FOR TESTING:
-some lines does not follow with a prompt..
+some lines does not follow with a prompt.. can de be because of async?
 
 - set name
 - password_cracker downloaded successfully
@@ -37,7 +41,7 @@ some lines does not follow with a prompt..
 
 GAMEPLAY:
 
-- hidden files and a tool to find them (.files?) ls -a?
+- hidden files and a tool to find them (.files?) ls -a? /root should be hidden so it shows (/)
 - another way to upgrade tools?
 
 STRUCTURE:
