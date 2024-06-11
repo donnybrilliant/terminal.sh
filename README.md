@@ -16,9 +16,14 @@
 - move fileData handling from login.js to fileSystem.js?
 - send more data from tool on save - should content be description?
 - steal data
+- tool information on server might not be the smartest.
+- need to check vulnerable bollean on server.services
 
 FIX ASAP:
 
+- ssh
+- sniff for user roles
+- user roles list /etc/groups/ /etc/password
 - scan command (flags to show different info)
   I should use utils more places getUsers etc
   I should set up auth checks with checkAuth instead. (Should this return a username? or is it enough with the req.socket?)
@@ -68,6 +73,10 @@ STORY
 - log into neighbors network with sniffer (do fun stuff)
 -
 
+NAMES
+
+- PacketStorm, ExploitMadness, ProtocolBuster, PacketScripter, sysAdmin, RootExploiter, KernelPanic, BackdoorScripter
+
 OTHER
 
 - ai chat bots
@@ -76,6 +85,7 @@ OTHER
 - other players have dynamic ports open?
 - set up fake "wifi" / server for phishing etc
 - make randomly generated file system for servers. ai?
+- everything random! use deauth and some servers might never appear again.
 
 WORKFLOWS:
 

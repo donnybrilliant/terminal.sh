@@ -1,4 +1,50 @@
 {
+  "repo": {
+    "securityLevel": 100,
+    "resources": {
+      "cpu": 10000,
+      "bandwidth": 50000,
+      "ram": 1048,
+      "crypto": 10000,
+      "data": 50000000
+    },
+    "tools": [
+      "password_cracker",
+      "password_sniffer",
+      "ssh_exploit",
+      "password_sniffer",
+      "exploit_kit",
+      "advanced_exploit_kit",
+      "network_sniffer",
+      "user_enum"
+    ],
+    "connectedIPs": ["1.1.1.1"],
+    "services": [
+      {
+        "name": "ftp",
+        "description": "File Transfer Protocol",
+        "port": 989,
+        "vulnerable": false,
+        "level": 100,
+        "vulnerabilities": []
+      }
+    ],
+    "roles": [
+      {
+        "role": "admin",
+        "level": 100
+      }
+    ],
+    "logs": [],
+    "fileSystem": {
+      "home": {
+        "admin": {
+          "README.txt": "Admin home directory."
+        }
+      }
+    },
+    "activeMiners": 0
+  },
   "1.1.1.1": {
     "securityLevel": 0,
     "resources": {
@@ -9,7 +55,7 @@
       "data": 5000
     },
     "tools": ["exploit_kit"],
-    "connectedIPs": ["192.168.0.1"],
+    "connectedIPs": ["192.168.0.1", "repo"],
     "services": [
       {
         "name": "ssh",
@@ -19,8 +65,7 @@
         "level": 10,
         "vulnerabilities": [
           {
-            "type": "password",
-            "level": 1
+            "type": "password"
           },
           {
             "type": "remote_code_execution",
@@ -76,16 +121,14 @@
         ]
       }
     ],
-    "users": [
+    "roles": [
       {
-        "username": "user",
-        "password": "pass",
-        "role": "user"
+        "role": "user",
+        "level": 10
       },
       {
-        "username": "admin",
-        "password": "adminpass",
-        "role": "admin"
+        "role": "admin",
+        "level": 12
       }
     ],
     "logs": [
@@ -128,7 +171,7 @@
       "crypto": 0.5,
       "data": 1000
     },
-    "tools": ["password_cracker", "ssh_exploit"],
+    "tools": ["password_cracker", "ssh_exploit", "password_sniffer"],
     "connectedIPs": ["192.168.0.2", "192.168.0.3", "1.1.1.1"],
     "services": [
       {

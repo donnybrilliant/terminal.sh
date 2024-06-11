@@ -141,12 +141,17 @@ const baseCommandMap = {
 
 // Tool-specific Command map
 const toolCommandMap = {
-  password_cracker: () => {
-    console.log("Password Cracker executed");
-    return "Password Cracker executed";
+  password_sniffer: (args) => {
+    // fix better args handling when empty string
+    if (args.length !== 1 || args[0] === "") {
+      return "Usage: password_sniffer <targetIP>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    socket.emit("password_sniffer", { username, targetIP: args[0] });
+    return `Attempting to sniff password on IP ${args[0]}...`;
   },
   ssh_exploit: (args) => {
-    if (args.length !== 1) {
+    if (args.length !== 1 || args[0] === "") {
       return "Usage: ssh_exploit <targetIP>";
     }
     const username = loginManager.getUsername() || "Guest";

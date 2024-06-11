@@ -13,6 +13,7 @@ export function initializeGame() {
   socket.on("miningResult", (data) => handleGameMessage(data));
   socket.on("downloadResult", (data) => handleGameMessage(data));
   socket.on("sshExploitResult", (data) => handleGameMessage(data));
+  socket.on("passwordSnifferResult", (data) => handleGameMessage(data));
 }
 
 function handleGameMessage(data) {
@@ -30,7 +31,6 @@ function handleGameMessage(data) {
       term.write(`${formatJSON(eventData)}\r\n`);
     }
     if (toolName) {
-      console.log(toolName);
       appendToolToFileData(toolName);
       updateCommandList();
     }
