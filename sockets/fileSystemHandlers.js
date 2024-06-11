@@ -4,6 +4,7 @@ import {
   writeJSONFile,
   FILE_SYSTEM_PATH,
   USERS_FILE_PATH,
+  INTERNET_FILE_PATH,
 } from "../utils/fileUtils.js";
 
 export function setupFileSystemHandlers(socket, io) {
@@ -42,6 +43,30 @@ export function setupFileSystemHandlers(socket, io) {
       callback({
         success: false,
         message: `Error loading filesystem: ${error.message}`,
+      });
+    }
+  });
+
+  socket.on("loadTargetFileSystem", async ({ targetIP }, callback) => {
+    try {
+      const internet = await readJSONFile(INTERNET_FILE_PATH);
+      const target = internet[targetIP];
+
+      if (!target) {
+        return callback({
+          success: false,
+          message: "Target IP not found",
+        });
+      }
+
+      callback({
+        success: true,
+        data: target.filesystem,
+      });
+    } catch (error) {
+      callback({
+        success: false,
+        message: `Error loading target filesystem: ${error.message}`,
       });
     }
   });

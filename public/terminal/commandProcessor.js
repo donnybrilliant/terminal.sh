@@ -1,3 +1,4 @@
+// commandProcessor.js
 import { commands } from "./shell.js";
 import { term, socket, loginManager } from "./index.js";
 import { loadtest, chars, hack, startMatrix, getClientInfo } from "./random.js";
@@ -15,6 +16,11 @@ import {
   handleChatCommand,
 } from "../chat/index.js";
 import { fileData } from "./fileSystem.js";
+import {
+  startSSHSession,
+  isInSSHMode,
+  handleSSHCommand,
+} from "../ssh/index.js";
 
 // Base Command map
 const baseCommandMap = {
@@ -132,10 +138,26 @@ const baseCommandMap = {
     socket.emit("requestHardwareInfo");
     socket.on("hardwareInfo", (data) => {
       console.log("Received hardware info:", data);
-
       // Use this information as needed
     });
     return "Hardware info received. Check the console.";
+  },
+  ssh: (args) => {
+    if (args.length !== 1) {
+      return "Usage: ssh <targetIP>";
+    }
+    const targetIP = args[0];
+    const username = loginManager.getUsername();
+    return new Promise((resolve) => {
+      socket.emit("ssh", { username, targetIP }, (response) => {
+        if (response.success) {
+          startSSHSession(targetIP);
+          resolve(`Connected to ${targetIP}`);
+        } else {
+          resolve(response.message);
+        }
+      });
+    });
   },
 };
 
@@ -160,7 +182,7 @@ const toolCommandMap = {
   },
 };
 
-function getCombinedCommandMap() {
+export function getCombinedCommandMap() {
   const username = loginManager.getUsername();
   let userTools = [];
 
@@ -194,6 +216,11 @@ export default async function processCommand(command) {
   // Handle chat mode
   if (isInChatMode()) {
     return handleChatCommand(command);
+  }
+
+  // Handle SSH mode
+  if (isInSSHMode()) {
+    return handleSSHCommand(command);
   }
 
   // Check if the system is in edit mode

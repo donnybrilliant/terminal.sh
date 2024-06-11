@@ -17,7 +17,7 @@
 - send more data from tool on save - should content be description?
 - steal data
 - tool information on server might not be the smartest.
-- need to check vulnerable bollean on server.services
+- need to check vulnerable boolean on server.services
 
 FIX ASAP:
 

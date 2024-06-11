@@ -412,4 +412,66 @@ export function setupGameHandlers(socket, io) {
       });
     }
   });
+
+  socket.on("ssh", async ({ username, targetIP }, callback) => {
+    const users = await getUsers();
+    const user = getUserByUsername(username);
+
+    if (!user) {
+      callback({
+        success: false,
+        message: "User not found",
+      });
+      return;
+    }
+
+    const internet = await readJSONFile(INTERNET_FILE_PATH);
+    const target = internet[targetIP];
+
+    if (!target) {
+      callback({
+        success: false,
+        message: "Target IP not found",
+      });
+      return;
+    }
+
+    const sshService = target.services.find(
+      (service) => service.name === "ssh"
+    );
+
+    if (!sshService) {
+      callback({
+        success: false,
+        message: "SSH service not found",
+      });
+      return;
+    }
+
+    const requiredVulnerabilities = sshService.vulnerabilities
+      .filter((vul) => vul.type !== "password")
+      .map((vul) => vul.type);
+
+    user.exploitedServers = user.exploitedServers || {};
+    user.exploitedServers[targetIP] = user.exploitedServers[targetIP] || {};
+    const exploitedVulnerabilities = user.exploitedServers[targetIP].ssh || [];
+
+    const allRequiredExploited = requiredVulnerabilities.every((vul) =>
+      exploitedVulnerabilities.includes(vul)
+    );
+
+    if (!allRequiredExploited) {
+      callback({
+        success: false,
+        message: "Prerequisite vulnerabilities not exploited",
+      });
+      return;
+    }
+
+    logAction(username, `Connected to SSH on IP: ${targetIP}`);
+    callback({
+      success: true,
+      message: `Connecting to ${targetIP}...`,
+    });
+  });
 }
