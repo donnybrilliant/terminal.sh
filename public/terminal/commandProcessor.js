@@ -17,7 +17,7 @@ import {
 } from "../chat/index.js";
 import { fileData } from "./fileSystem.js";
 import {
-  startSSHSession,
+  currentSSHSession,
   isInSSHMode,
   handleSSHCommand,
 } from "../ssh/index.js";
@@ -171,6 +171,34 @@ const toolCommandMap = {
     const username = loginManager.getUsername() || "Guest";
     socket.emit("ssh_exploit", { username, targetIP: args[0] });
     return `Attempting to exploit SSH on IP ${args[0]}...`;
+  },
+  user_enum: (args) => {
+    if (args.length !== 0) {
+      return "Usage: user_enum";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    const targetIP = currentSSHSession.targetIP;
+    if (!targetIP) {
+      return "No active SSH session.";
+    }
+    socket.emit("user_enum", { username, targetIP });
+    return `Enumerating users on IP ${targetIP}...`;
+  },
+  password_cracker: (args) => {
+    if (args.length !== 1 || args[0] === "") {
+      return "Usage: password_cracker <role>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    const targetIP = currentSSHSession.targetIP;
+    if (!targetIP) {
+      return "No active SSH session.";
+    }
+    socket.emit("password_cracker", {
+      username,
+      targetIP,
+      role: args[0],
+    });
+    return `Attempting to crack password for role ${args[0]} on IP ${targetIP}...`;
   },
 };
 

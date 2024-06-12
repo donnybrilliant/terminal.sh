@@ -25,6 +25,9 @@ function ls(args = []) {
   );
 
   if (contents.length === 0) {
+    if (isInSSHMode()) {
+      return "..........................";
+    }
     return "Directory is empty";
   }
 

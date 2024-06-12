@@ -4,7 +4,10 @@ import {
   restoreCommandBuffer,
   updateCommandList,
 } from "../terminal/keyInputHandler.js";
-import { appendToolToFileData } from "../terminal/fileSystem.js";
+import {
+  appendToolToFileData,
+  loadTargetFileSystem,
+} from "../terminal/fileSystem.js";
 import { startSSHSession } from "../ssh/index.js";
 
 export function initializeGame() {
@@ -15,6 +18,8 @@ export function initializeGame() {
   socket.on("downloadResult", (data) => handleGameMessage(data));
   socket.on("sshExploitResult", (data) => handleGameMessage(data));
   socket.on("passwordSnifferResult", (data) => handleGameMessage(data));
+  socket.on("userEnumResult", (data) => handleGameMessage(data));
+  socket.on("passwordCrackerResult", (data) => handleGameMessage(data));
   socket.on("sshResult", (data) => handleGameMessage(data));
 }
 
@@ -30,6 +35,7 @@ function handleGameMessage(data) {
     toolName,
     targetIP,
     ssh,
+    load,
   } = data;
 
   if (error) {
@@ -46,7 +52,13 @@ function handleGameMessage(data) {
       updateCommandList();
     }
     if (ssh) {
-      startSSHSession(targetIP, eventData);
+      startSSHSession(targetIP);
+      if (eventData) {
+        loadTargetFileSystem(eventData);
+      }
+    }
+    if (load) {
+      loadTargetFileSystem(eventData);
     }
   }
 

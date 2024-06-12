@@ -238,6 +238,7 @@ export function setupGameHandlers(socket, io) {
     }
 
     // Add detailed information to exploitedServers
+    // add this on ssh connection instead?
     user.exploitedServers = user.exploitedServers || {};
     user.exploitedServers[targetIP] = user.exploitedServers[targetIP] || {};
     user.exploitedServers[targetIP][sshService.name] =
@@ -468,13 +469,159 @@ export function setupGameHandlers(socket, io) {
       return;
     }
 
+    const hasPasswordVulnerability =
+      exploitedVulnerabilities.includes("password");
+
+    let eventData = null;
+    if (hasPasswordVulnerability) {
+      eventData = target;
+    }
+
     logAction(username, `Connected to SSH on IP: ${targetIP}`);
     socket.emit("sshResult", {
       success: true,
       message: `Connected to ${targetIP}...`,
-      data: target,
+      data: eventData,
       targetIP,
       ssh: true,
+    });
+  });
+
+  // Handler for user enumeration
+  socket.on("user_enum", async ({ username, targetIP }) => {
+    const users = await getUsers();
+    const user = getUserByUsername(username);
+
+    if (!user) {
+      socket.emit("userEnumResult", {
+        success: false,
+        message: "Enumeration failed",
+        error: "User not found",
+      });
+      return;
+    }
+
+    const internet = await readJSONFile(INTERNET_FILE_PATH);
+    const target = internet[targetIP];
+
+    if (!target) {
+      socket.emit("userEnumResult", {
+        success: false,
+        message: "Enumeration failed",
+        error: "Target IP not found",
+      });
+      return;
+    }
+
+    logAction(username, `Enumerated users on IP: ${targetIP}`);
+    socket.emit("userEnumResult", {
+      success: true,
+      message: `User enumeration on ${targetIP} succeeded`,
+      data: target.roles,
+    });
+  });
+
+  // Handler for password cracker
+  socket.on("password_cracker", async ({ username, targetIP, role }) => {
+    const users = await getUsers();
+    const user = getUserByUsername(username);
+
+    if (!user) {
+      socket.emit("passwordCrackerResult", {
+        success: false,
+        message: "Cracking failed",
+        error: "User not found",
+      });
+      return;
+    }
+
+    const internet = await readJSONFile(INTERNET_FILE_PATH);
+    const target = internet[targetIP];
+    const tools = await readJSONFile(TOOLS_FILE_PATH);
+    const passwordCrackerTool = tools.tools.password_cracker;
+
+    if (!target) {
+      socket.emit("passwordCrackerResult", {
+        success: false,
+        message: "Cracking failed",
+        error: "Target IP not found",
+      });
+      return;
+    }
+
+    const sshService = target.services.find(
+      (service) => service.name === "ssh"
+    );
+
+    if (!sshService) {
+      socket.emit("passwordCrackerResult", {
+        success: false,
+        message: "Cracking failed",
+        error: "SSH service not found",
+      });
+      return;
+    }
+
+    const requiredVulnerabilities = sshService.vulnerabilities
+      .filter((vul) => vul.type !== "password")
+      .map((vul) => vul.type);
+
+    const exploitedVulnerabilities = user.exploitedServers[targetIP]?.ssh || [];
+
+    const allRequiredExploited = requiredVulnerabilities.every((vul) =>
+      exploitedVulnerabilities.includes(vul)
+    );
+
+    if (!allRequiredExploited) {
+      socket.emit("passwordCrackerResult", {
+        success: false,
+        message: "Cracking failed",
+        error: "Prerequisite vulnerabilities not exploited",
+      });
+      return;
+    }
+
+    const roleDetails = target.roles.find((r) => r.role === role);
+
+    if (!roleDetails) {
+      socket.emit("passwordCrackerResult", {
+        success: false,
+        message: "Cracking failed",
+        error: "Role not found",
+      });
+      return;
+    }
+
+    if (roleDetails.level > passwordCrackerTool.exploits[0].level) {
+      socket.emit("passwordCrackerResult", {
+        success: false,
+        message: "Cracking failed",
+        error: "Role level too high for the tool",
+      });
+      return;
+    }
+
+    user.exploitedServers[targetIP].roles =
+      user.exploitedServers[targetIP].roles || [];
+
+    // Add the role
+    if (!user.exploitedServers[targetIP].roles.includes(role)) {
+      user.exploitedServers[targetIP].roles.push(role);
+    }
+
+    // Add the password vulnerability to the list if not already there
+    if (!user.exploitedServers[targetIP].ssh.includes("password")) {
+      user.exploitedServers[targetIP].ssh.push("password");
+    }
+
+    await writeJSONFile(USERS_FILE_PATH, users);
+
+    logAction(username, `Cracked password for role ${role} on IP: ${targetIP}`);
+    socket.emit("passwordCrackerResult", {
+      success: true,
+      message: `Password cracked for role ${role} on ${targetIP}`,
+      data: target,
+      load: true,
     });
   });
 }

@@ -11,12 +11,11 @@ import {
 import { getCombinedCommandMap } from "../terminal/commandProcessor.js";
 
 let sshMode = false;
-let targetIP = "";
+export let currentSSHSession = { targetIP: null };
 
-export function startSSHSession(ip, eventData) {
+export function startSSHSession(ip) {
+  currentSSHSession.targetIP = ip;
   sshMode = true;
-  targetIP = ip;
-  loadTargetFileSystem(eventData);
   renderSSHPrompt();
 }
 
@@ -30,7 +29,7 @@ export function handleSSHCommand(command) {
 
   if (command.trim() === ":exit") {
     sshMode = false;
-    targetIP = "";
+    currentSSHSession.targetIP = null;
     term.write(`\r\nDisconnected from SSH session.\r\n`);
     loadFileSystem(); // Reload the main terminal filesystem
     return;
@@ -46,6 +45,6 @@ export function handleSSHCommand(command) {
 
 export function renderSSHPrompt() {
   const user = loginManager.getUsername();
-  const prompt = `${user}@${targetIP}$ `;
+  const prompt = `${user}@${currentSSHSession.targetIP}$ `;
   term.write(prompt);
 }
