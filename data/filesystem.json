@@ -1,121 +1,120 @@
 {
-  "root": {
-    "home": {
-      "users": {}
+  "home": {
+    "users": {}
+  },
+  "etc": {
+    "config": "System configuration details.",
+    "network": {
+      "interfaces": "Network interface configurations.",
+      "firewall": {
+        "rules": "Firewall rules and policies.",
+        "logs": "Firewall activity logs."
+      },
+      "dns": {
+        "resolv.conf": "DNS resolver configurations.",
+        "hosts": "Static hostnames to IP mappings."
+      }
     },
-    "etc": {
-      "config": "System configuration details.",
-      "network": {
-        "interfaces": "Network interface configurations.",
-        "firewall": {
-          "rules": "Firewall rules and policies.",
-          "logs": "Firewall activity logs."
-        },
-        "dns": {
-          "resolv.conf": "DNS resolver configurations.",
-          "hosts": "Static hostnames to IP mappings."
-        }
-      },
-      "passwd": "User account information.",
-      "shadow": "Secure user account information."
+    "passwd": "User account information.",
+    "shadow": "Secure user account information."
+  },
+  "var": {
+    "log": {
+      "syslog": "System log contents.",
+      "auth.log": "Authentication log contents.",
+      "dmesg": "Kernel ring buffer messages.",
+      "app.log": "Application log file."
     },
-    "var": {
-      "log": {
-        "syslog": "System log contents.",
-        "auth.log": "Authentication log contents.",
-        "dmesg": "Kernel ring buffer messages.",
-        "app.log": "Application log file."
+    "tmp": {
+      "session.tmp": "Temporary session file.",
+      "cache.tmp": "Temporary cache data."
+    },
+    "www": {
+      "html": {
+        "index.html": "<html><body>Welcome to our server!</body></html>",
+        "admin.html": "<html><body>Admin Panel</body></html>"
       },
-      "tmp": {
-        "session.tmp": "Temporary session file.",
-        "cache.tmp": "Temporary cache data."
-      },
-      "www": {
-        "html": {
-          "index.html": "<html><body>Welcome to our server!</body></html>",
-          "admin.html": "<html><body>Admin Panel</body></html>"
+      "cgi-bin": {
+        "script.sh": "#!/bin/bash\necho Hello World"
+      }
+    }
+  },
+  "usr": {
+    "bin": {
+      "bash": "Bash shell binary.",
+      "ls": "List directory contents command.",
+      "vim": "Vim text editor binary.",
+      "python": "Python interpreter."
+    },
+    "lib": {
+      "libc.so": "C standard library.",
+      "libm.so": "Math library.",
+      "libssl.so": "SSL/TLS library.",
+      "libcurl.so": "cURL library for network transfers."
+    },
+    "share": {
+      "man": {
+        "man1": {
+          "ls.1": "Manual page for ls command."
         },
-        "cgi-bin": {
-          "script.sh": "#!/bin/bash\necho Hello World"
+        "man5": {
+          "passwd.5": "Manual page for passwd file format."
         }
       }
     },
-    "usr": {
+    "local": {
       "bin": {
-        "bash": "Bash shell binary.",
-        "ls": "List directory contents command.",
-        "vim": "Vim text editor binary.",
-        "python": "Python interpreter."
-      },
-      "lib": {
-        "libc.so": "C standard library.",
-        "libm.so": "Math library.",
-        "libssl.so": "SSL/TLS library.",
-        "libcurl.so": "cURL library for network transfers."
+        "custom_script": "#!/bin/bash\necho Custom script"
       },
       "share": {
-        "man": {
-          "man1": {
-            "ls.1": "Manual page for ls command."
-          },
-          "man5": {
-            "passwd.5": "Manual page for passwd file format."
-          }
-        }
-      },
-      "local": {
-        "bin": {
-          "custom_script": "#!/bin/bash\necho Custom script"
-        },
-        "share": {
-          "info": {
-            "custom_info.txt": "Custom software information."
-          }
+        "info": {
+          "custom_info.txt": "Custom software information."
         }
       }
-    },
-    "opt": {
-      "custom_app": {
-        "README": "Custom application readme file.",
-        "config": "Configuration file for custom app."
-      }
-    },
-    "srv": {
-      "ftp": {
-        "welcome.msg": "Welcome to our FTP server.",
-        "uploads": {}
-      },
-      "http": {
-        "data": {
-          "index.html": "<html><body>Welcome to our HTTP server!</body></html>"
-        }
-      }
-    },
-    "proc": {
-      "cpuinfo": "Processor information.",
-      "meminfo": "Memory information.",
-      "uptime": "System uptime."
-    },
-    "dev": {
-      "sda1": "First partition on the first hard drive.",
-      "tty0": "Current terminal.",
-      "null": "Null device."
-    },
-    "boot": {
-      "vmlinuz": "Compressed kernel image.",
-      "initrd.img": "Initial RAM disk image."
-    },
-    "mnt": {
-      "usb": {
-        "README": "USB drive mount point."
-      }
-    },
-    "media": {
-      "cdrom": {
-        "README": "CD-ROM drive mount point."
-      }
-    },
-    "lost+found": {}
+    }
   },
+  "opt": {
+    "custom_app": {
+      "README": "Custom application readme file.",
+      "config": "Configuration file for custom app."
+    }
+  },
+  "srv": {
+    "ftp": {
+      "welcome.msg": "Welcome to our FTP server.",
+      "uploads": {}
+    },
+    "http": {
+      "data": {
+        "index.html": "<html><body>Welcome to our HTTP server!</body></html>"
+      }
+    }
+  },
+  "proc": {
+    "cpuinfo": "Processor information.",
+    "meminfo": "Memory information.",
+    "uptime": "System uptime."
+  },
+  "dev": {
+    "sda1": "First partition on the first hard drive.",
+    "tty0": "Current terminal.",
+    "null": "Null device."
+  },
+  "boot": {
+    "vmlinuz": "Compressed kernel image.",
+    "initrd.img": "Initial RAM disk image."
+  },
+  "mnt": {
+    "usb": {
+      "README": "USB drive mount point."
+    }
+  },
+  "media": {
+    "cdrom": {
+      "README": "CD-ROM drive mount point."
+    }
+  },
+  "lost+found": {},
+
   ".h4x0r": "You have been hacked!"
 }

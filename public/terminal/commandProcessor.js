@@ -208,10 +208,10 @@ export function getCombinedCommandMap() {
 
   if (
     username &&
-    fileData.root.home.users[username] &&
-    fileData.root.home.users[username].bin
+    fileData.home.users[username] &&
+    fileData.home.users[username].bin
   ) {
-    userTools = Object.keys(fileData.root.home.users[username].bin);
+    userTools = Object.keys(fileData.home.users[username].bin);
   }
 
   const combinedCommandMap = { ...baseCommandMap };

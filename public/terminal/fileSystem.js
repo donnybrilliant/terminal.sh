@@ -2,7 +2,7 @@
 import { loginManager, socket } from "./index.js";
 
 let fileData = {};
-let pathStack = ["root", "home", "users", "guest"]; // Default path for unauthenticated access
+let pathStack = ["home", "users", "guest"]; // Default path for unauthenticated access
 
 let sshFileData = {};
 let sshPathStack = [""]; // Default path for SSH
@@ -17,16 +17,12 @@ async function loadFileSystem() {
     if (response.success) {
       fileData = response.data;
       const username = loginManager.getUsername();
-      if (
-        username &&
-        username.trim() !== "" &&
-        fileData.root.home.users[username]
-      ) {
-        pathStack = ["root", "home", "users", username];
+      if (username && username.trim() !== "" && fileData.home.users[username]) {
+        pathStack = ["home", "users", username];
       } else {
-        pathStack = ["root", "home", "users", "guest"];
-        if (!fileData.root.home.users.guest) {
-          fileData.root.home.users.guest = {
+        pathStack = ["home", "users", "guest"];
+        if (!fileData.home.users.guest) {
+          fileData.home.users.guest = {
             README: "You are not logged in.",
           };
         }
@@ -126,22 +122,18 @@ function appendToolToFileData(toolName, isSSH = false) {
   const username = loginManager.getUsername();
   const currentData = isSSH ? sshFileData : fileData;
   if (username && username.trim() !== "") {
-    if (!currentData.root.home.users[username].bin) {
-      currentData.root.home.users[username].bin = {};
+    if (!currentData.home.users[username].bin) {
+      currentData.home.users[username].bin = {};
     }
-    currentData.root.home.users[username].bin[toolName] = toolName;
+    currentData.home.users[username].bin[toolName] = toolName;
   }
 }
 
 // Function to save the user's home directory
 async function saveUserHome() {
   const username = loginManager.getUsername();
-  if (
-    username &&
-    username.trim() !== "" &&
-    fileData.root.home.users[username]
-  ) {
-    const { README, ...filteredHomeData } = fileData.root.home.users[username]; // Exclude README
+  if (username && username.trim() !== "" && fileData.home.users[username]) {
+    const { README, ...filteredHomeData } = fileData.home.users[username]; // Exclude README
 
     try {
       const response = await new Promise((resolve) => {

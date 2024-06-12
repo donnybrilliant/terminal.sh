@@ -25,15 +25,12 @@
 
 ### Improvements
 
-- Guest restrictions (no alliances done - what more?)
+- Guest restrictions (no alliances done - tool restrictions - what more?)
 - Check over gameHandlers, they might not do what I want
 - refactor data/.json handling/structure
 - move fileData handling from login.js to fileSystem.js?
-- improve cd to do full paths.
+- improve cd to autocomplete full paths.
 - test edit mode
-- sniff for user roles
-- password_cracker
-  - remove root
 - PROMPT! especially on SSH should be ip>
 - .trim() command arguments?
 - I should use utils more places getUsers etc
