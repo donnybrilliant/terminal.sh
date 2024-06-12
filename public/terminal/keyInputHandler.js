@@ -8,8 +8,13 @@ import {
   handleChatCommand,
   getChatCommandList,
 } from "../chat/index.js";
+import {
+  isInSSHMode,
+  handleSSHCommand,
+  renderSSHPrompt,
+} from "../ssh/index.js";
 import { getCommandList } from "./commandProcessor.js";
-import { getDirectoryNames } from "./fileSystem.js";
+import { getCurrentPath, getDirectoryNames } from "./fileSystem.js";
 
 let commandBuffer = "";
 let cursorPosition = 0;
@@ -19,8 +24,10 @@ let isShowingSuggestions = false;
 
 const mainCommandHistory = [];
 const chatCommandHistory = [];
+const sshCommandHistory = [];
 let mainHistoryIndex = -1;
 let chatHistoryIndex = -1;
+let sshHistoryIndex = -1;
 
 let availableCommands;
 let chatCommands;
@@ -53,7 +60,11 @@ function displaySuggestions(term, suggestions) {
 
 function render(term) {
   const user = loginManager.getUsername();
-  const prompt = isInChatMode() ? `${user}> ` : `${user}$ `;
+  const prompt = isInChatMode()
+    ? `${user}> `
+    : isInSSHMode()
+    ? `${user}@${getCurrentPath(true)}$ `
+    : `${user}$ `;
   term.write(`\r\x1b[2K\r${prompt}${commandBuffer}`);
   term.write(`\x1b[${cursorPosition + prompt.length + 1}G`);
   if (isShowingSuggestions) {
@@ -82,10 +93,22 @@ export default async function handleKeyInput(
   }
 
   const keyCode = domEvent.keyCode || domEvent.which;
-  const history = isInChatMode() ? chatCommandHistory : mainCommandHistory;
-  let historyIndex = isInChatMode() ? chatHistoryIndex : mainHistoryIndex;
+  const history = isInChatMode()
+    ? chatCommandHistory
+    : isInSSHMode()
+    ? sshCommandHistory
+    : mainCommandHistory;
+  let historyIndex = isInChatMode()
+    ? chatHistoryIndex
+    : isInSSHMode()
+    ? sshHistoryIndex
+    : mainHistoryIndex;
   const user = loginManager.getUsername();
-  const prompt = isInChatMode() ? `${user}> ` : `${user}$ `;
+  const prompt = isInChatMode()
+    ? `${user}> `
+    : isInSSHMode()
+    ? `${user}@${getCurrentPath(true)}$ `
+    : `${user}$ `;
 
   if (keyCode === 37) {
     // Left arrow
@@ -121,6 +144,8 @@ export default async function handleKeyInput(
     }
     if (isInChatMode()) {
       chatHistoryIndex = historyIndex;
+    } else if (isInSSHMode()) {
+      sshHistoryIndex = historyIndex;
     } else {
       mainHistoryIndex = historyIndex;
     }
@@ -144,6 +169,8 @@ export default async function handleKeyInput(
     }
     if (isInChatMode()) {
       chatHistoryIndex = historyIndex;
+    } else if (isInSSHMode()) {
+      sshHistoryIndex = historyIndex;
     } else {
       mainHistoryIndex = historyIndex;
     }
@@ -166,7 +193,9 @@ export default async function handleKeyInput(
   if (key === "Tab" || keyCode === 9) {
     if (commandBuffer.startsWith("cd ")) {
       const currentPath = commandBuffer.slice(3);
-      const directories = getDirectoryNames();
+      const directories = isInSSHMode()
+        ? getDirectoryNames(true) // Pass true to get SSH directories
+        : getDirectoryNames();
       const possibleDirs = directories.filter((dir) =>
         dir.startsWith(currentPath)
       );
@@ -229,6 +258,20 @@ export default async function handleKeyInput(
       cursorPosition = 0;
       clearSuggestions(term);
       render(term); // Render the chat prompt
+      return;
+    } else if (isInSSHMode()) {
+      const output = await handleSSHCommand(commandBuffer);
+      if (output) {
+        term.write(`\r\n${output}`);
+      }
+      sshCommandHistory.push(commandBuffer);
+      sshHistoryIndex = sshCommandHistory.length;
+      commandBuffer = "";
+      cursorPosition = 0;
+      clearSuggestions(term);
+      term.write("\r\n"); // Ensure we move to a new line
+      render(term);
+      term.scrollToBottom();
       return;
     } else {
       const output = await processCommand(commandBuffer);

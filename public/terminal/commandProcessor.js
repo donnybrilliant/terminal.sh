@@ -1,3 +1,4 @@
+// commandProcessor.js
 import { commands } from "./shell.js";
 import { term, socket, loginManager } from "./index.js";
 import { loadtest, chars, hack, startMatrix, getClientInfo } from "./random.js";
@@ -15,9 +16,14 @@ import {
   handleChatCommand,
 } from "../chat/index.js";
 import { fileData } from "./fileSystem.js";
+import {
+  currentSSHSession,
+  isInSSHMode,
+  handleSSHCommand,
+} from "../ssh/index.js";
 
-// Command map
-const commandMap = {
+// Base Command map
+const baseCommandMap = {
   nano: (args) => editFile(args[0]),
   vi: (args) => editFile(args[0]),
   edit: (args) => editFile(args[0]),
@@ -132,37 +138,109 @@ const commandMap = {
     socket.emit("requestHardwareInfo");
     socket.on("hardwareInfo", (data) => {
       console.log("Received hardware info:", data);
-
       // Use this information as needed
     });
     return "Hardware info received. Check the console.";
   },
-  password_cracker: () => {
-    console.log("Password Cracker executed");
-    return "Password Cracker executed";
+  ssh: (args) => {
+    if (args.length !== 1) {
+      return "Usage: ssh <targetIP>";
+    }
+    const targetIP = args[0];
+    const username = loginManager.getUsername();
+    socket.emit("ssh", { username, targetIP });
+    return `Connecting to ${targetIP}...`;
   },
 };
 
-export function getCommandList() {
-  const baseCommands = Object.keys(commandMap);
+// Tool-specific Command map
+const toolCommandMap = {
+  password_sniffer: (args) => {
+    // fix better args handling when empty string
+    if (args.length !== 1 || args[0] === "") {
+      return "Usage: password_sniffer <targetIP>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    socket.emit("password_sniffer", { username, targetIP: args[0] });
+    return `Attempting to sniff password on IP ${args[0]}...`;
+  },
+  ssh_exploit: (args) => {
+    if (args.length !== 1 || args[0] === "") {
+      return "Usage: ssh_exploit <targetIP>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    socket.emit("ssh_exploit", { username, targetIP: args[0] });
+    return `Attempting to exploit SSH on IP ${args[0]}...`;
+  },
+  user_enum: (args) => {
+    if (args.length !== 0) {
+      return "Usage: user_enum";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    const targetIP = currentSSHSession.targetIP;
+    if (!targetIP) {
+      return "No active SSH session.";
+    }
+    socket.emit("user_enum", { username, targetIP });
+    return `Enumerating users on IP ${targetIP}...`;
+  },
+  password_cracker: (args) => {
+    if (args.length !== 1 || args[0] === "") {
+      return "Usage: password_cracker <role>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    const targetIP = currentSSHSession.targetIP;
+    if (!targetIP) {
+      return "No active SSH session.";
+    }
+    socket.emit("password_cracker", {
+      username,
+      targetIP,
+      role: args[0],
+    });
+    return `Attempting to crack password for role ${args[0]} on IP ${targetIP}...`;
+  },
+};
+
+export function getCombinedCommandMap() {
   const username = loginManager.getUsername();
+  let userTools = [];
+
   if (
     username &&
     fileData.root.home.users[username] &&
     fileData.root.home.users[username].bin
   ) {
-    const userCommands = Object.keys(fileData.root.home.users[username].bin);
-    return [...new Set([...baseCommands, ...userCommands])];
+    userTools = Object.keys(fileData.root.home.users[username].bin);
   }
-  return baseCommands;
+
+  const combinedCommandMap = { ...baseCommandMap };
+  userTools.forEach((tool) => {
+    if (toolCommandMap[tool]) {
+      combinedCommandMap[tool] = toolCommandMap[tool];
+    }
+  });
+
+  return combinedCommandMap;
+}
+
+export function getCommandList() {
+  const combinedCommandMap = getCombinedCommandMap();
+  return Object.keys(combinedCommandMap);
 }
 
 export default async function processCommand(command) {
   const [cmd, ...args] = command.split(" ");
+  const combinedCommandMap = getCombinedCommandMap();
 
   // Handle chat mode
   if (isInChatMode()) {
     return handleChatCommand(command);
+  }
+
+  // Handle SSH mode
+  if (isInSSHMode()) {
+    return await handleSSHCommand(command);
   }
 
   // Check if the system is in edit mode
@@ -178,7 +256,7 @@ export default async function processCommand(command) {
   }
 
   // If not in edit mode, proceed with normal command processing
-  const commandFunction = commandMap[cmd];
+  const commandFunction = combinedCommandMap[cmd];
   if (commandFunction) {
     return await commandFunction(args);
   } else {

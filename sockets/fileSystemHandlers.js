@@ -4,6 +4,7 @@ import {
   writeJSONFile,
   FILE_SYSTEM_PATH,
   USERS_FILE_PATH,
+  INTERNET_FILE_PATH,
 } from "../utils/fileUtils.js";
 
 export function setupFileSystemHandlers(socket, io) {

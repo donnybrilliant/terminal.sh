@@ -1,7 +1,11 @@
+// fileSystem.js
 import { loginManager, socket } from "./index.js";
 
 let fileData = {};
 let pathStack = ["root", "home", "users", "guest"]; // Default path for unauthenticated access
+
+let sshFileData = {};
+let sshPathStack = [""]; // Default path for SSH
 
 // Function to load the filesystem data from server
 async function loadFileSystem() {
@@ -36,6 +40,99 @@ async function loadFileSystem() {
   }
 }
 
+// Function to load the target filesystem data for SSH
+async function loadTargetFileSystem(targetData) {
+  sshFileData = targetData.fileSystem;
+  // set startdir in targetDir and set it here.
+  sshPathStack = [""];
+  // pipe this through?
+  return "Target filesystem loaded successfully.";
+}
+
+// General function to get the current directory
+function getCurrentDir(isSSH = false) {
+  const currentData = isSSH ? sshFileData : fileData;
+  const currentPathStack = isSSH ? sshPathStack : pathStack;
+
+  // Start from the root
+  let dir = currentData;
+  for (const part of currentPathStack) {
+    if (part && dir[part] && typeof dir[part] === "object") {
+      dir = dir[part];
+    }
+  }
+
+  return dir;
+}
+
+// General function to set the current directory
+function setCurrentDir(dir, isSSH = false) {
+  const currentData = isSSH ? sshFileData : fileData;
+  const currentPathStack = isSSH ? sshPathStack : pathStack;
+
+  if (dir.startsWith("/")) {
+    // Absolute path
+    let tmpDir = currentData; // Start from root
+    const parts = dir.split("/").filter(Boolean);
+
+    for (const part of parts) {
+      if (part in tmpDir && typeof tmpDir[part] === "object") {
+        tmpDir = tmpDir[part];
+      } else {
+        return false; // Any part in the path is not found or is not a directory
+      }
+    }
+
+    if (isSSH) {
+      sshPathStack = parts.length ? parts : [""];
+    } else {
+      pathStack = parts.length ? parts : [""];
+    }
+    return true;
+  } else {
+    // Relative path
+    const currentDir = getCurrentDir(isSSH);
+
+    if (dir === "..") {
+      if (currentPathStack.length > 0) {
+        currentPathStack.pop();
+      }
+    } else if (dir in currentDir && typeof currentDir[dir] === "object") {
+      currentPathStack.push(dir);
+    } else {
+      return false; // Handle error (not a directory or doesn't exist)
+    }
+    return true;
+  }
+}
+
+// General function to get the full path as a string
+function getCurrentPath(isSSH = false) {
+  const currentPathStack = isSSH ? sshPathStack : pathStack;
+  const path = currentPathStack.filter(Boolean).join("/");
+  return path ? `/${path}` : "/";
+}
+
+// General function to get directory names for autocompletion
+function getDirectoryNames(isSSH = false) {
+  const currentDir = getCurrentDir(isSSH);
+  return Object.keys(currentDir).filter(
+    (key) => typeof currentDir[key] === "object"
+  );
+}
+
+// Function to append a tool to file data
+function appendToolToFileData(toolName, isSSH = false) {
+  const username = loginManager.getUsername();
+  const currentData = isSSH ? sshFileData : fileData;
+  if (username && username.trim() !== "") {
+    if (!currentData.root.home.users[username].bin) {
+      currentData.root.home.users[username].bin = {};
+    }
+    currentData.root.home.users[username].bin[toolName] = toolName;
+  }
+}
+
 // Function to save the user's home directory
 async function saveUserHome() {
   const username = loginManager.getUsername();
@@ -67,71 +164,6 @@ async function saveUserHome() {
   }
 }
 
-// Function to get the current directory
-function getCurrentDir() {
-  return (
-    pathStack.reduce(
-      (acc, dir) => (acc && acc[dir] ? acc[dir] : undefined),
-      fileData
-    ) || fileData
-  );
-}
-
-// Function to set the current directory
-function setCurrentDir(dir) {
-  if (dir.startsWith("/")) {
-    let tmpDir = fileData; // Start from root
-    const parts = dir.split("/").filter(Boolean);
-
-    for (const part of parts) {
-      if (part in tmpDir && typeof tmpDir[part] === "object") {
-        tmpDir = tmpDir[part];
-      } else {
-        return false; // Any part in the path is not found or is not a directory
-      }
-    }
-
-    pathStack = parts;
-    return true;
-  } else {
-    const currentDir = getCurrentDir();
-
-    if (dir === "..") {
-      if (pathStack.length > 0) {
-        pathStack.pop();
-      }
-    } else if (dir in currentDir && typeof currentDir[dir] === "object") {
-      pathStack.push(dir);
-    } else {
-      return false; // Handle error (not a directory or doesn't exist)
-    }
-    return true;
-  }
-}
-
-// Get the full path as a string
-function getCurrentPath() {
-  return "/" + pathStack.join("/");
-}
-
-// Function to get directory names for autocompletion
-function getDirectoryNames() {
-  const currentDir = getCurrentDir();
-  return Object.keys(currentDir).filter(
-    (key) => typeof currentDir[key] === "object"
-  );
-}
-
-function appendToolToFileData(toolName) {
-  const username = loginManager.getUsername();
-  if (username && username.trim() !== "") {
-    if (!fileData.root.home.users[username].bin) {
-      fileData.root.home.users[username].bin = {};
-    }
-    fileData.root.home.users[username].bin[toolName] = toolName;
-  }
-}
-
 // Export necessary functions
 export {
   getCurrentDir,
@@ -139,6 +171,7 @@ export {
   getCurrentPath,
   getDirectoryNames,
   loadFileSystem,
+  loadTargetFileSystem,
   saveUserHome,
   pathStack,
   fileData,
