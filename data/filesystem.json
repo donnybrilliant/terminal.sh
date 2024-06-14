@@ -3,118 +3,246 @@
     "users": {}
   },
   "etc": {
-    "config": "System configuration details.",
+    "config": {
+      "content": "System configuration details.",
+      "isDownloadable": true
+    },
     "network": {
-      "interfaces": "Network interface configurations.",
+      "interfaces": {
+        "content": "Network interface configurations.",
+        "isDownloadable": true
+      },
       "firewall": {
-        "rules": "Firewall rules and policies.",
-        "logs": "Firewall activity logs."
+        "rules": {
+          "content": "Firewall rules and policies.",
+          "isDownloadable": true
+        },
+        "logs": {
+          "content": "Firewall activity logs.",
+          "isDownloadable": true
+        }
       },
       "dns": {
-        "resolv.conf": "DNS resolver configurations.",
-        "hosts": "Static hostnames to IP mappings."
+        "resolv.conf": {
+          "content": "DNS resolver configurations.",
+          "isDownloadable": true
+        },
+        "hosts": {
+          "content": "Static hostnames to IP mappings.",
+          "isDownloadable": true,
+          "url": "http://localhost:3000"
+        }
       }
     },
-    "passwd": "User account information.",
-    "shadow": "Secure user account information."
+    "passwd": {
+      "content": "User account information.",
+      "isDownloadable": true
+    },
+    "shadow": {
+      "content": "Secure user account information.",
+      "isDownloadable": true
+    }
   },
   "var": {
     "log": {
-      "syslog": "System log contents.",
-      "auth.log": "Authentication log contents.",
-      "dmesg": "Kernel ring buffer messages.",
-      "app.log": "Application log file."
+      "syslog": {
+        "content": "System log contents.",
+        "isDownloadable": true
+      },
+      "auth.log": {
+        "content": "Authentication log contents.",
+        "isDownloadable": true
+      },
+      "dmesg": {
+        "content": "Kernel ring buffer messages.",
+        "isDownloadable": true
+      },
+      "app.log": {
+        "content": "Application log file.",
+        "isDownloadable": true
+      }
     },
     "tmp": {
-      "session.tmp": "Temporary session file.",
-      "cache.tmp": "Temporary cache data."
+      "session.tmp": {
+        "content": "Temporary session file.",
+        "isDownloadable": true
+      },
+      "cache.tmp": {
+        "content": "Temporary cache data.",
+        "isDownloadable": true
+      }
     },
     "www": {
       "html": {
-        "index.html": "<html><body>Welcome to our server!</body></html>",
-        "admin.html": "<html><body>Admin Panel</body></html>"
+        "index.html": {
+          "content": "<html><body>Welcome to our server!</body></html>",
+          "isDownloadable": true
+        },
+        "admin.html": {
+          "content": "<html><body>Admin Panel</body></html>",
+          "isDownloadable": true
+        }
       },
       "cgi-bin": {
-        "script.sh": "#!/bin/bash\necho Hello World"
+        "script.sh": {
+          "content": "#!/bin/bash\necho Hello World",
+          "isDownloadable": true
+        }
       }
     }
   },
   "usr": {
     "bin": {
-      "bash": "Bash shell binary.",
-      "ls": "List directory contents command.",
-      "vim": "Vim text editor binary.",
-      "python": "Python interpreter."
+      "bash": {
+        "content": "Bash shell binary.",
+        "isDownloadable": true
+      },
+      "ls": {
+        "content": "List directory contents command.",
+        "isDownloadable": true
+      },
+      "vim": {
+        "content": "Vim text editor binary.",
+        "isDownloadable": true
+      },
+      "python": {
+        "content": "Python interpreter.",
+        "isDownloadable": true
+      }
     },
     "lib": {
-      "libc.so": "C standard library.",
-      "libm.so": "Math library.",
-      "libssl.so": "SSL/TLS library.",
-      "libcurl.so": "cURL library for network transfers."
+      "libc.so": {
+        "content": "C standard library.",
+        "isDownloadable": true
+      },
+      "libm.so": {
+        "content": "Math library.",
+        "isDownloadable": true
+      },
+      "libssl.so": {
+        "content": "SSL/TLS library.",
+        "isDownloadable": true
+      },
+      "libcurl.so": {
+        "content": "cURL library for network transfers.",
+        "isDownloadable": true
+      }
     },
     "share": {
       "man": {
         "man1": {
-          "ls.1": "Manual page for ls command."
+          "ls.1": {
+            "content": "Manual page for ls command.",
+            "isDownloadable": true
+          }
         },
         "man5": {
-          "passwd.5": "Manual page for passwd file format."
+          "passwd.5": {
+            "content": "Manual page for passwd file format.",
+            "isDownloadable": true
+          }
         }
       }
     },
     "local": {
       "bin": {
-        "custom_script": "#!/bin/bash\necho Custom script"
+        "custom_script": {
+          "content": "#!/bin/bash\necho Custom script",
+          "isDownloadable": true
+        }
       },
       "share": {
         "info": {
-          "custom_info.txt": "Custom software information."
+          "custom_info.txt": {
+            "content": "Custom software information.",
+            "isDownloadable": true
+          }
         }
       }
     }
   },
   "opt": {
     "custom_app": {
-      "README": "Custom application readme file.",
-      "config": "Configuration file for custom app."
+      "README": {
+        "content": "Custom application readme file.",
+        "isDownloadable": true
+      },
+      "config": {
+        "content": "Configuration file for custom app.",
+        "isDownloadable": true
+      }
     }
   },
   "srv": {
     "ftp": {
-      "welcome.msg": "Welcome to our FTP server.",
+      "welcome.msg": {
+        "content": "Welcome to our FTP server.",
+        "isDownloadable": true
+      },
       "uploads": {}
     },
     "http": {
       "data": {
-        "index.html": "<html><body>Welcome to our HTTP server!</body></html>"
+        "index.html": {
+          "content": "<html><body>Welcome to our HTTP server!</body></html>",
+          "isDownloadable": true
+        }
       }
     }
   },
   "proc": {
-    "cpuinfo": "Processor information.",
-    "meminfo": "Memory information.",
-    "uptime": "System uptime."
+    "cpuinfo": {
+      "content": "Processor information.",
+      "isDownloadable": true
+    },
+    "meminfo": {
+      "content": "Memory information.",
+      "isDownloadable": true
+    },
+    "uptime": {
+      "content": "System uptime.",
+      "isDownloadable": true
+    }
   },
   "dev": {
-    "sda1": "First partition on the first hard drive.",
-    "tty0": "Current terminal.",
-    "null": "Null device."
+    "sda1": {
+      "content": "First partition on the first hard drive.",
+      "isDownloadable": true
+    },
+    "tty0": {
+      "content": "Current terminal.",
+      "isDownloadable": true
+    },
+    "null": {
+      "content": "Null device.",
+      "isDownloadable": true
+    }
   },
   "boot": {
-    "vmlinuz": "Compressed kernel image.",
-    "initrd.img": "Initial RAM disk image."
+    "vmlinuz": {
+      "content": "Compressed kernel image.",
+      "isDownloadable": true
+    },
+    "initrd.img": {
+      "content": "Initial RAM disk image.",
+      "isDownloadable": true
+    }
   },
   "mnt": {
     "usb": {
-      "README": "USB drive mount point."
+      "README": {
+        "content": "USB drive mount point.",
+        "isDownloadable": true
+      }
     }
   },
   "media": {
     "cdrom": {
-      "README": "CD-ROM drive mount point."
+      "README": {
+        "content": "CD-ROM drive mount point.",
+        "isDownloadable": true
+      }
     }
   },
-  "lost+found": {},
-
-  ".h4x0r": "You have been hacked!"
+  "lost+found": {}
 }

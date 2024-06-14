@@ -123,16 +123,28 @@ const baseCommandMap = {
     return `Mining IP ${targetIP}...`;
   },
   download: (args) => {
-    if (args.length !== 2) {
-      return "Usage: download <targetIP> <toolName>";
-    }
     const username = loginManager.getUsername() || "Guest";
-    socket.emit("download", {
-      username,
-      targetIP: args[0],
-      toolName: args[1],
-    });
-    return `Downloading ${args[1]} from IP ${args[0]}...`;
+
+    if (args.length === 2) {
+      // Original format: download ip toolName
+      const [targetIP, toolName] = args;
+      socket.emit("download", {
+        username,
+        targetIP,
+        toolName,
+      });
+      return `Downloading ${toolName} from IP ${targetIP}...`;
+    } else if (args.length === 1) {
+      // New format: download filePath
+      const filePath = args[0];
+      socket.emit("download", {
+        username,
+        filePath,
+      });
+      return `Downloading file from ${filePath}...`;
+    } else {
+      return "Usage: download <targetIP> <toolName> or download <filePath>";
+    }
   },
   server: () => {
     socket.emit("requestHardwareInfo");

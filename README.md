@@ -25,7 +25,9 @@
 
 ### Improvements
 
+- TOOLS ARE TOO STATIC!
 - Guest restrictions (no alliances done - tool restrictions - what more?)
+- remove login command from ssh
 - Check over gameHandlers, they might not do what I want
 - refactor data/.json handling/structure
 - move fileData handling from login.js to fileSystem.js?

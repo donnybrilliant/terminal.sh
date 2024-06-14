@@ -1,4 +1,4 @@
-// fileSystem.js
+// filesystem.js
 import { loginManager, socket } from "./index.js";
 
 let fileData = {};
@@ -23,7 +23,7 @@ async function loadFileSystem() {
         pathStack = ["home", "users", "guest"];
         if (!fileData.home.users.guest) {
           fileData.home.users.guest = {
-            README: "You are not logged in.",
+            README: { content: "You are not logged in." },
           };
         }
       }
@@ -39,7 +39,6 @@ async function loadFileSystem() {
 // Function to load the target filesystem data for SSH
 async function loadTargetFileSystem(targetData) {
   sshFileData = targetData.fileSystem;
-  // set startdir in targetDir and set it here.
   sshPathStack = [""];
   // pipe this through?
   return "Target filesystem loaded successfully.";
@@ -50,7 +49,6 @@ function getCurrentDir(isSSH = false) {
   const currentData = isSSH ? sshFileData : fileData;
   const currentPathStack = isSSH ? sshPathStack : pathStack;
 
-  // Start from the root
   let dir = currentData;
   for (const part of currentPathStack) {
     if (part && dir[part] && typeof dir[part] === "object") {
@@ -72,10 +70,13 @@ function setCurrentDir(dir, isSSH = false) {
     const parts = dir.split("/").filter(Boolean);
 
     for (const part of parts) {
-      if (part in tmpDir && typeof tmpDir[part] === "object") {
+      if (part in tmpDir) {
+        if (tmpDir[part].content) {
+          return "Not a directory";
+        }
         tmpDir = tmpDir[part];
       } else {
-        return false; // Any part in the path is not found or is not a directory
+        return false;
       }
     }
 
@@ -93,10 +94,13 @@ function setCurrentDir(dir, isSSH = false) {
       if (currentPathStack.length > 0) {
         currentPathStack.pop();
       }
-    } else if (dir in currentDir && typeof currentDir[dir] === "object") {
+    } else if (dir in currentDir) {
+      if (currentDir[dir].content) {
+        return "Not a directory";
+      }
       currentPathStack.push(dir);
     } else {
-      return false; // Handle error (not a directory or doesn't exist)
+      return false;
     }
     return true;
   }
@@ -113,7 +117,15 @@ function getCurrentPath(isSSH = false) {
 function getDirectoryNames(isSSH = false) {
   const currentDir = getCurrentDir(isSSH);
   return Object.keys(currentDir).filter(
-    (key) => typeof currentDir[key] === "object"
+    (key) => typeof currentDir[key] === "object" && !currentDir[key].content
+  );
+}
+
+// Function to get file names for autocompletion
+function getFileNames(isSSH = false) {
+  const currentDir = getCurrentDir(isSSH);
+  return Object.keys(currentDir).filter(
+    (key) => typeof currentDir[key] === "object" && currentDir[key].content
   );
 }
 
@@ -125,8 +137,23 @@ function appendToolToFileData(toolName, isSSH = false) {
     if (!currentData.home.users[username].bin) {
       currentData.home.users[username].bin = {};
     }
-    currentData.home.users[username].bin[toolName] = toolName;
+    currentData.home.users[username].bin[toolName] = { content: toolName };
   }
+}
+
+function getFileFromPath(fileSystem, filePath) {
+  const pathParts = filePath.split("/");
+  let currentDir = fileSystem;
+
+  for (const part of pathParts) {
+    if (currentDir[part]) {
+      currentDir = currentDir[part];
+    } else {
+      return null;
+    }
+  }
+
+  return currentDir;
 }
 
 // Function to save the user's home directory
@@ -156,7 +183,6 @@ async function saveUserHome() {
   }
 }
 
-// Export necessary functions
 export {
   getCurrentDir,
   setCurrentDir,
@@ -165,6 +191,8 @@ export {
   loadFileSystem,
   loadTargetFileSystem,
   saveUserHome,
+  getFileFromPath,
+  getFileNames,
   pathStack,
   fileData,
   appendToolToFileData,

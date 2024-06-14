@@ -14,7 +14,11 @@ import {
   renderSSHPrompt,
 } from "../ssh/index.js";
 import { getCommandList } from "./commandProcessor.js";
-import { getCurrentPath, getDirectoryNames } from "./fileSystem.js";
+import {
+  getCurrentPath,
+  getDirectoryNames,
+  getFileNames,
+} from "./fileSystem.js";
 
 let commandBuffer = "";
 let cursorPosition = 0;
@@ -190,11 +194,13 @@ export default async function handleKeyInput(
   }
 
   // Handle Tab key press for command auto-completion
+
   if (key === "Tab" || keyCode === 9) {
-    if (commandBuffer.startsWith("cd ")) {
-      const currentPath = commandBuffer.slice(3);
+    const [command, ...args] = commandBuffer.split(" ");
+    if (command === "cd") {
+      const currentPath = args.join(" ");
       const directories = isInSSHMode()
-        ? getDirectoryNames(true) // Pass true to get SSH directories
+        ? getDirectoryNames(true)
         : getDirectoryNames();
       const possibleDirs = directories.filter((dir) =>
         dir.startsWith(currentPath)
@@ -208,7 +214,6 @@ export default async function handleKeyInput(
         render(term);
       } else if (possibleDirs.length > 1) {
         suggestions = possibleDirs;
-        console.log(suggestions);
         displaySuggestions(term, possibleDirs);
         term.write(`\x1b[${cursorPosition + prompt.length + 1}G`);
       } else {
@@ -216,7 +221,31 @@ export default async function handleKeyInput(
         render(term);
       }
 
-      domEvent.preventDefault(); // Prevent the default action of the Tab key
+      domEvent.preventDefault();
+      return;
+    } else if (command === "cat") {
+      const currentPath = args.join(" ");
+      const files = isInSSHMode() ? getFileNames(true) : getFileNames();
+      const possibleFiles = files.filter((file) =>
+        file.startsWith(currentPath)
+      );
+
+      clearSuggestions(term);
+
+      if (possibleFiles.length === 1) {
+        commandBuffer = `cat ${possibleFiles[0]}`;
+        cursorPosition = commandBuffer.length;
+        render(term);
+      } else if (possibleFiles.length > 1) {
+        suggestions = possibleFiles;
+        displaySuggestions(term, possibleFiles);
+        term.write(`\x1b[${cursorPosition + prompt.length + 1}G`);
+      } else {
+        suggestions = [];
+        render(term);
+      }
+
+      domEvent.preventDefault();
       return;
     } else {
       const commands = isInChatMode() ? chatCommands : availableCommands;
@@ -227,7 +256,7 @@ export default async function handleKeyInput(
       clearSuggestions(term);
 
       if (possibleCommands.length === 1) {
-        commandBuffer = possibleCommands[0] + " "; // Add a space after the completed command
+        commandBuffer = possibleCommands[0] + " ";
         cursorPosition = commandBuffer.length;
         render(term);
       } else if (possibleCommands.length > 1) {
@@ -238,7 +267,7 @@ export default async function handleKeyInput(
         suggestions = [];
         render(term);
       }
-      domEvent.preventDefault(); // Prevent the default action of the Tab key
+      domEvent.preventDefault();
       return;
     }
   }

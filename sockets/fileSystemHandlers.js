@@ -1,10 +1,9 @@
-// fileSystemHandlers.js
+// filesystemhandlers.js
 import {
   readJSONFile,
   writeJSONFile,
   FILE_SYSTEM_PATH,
   USERS_FILE_PATH,
-  INTERNET_FILE_PATH,
 } from "../utils/fileUtils.js";
 
 export function setupFileSystemHandlers(socket, io) {
@@ -25,15 +24,17 @@ export function setupFileSystemHandlers(socket, io) {
         if (user) {
           const userHomeData = {
             ...user.home,
-            README: "Welcome, " + user.username,
+            README: { content: "Welcome, " + user.username },
           };
           baseFileSystem.home.users[user.username] = userHomeData;
         }
       } else {
         if (!baseFileSystem.home.users.guest) {
           baseFileSystem.home.users.guest = {
-            README:
-              "You are not logged in. There should be some information here...",
+            README: {
+              content:
+                "You are not logged in. There should be some information here...",
+            },
           };
         }
       }
