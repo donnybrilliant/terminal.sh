@@ -8,6 +8,8 @@ import {
 import { getUsers, getUserByUsername, saveUsers } from "../utils/userUtils.js";
 import { logAction } from "../utils/logger.js";
 
+let passwordCracked = false;
+
 function getFileFromPath(fileSystem, filePath) {
   const pathParts = filePath.split("/");
   let currentDir = fileSystem;
@@ -215,6 +217,7 @@ export function setupGameHandlers(socket, io) {
 
     if (filePath) {
       // Handle file download
+      // Check if it is a tool - then add it to the user.tools
       const targetServer = await getFileFromPath(fileData, filePath);
       if (!targetServer || !targetServer.isDownloadable) {
         return socket.emit("downloadResult", {
@@ -435,6 +438,7 @@ export function setupGameHandlers(socket, io) {
         user.exploitedServers[targetIP].ssh.push("password");
       }
 
+      // This should maybe be for a rootkit type thing?
       // Add the accessed role to the list of roles if not already there
       if (
         !user.exploitedServers[targetIP].roles.some(
@@ -514,13 +518,14 @@ export function setupGameHandlers(socket, io) {
       return;
     }
 
-    const requiredVulnerabilities = sshService.vulnerabilities
-      .filter((vul) => vul.type !== "password")
-      .map((vul) => vul.type);
+    const requiredVulnerabilities = sshService.vulnerabilities.map(
+      (vul) => vul.type
+    );
 
     user.exploitedServers = user.exploitedServers || {};
     user.exploitedServers[targetIP] = user.exploitedServers[targetIP] || {};
     const exploitedVulnerabilities = user.exploitedServers[targetIP].ssh || [];
+    const exploitedRoles = user.exploitedServers[targetIP].roles || [];
 
     const allRequiredExploited = requiredVulnerabilities.every((vul) =>
       exploitedVulnerabilities.includes(vul)
@@ -535,11 +540,12 @@ export function setupGameHandlers(socket, io) {
       return;
     }
 
-    const hasPasswordVulnerability =
-      exploitedVulnerabilities.includes("password");
+    // Should check user role and permissions here in the future
+    // Check if any role is exploited
+    const hasExploitedRole = exploitedRoles.length > 0;
 
     let eventData = null;
-    if (hasPasswordVulnerability) {
+    if (hasExploitedRole) {
       eventData = target;
     }
 
@@ -623,9 +629,9 @@ export function setupGameHandlers(socket, io) {
       return;
     }
 
-    const requiredVulnerabilities = sshService.vulnerabilities
-      .filter((vul) => vul.type !== "password")
-      .map((vul) => vul.type);
+    const requiredVulnerabilities = sshService.vulnerabilities.map(
+      (vul) => vul.type
+    );
 
     const exploitedVulnerabilities = user.exploitedServers[targetIP]?.ssh || [];
 
@@ -664,27 +670,117 @@ export function setupGameHandlers(socket, io) {
       return;
     }
 
-    user.exploitedServers[targetIP].roles =
-      user.exploitedServers[targetIP].roles || [];
-
-    // Add the role
-    if (!user.exploitedServers[targetIP].roles.includes(role)) {
-      user.exploitedServers[targetIP].roles.push(role);
-    }
-
-    // Add the password vulnerability to the list if not already there
-    if (!user.exploitedServers[targetIP].ssh.includes("password")) {
-      user.exploitedServers[targetIP].ssh.push("password");
-    }
-
-    await writeJSONFile(USERS_FILE_PATH, users);
-
+    passwordCracked = true;
     logAction(username, `Cracked password for role ${role} on IP: ${targetIP}`);
     socket.emit("passwordCrackerResult", {
       success: true,
       message: `Password cracked for role ${role} on ${targetIP}`,
       data: target,
       load: true,
+    });
+  });
+
+  socket.on("rootkit", async ({ username, targetIP, role }) => {
+    const users = await getUsers();
+    const user = getUserByUsername(username);
+
+    if (!user) {
+      socket.emit("rootkitResult", {
+        success: false,
+        message: "Rootkit failed",
+        error: "User not found",
+      });
+      return;
+    }
+
+    const internet = await readJSONFile(INTERNET_FILE_PATH);
+    const target = internet[targetIP];
+    if (!target) {
+      socket.emit("rootkitResult", {
+        success: false,
+        message: "Rootkit failed",
+        error: "Target IP not found",
+      });
+      return;
+    }
+
+    const sshService = target.services.find(
+      (service) => service.name === "ssh"
+    );
+
+    if (!sshService) {
+      socket.emit("rootkitResult", {
+        success: false,
+        message: "Rootkit failed",
+        error: "SSH service not found",
+      });
+      return;
+    }
+    user.exploitedServers[targetIP].roles =
+      user.exploitedServers[targetIP].roles || [];
+
+    if (user.exploitedServers[targetIP].roles.includes(role)) {
+      socket.emit("rootkitResult", {
+        success: true,
+        message: "Rootkit already installed",
+      });
+      return;
+    }
+
+    if (!passwordCracked) {
+      socket.emit("rootkitResult", {
+        success: false,
+        message: "Rootkit failed",
+        error: "Password is not cracked",
+      });
+      return;
+    }
+
+    const requiredVulnerabilities = sshService.vulnerabilities.map(
+      (vul) => vul.type
+    );
+
+    const exploitedVulnerabilities = user.exploitedServers[targetIP]?.ssh || [];
+
+    const allRequiredExploited = requiredVulnerabilities.every((vul) =>
+      exploitedVulnerabilities.includes(vul)
+    );
+
+    if (!allRequiredExploited) {
+      socket.emit("rootkitResult", {
+        success: false,
+        message: "Rootkit failed",
+        error: "Prerequisite vulnerabilities not exploited",
+      });
+      return;
+    }
+
+    const roleDetails = target.roles.find((r) => r.role === role);
+
+    if (!roleDetails) {
+      socket.emit("rootkitResult", {
+        success: false,
+        message: "Rootkit failed",
+        error: "Role not found",
+      });
+      return;
+    }
+
+    // Add a rootkit value instead?
+    // Add the role
+    if (!user.exploitedServers[targetIP].roles.includes(role)) {
+      user.exploitedServers[targetIP].roles.push(role);
+    }
+
+    await writeJSONFile(USERS_FILE_PATH, users);
+
+    logAction(
+      username,
+      `Rootkit initialized for role ${role} on IP: ${targetIP}`
+    );
+    socket.emit("rootkitResult", {
+      success: true,
+      message: `Rootkit initialized for role ${role} on ${targetIP}`,
     });
   });
 }

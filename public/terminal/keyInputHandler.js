@@ -289,7 +289,7 @@ export default async function handleKeyInput(
       render(term); // Render the chat prompt
       return;
     } else if (isInSSHMode()) {
-      const output = await handleSSHCommand(commandBuffer);
+      const output = handleSSHCommand(commandBuffer);
       if (output) {
         term.write(`\r\n${output}`);
       }

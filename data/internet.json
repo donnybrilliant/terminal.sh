@@ -16,7 +16,8 @@
       "exploit_kit",
       "advanced_exploit_kit",
       "network_sniffer",
-      "user_enum"
+      "user_enum",
+      "rootkit"
     ],
     "connectedIPs": ["1.1.1.1"],
     "services": [
@@ -64,9 +65,6 @@
         "vulnerable": true,
         "level": 10,
         "vulnerabilities": [
-          {
-            "type": "password"
-          },
           {
             "type": "remote_code_execution",
             "level": 20

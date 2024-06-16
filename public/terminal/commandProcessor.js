@@ -212,6 +212,22 @@ const toolCommandMap = {
     });
     return `Attempting to crack password for role ${args[0]} on IP ${targetIP}...`;
   },
+  rootkit: (args) => {
+    if (args.length !== 1 || args[0] === "") {
+      return "Usage: rootkit <role>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    const targetIP = currentSSHSession.targetIP;
+    if (!targetIP) {
+      return "No active SSH session.";
+    }
+    socket.emit("rootkit", {
+      username,
+      targetIP,
+      role: args[0],
+    });
+    return `Initializing rootkit for role ${args[0]} on IP ${targetIP}...`;
+  },
 };
 
 export function getCombinedCommandMap() {

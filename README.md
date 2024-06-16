@@ -9,8 +9,6 @@
 - name command in chat too
 - unique names generator for alliances?
 - autocomplete for /join with available user.alliance[] or the way socket keeps track of the rooms.
-- autocomplete on file handling (edit etc)
-- send more data from tool on save - should content be description?
 - scan command (flags to show different info)
 - user roles list /etc/groups/ /etc/password
 - Virtual Sub-Root System - reveal root
@@ -116,7 +114,7 @@
 - ai players
 - command that creates new dynamic servers?
 - other players have dynamic ports open?
-- set up fake "wifi" / server for phishing etc
+- set up fake "wifi" to create new servers / server for phishing etc
 - make randomly generated file system for servers. ai?
 - everything random! use deauth and some servers might never appear again.
 

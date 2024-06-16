@@ -7,6 +7,7 @@ import {
 import {
   appendToolToFileData,
   loadTargetFileSystem,
+  sshFileData,
 } from "../terminal/fileSystem.js";
 import { startSSHSession } from "../ssh/index.js";
 
@@ -21,6 +22,7 @@ export function initializeGame() {
   socket.on("userEnumResult", (data) => handleGameMessage(data));
   socket.on("passwordCrackerResult", (data) => handleGameMessage(data));
   socket.on("sshResult", (data) => handleGameMessage(data));
+  socket.on("rootkitResult", (data) => handleGameMessage(data));
 }
 
 function handleGameMessage(data) {
@@ -55,6 +57,8 @@ function handleGameMessage(data) {
       startSSHSession(targetIP);
       if (eventData) {
         loadTargetFileSystem(eventData);
+      } else {
+        loadTargetFileSystem();
       }
     }
     if (load) {

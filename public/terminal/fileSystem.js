@@ -38,7 +38,11 @@ async function loadFileSystem() {
 
 // Function to load the target filesystem data for SSH
 async function loadTargetFileSystem(targetData) {
-  sshFileData = targetData.fileSystem;
+  if (!targetData) {
+    sshFileData = {};
+  } else {
+    sshFileData = targetData.fileSystem;
+  }
   sshPathStack = [""];
   // pipe this through?
   return "Target filesystem loaded successfully.";
@@ -195,5 +199,7 @@ export {
   getFileNames,
   pathStack,
   fileData,
+  sshFileData,
+  sshPathStack,
   appendToolToFileData,
 };
