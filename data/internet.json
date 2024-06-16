@@ -16,7 +16,8 @@
       "exploit_kit",
       "advanced_exploit_kit",
       "network_sniffer",
-      "user_enum"
+      "user_enum",
+      "rootkit"
     ],
     "connectedIPs": ["1.1.1.1"],
     "services": [
@@ -39,7 +40,7 @@
     "fileSystem": {
       "home": {
         "admin": {
-          "README.txt": "Admin home directory."
+          "README.txt": { "content": "Admin home directory." }
         }
       }
     },
@@ -54,7 +55,7 @@
       "crypto": 10,
       "data": 5000
     },
-    "tools": ["exploit_kit"],
+    "tools": ["exploit_kit", "password_sniffer"],
     "connectedIPs": ["192.168.0.1", "repo"],
     "services": [
       {
@@ -64,9 +65,6 @@
         "vulnerable": true,
         "level": 10,
         "vulnerabilities": [
-          {
-            "type": "password"
-          },
           {
             "type": "remote_code_execution",
             "level": 20
@@ -144,35 +142,72 @@
     "fileSystem": {
       "home": {
         "superuser": {
-          "README.txt": "Superuser home directory."
+          "README.txt": {
+            "content": "Superuser home directory.",
+            "isDownloadable": true
+          }
         }
       },
       "etc": {
         "oracle": {
-          "config": "Oracle database configuration file."
-        },
-        "config": "System configuration details.",
-        "network": {
-          "interfaces": "Network interface configurations.",
-          "firewall": {
-            "rules": "Firewall rules and policies.",
-            "logs": "Firewall activity logs."
-          },
-          "dns": {
-            "resolv.conf": "DNS resolver configurations.",
-            "hosts": "Static hostnames to IP mappings."
+          "config": {
+            "content": "Oracle database configuration file.",
+            "isDownloadable": true
           }
         },
-        "passwd": "User account information.",
-        "shadow": "Secure user account information."
+        "config": {
+          "content": "System configuration details.",
+          "isDownloadable": true
+        },
+        "network": {
+          "interfaces": {
+            "content": "Network interface configurations.",
+            "isDownloadable": true
+          },
+          "firewall": {
+            "rules": {
+              "content": "Firewall rules and policies.",
+              "isDownloadable": true
+            },
+            "logs": {
+              "content": "Firewall activity logs.",
+              "isDownloadable": true
+            }
+          },
+          "dns": {
+            "resolv.conf": {
+              "content": "DNS resolver configurations.",
+              "isDownloadable": true
+            },
+            "hosts": {
+              "content": "Static hostnames to IP mappings.",
+              "isDownloadable": true
+            }
+          }
+        },
+        "passwd": {
+          "content": "User account information.",
+          "isDownloadable": true
+        },
+        "shadow": {
+          "content": "Secure user account information.",
+          "isDownloadable": true
+        }
       },
       "var": {
         "log": {
-          "rdp.log": "Remote Desktop Protocol log contents.",
-          "oracle.log": "Oracle database log contents."
+          "rdp.log": {
+            "content": "Remote Desktop Protocol log contents.",
+            "isDownloadable": true
+          },
+          "oracle.log": {
+            "content": "Oracle database log contents.",
+            "isDownloadable": true
+          }
         }
       }
     },
+
     "activeMiners": 0
   },
 
@@ -227,21 +262,30 @@
     "fileSystem": {
       "home": {
         "admin": {
-          "README.txt": "Admin home directory."
+          "README.txt": {
+            "content": "Admin home directory."
+          }
         }
       },
       "etc": {
-        "config": "System configuration details."
+        "config": {
+          "content": "System configuration details."
+        }
       },
       "var": {
         "log": {
-          "syslog": "System log contents.",
-          "auth.log": "Authentication log contents."
+          "syslog": {
+            "content": "System log contents."
+          },
+          "auth.log": {
+            "content": "Authentication log contents."
+          }
         }
       }
     },
     "activeMiners": 0
   },
+
   "192.168.0.2": {
     "securityLevel": 2,
     "resources": {

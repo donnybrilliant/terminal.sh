@@ -9,8 +9,6 @@
 - name command in chat too
 - unique names generator for alliances?
 - autocomplete for /join with available user.alliance[] or the way socket keeps track of the rooms.
-- autocomplete on file handling (edit etc)
-- send more data from tool on save - should content be description?
 - scan command (flags to show different info)
 - user roles list /etc/groups/ /etc/password
 - Virtual Sub-Root System - reveal root
@@ -25,15 +23,14 @@
 
 ### Improvements
 
-- Guest restrictions (no alliances done - what more?)
+- TOOLS ARE TOO STATIC!
+- Guest restrictions (no alliances done - tool restrictions - what more?)
+- remove login command from ssh
 - Check over gameHandlers, they might not do what I want
 - refactor data/.json handling/structure
 - move fileData handling from login.js to fileSystem.js?
-- improve cd to do full paths.
+- improve cd to autocomplete full paths.
 - test edit mode
-- sniff for user roles
-- password_cracker
-  - remove root
 - PROMPT! especially on SSH should be ip>
 - .trim() command arguments?
 - I should use utils more places getUsers etc
@@ -117,7 +114,7 @@
 - ai players
 - command that creates new dynamic servers?
 - other players have dynamic ports open?
-- set up fake "wifi" / server for phishing etc
+- set up fake "wifi" to create new servers / server for phishing etc
 - make randomly generated file system for servers. ai?
 - everything random! use deauth and some servers might never appear again.
 

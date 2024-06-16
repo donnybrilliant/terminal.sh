@@ -18,10 +18,10 @@ router.get("/filesystem", async (req, res, next) => {
       let users = await readJSONFile(USERS_FILE_PATH);
       const user = users.find((u) => u.id === req.user.id);
 
-      // Assuming baseFileSystem is structured such that `baseFileSystem.root.home.users` is an array
+      // Assuming baseFileSystem is structured such that `baseFileSystem.home.users` is an array
       // Convert it to an object for easier manipulation
-      if (Array.isArray(baseFileSystem.root.home.users)) {
-        baseFileSystem.root.home.users = baseFileSystem.root.home.users.reduce(
+      if (Array.isArray(baseFileSystem.home.users)) {
+        baseFileSystem.home.users = baseFileSystem.home.users.reduce(
           (acc, username) => {
             acc[username] = { README: "User directory for " + username };
             return acc;
@@ -31,7 +31,7 @@ router.get("/filesystem", async (req, res, next) => {
       }
 
       // Merge user-specific directory
-      baseFileSystem.root.home.users[user.username] = {
+      baseFileSystem.home.users[user.username] = {
         ...user.home,
         README: "Welcome, " + user.username,
       };
@@ -60,7 +60,7 @@ router.post("/set-name", async (req, res, next) => {
       return sendResponse(res, 400, {}, "Username already exists.");
     }
 
-    const userIndex = fileSystem.root.home.users.indexOf(oldName);
+    const userIndex = fileSystem.home.users.indexOf(oldName);
     if (userIndex === -1) {
       return sendResponse(
         res,
@@ -70,9 +70,9 @@ router.post("/set-name", async (req, res, next) => {
       );
     }
 
-    fileSystem.root.home.users[userIndex] = newName; // Update the username in the array
+    fileSystem.home.users[userIndex] = newName; // Update the username in the array
     user.username = newName;
-    //delete fileSystem.root.home.users[oldName]; // Delete the old username from the object
+    //delete fileSystem.home.users[oldName]; // Delete the old username from the object
 
     await writeJSONFile(USERS_FILE_PATH, users);
     await writeJSONFile(FILE_SYSTEM_PATH, fileSystem);

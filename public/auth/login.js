@@ -117,14 +117,14 @@ export class LoginManager {
       return;
     }
 
-    if (fileData.root.home.users[newName]) {
+    if (fileData.home.users[newName]) {
       this.term.write(
         `\r\nError updating name: Username ${newName} already exists\r\n`
       );
       return;
     }
 
-    if (!fileData.root.home.users[oldName]) {
+    if (!fileData.home.users[oldName]) {
       this.term.write(
         `\r\nError updating name: Username ${oldName} not found\r\n`
       );
@@ -135,13 +135,13 @@ export class LoginManager {
       if (response.success) {
         this.setUsername(newName);
         try {
-          fileData.root.home.users[newName] = {
-            ...fileData.root.home.users[oldName],
+          fileData.home.users[newName] = {
+            ...fileData.home.users[oldName],
             README: `User directory for ${newName}`,
           };
-          delete fileData.root.home.users[oldName];
+          delete fileData.home.users[oldName];
           pathStack.length = 0;
-          pathStack.push("root", "home", "users", newName);
+          pathStack.push("home", "users", newName);
           this.term.write(`\r\nName updated to ${newName}\r\n`);
         } catch (error) {
           this.term.write(

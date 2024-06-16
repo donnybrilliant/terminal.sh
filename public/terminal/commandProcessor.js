@@ -113,26 +113,30 @@ const baseCommandMap = {
     socket.emit("hackIP", { username, targetIP: args[0] });
     return `Attempting to hack IP ${args[0]}...`;
   },
-  mine: (args) => {
-    if (args.length !== 1) {
-      return "Usage: mine <targetIP>";
-    }
-    const username = loginManager.getUsername() || "Guest";
-    const targetIP = args[0];
-    socket.emit("startMining", { username, targetIP });
-    return `Mining IP ${targetIP}...`;
-  },
+
   download: (args) => {
-    if (args.length !== 2) {
-      return "Usage: download <targetIP> <toolName>";
-    }
     const username = loginManager.getUsername() || "Guest";
-    socket.emit("download", {
-      username,
-      targetIP: args[0],
-      toolName: args[1],
-    });
-    return `Downloading ${args[1]} from IP ${args[0]}...`;
+
+    if (args.length === 2) {
+      // Original format: download ip toolName
+      const [targetIP, toolName] = args;
+      socket.emit("download", {
+        username,
+        targetIP,
+        toolName,
+      });
+      return `Downloading ${toolName} from IP ${targetIP}...`;
+    } else if (args.length === 1) {
+      // New format: download filePath
+      const filePath = args[0];
+      socket.emit("download", {
+        username,
+        filePath,
+      });
+      return `Downloading file from ${filePath}...`;
+    } else {
+      return "Usage: download <targetIP> <toolName> or download <filePath>";
+    }
   },
   server: () => {
     socket.emit("requestHardwareInfo");
@@ -200,6 +204,31 @@ const toolCommandMap = {
     });
     return `Attempting to crack password for role ${args[0]} on IP ${targetIP}...`;
   },
+  rootkit: (args) => {
+    if (args.length !== 1 || args[0] === "") {
+      return "Usage: rootkit <role>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    const targetIP = currentSSHSession.targetIP;
+    if (!targetIP) {
+      return "No active SSH session.";
+    }
+    socket.emit("rootkit", {
+      username,
+      targetIP,
+      role: args[0],
+    });
+    return `Initializing rootkit for role ${args[0]} on IP ${targetIP}...`;
+  },
+  mine: (args) => {
+    if (args.length !== 1) {
+      return "Usage: mine <targetIP>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    const targetIP = args[0];
+    socket.emit("startMining", { username, targetIP });
+    return `Mining IP ${targetIP}...`;
+  },
 };
 
 export function getCombinedCommandMap() {
@@ -208,10 +237,10 @@ export function getCombinedCommandMap() {
 
   if (
     username &&
-    fileData.root.home.users[username] &&
-    fileData.root.home.users[username].bin
+    fileData.home.users[username] &&
+    fileData.home.users[username].bin
   ) {
-    userTools = Object.keys(fileData.root.home.users[username].bin);
+    userTools = Object.keys(fileData.home.users[username].bin);
   }
 
   const combinedCommandMap = { ...baseCommandMap };

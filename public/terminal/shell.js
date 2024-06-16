@@ -1,3 +1,4 @@
+// shell.js
 import {
   setCurrentDir,
   getCurrentDir,
@@ -25,16 +26,13 @@ function ls(args = []) {
   );
 
   if (contents.length === 0) {
-    if (isInSSHMode()) {
-      return "..........................";
-    }
-    return "Directory is empty";
+    return isInSSHMode() ? ".........................." : "Directory is empty";
   }
 
   if (listFlag) {
     return contents
       .map((entry) => {
-        const isDir = typeof path[entry] === "object";
+        const isDir = !path[entry].content;
         const type = isDir
           ? `${ANSI_COLORS.blue}[DIR]${ANSI_COLORS.reset} `
           : `${ANSI_COLORS.green}[FILE]${ANSI_COLORS.reset} `;
@@ -42,7 +40,8 @@ function ls(args = []) {
         if (isDir) {
           return type + entry;
         } else {
-          return type + createHyperlink(entry, path[entry]);
+          const url = path[entry].url || "";
+          return type + createHyperlink(entry, url);
         }
       })
       .join("\r\n");
@@ -50,10 +49,11 @@ function ls(args = []) {
 
   return contents
     .map((entry) => {
-      if (typeof path[entry] === "object") {
+      if (!path[entry].content) {
         return entry;
       } else {
-        return createHyperlink(entry, path[entry]);
+        const url = path[entry].url || "";
+        return createHyperlink(entry, url);
       }
     })
     .join("  ");
@@ -71,6 +71,8 @@ function ls(args = []) {
 function createHyperlink(text, url) {
   return `\x1B]8;;${url}\x1B\\${text}\x1B]8;;\x1B\\`;
 }
+// for creating links
+//createHyperlink(entry, path[entry]);
 
 /**
  * Mocked ShellJS 'cat' command.
@@ -84,10 +86,11 @@ function cat(filename) {
   const currentDir = getCurrentDir(isInSSHMode());
   if (filename in currentDir) {
     const file = currentDir[filename];
-    if (typeof file === "object") {
+    if (file.content) {
+      return file.content.replace(/\n/g, "\r\n");
+    } else {
       return `cat: ${filename}: Is a directory`;
     }
-    return file.replace(/\n/g, "\r\n");
   } else {
     return `cat: ${filename}: No such file`;
   }
@@ -101,10 +104,11 @@ function cat(filename) {
  * @returns {string} - Success or error message.
  */
 function cd(dir) {
-  if (setCurrentDir(dir, isInSSHMode())) {
+  const result = setCurrentDir(dir, isInSSHMode());
+  if (result === true) {
     return pwd();
-  } else if (typeof getCurrentDir(isInSSHMode())[dir] === "string") {
-    return `Cannot cd into ${dir}. It's a file, not a directory.`;
+  } else if (result === "Not a directory") {
+    return `cd: ${dir}: Not a directory`;
   } else {
     return `cd: ${dir}: No such directory`;
   }
@@ -184,7 +188,7 @@ async function remove(args = []) {
 }
 
 function clear() {
-  term.clear(); // assuming 'terminal' is your xterm.js terminal instance
+  term.clear();
   return "";
 }
 
@@ -203,7 +207,7 @@ async function touch(filename) {
   if (currentDir[filename]) {
     return `touch: ${filename}: File already exists`;
   }
-  currentDir[filename] = "";
+  currentDir[filename] = { content: "" };
   await saveUserHome();
   return `File '${filename}' created`;
 }
@@ -239,7 +243,6 @@ async function mv(source, destination) {
   return `File '${source}' moved to '${destination}'`;
 }
 
-// Exporting the mocked commands for use in the command processor.
 export const commands = {
   ls: ls,
   cat: cat,
