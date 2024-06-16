@@ -113,15 +113,7 @@ const baseCommandMap = {
     socket.emit("hackIP", { username, targetIP: args[0] });
     return `Attempting to hack IP ${args[0]}...`;
   },
-  mine: (args) => {
-    if (args.length !== 1) {
-      return "Usage: mine <targetIP>";
-    }
-    const username = loginManager.getUsername() || "Guest";
-    const targetIP = args[0];
-    socket.emit("startMining", { username, targetIP });
-    return `Mining IP ${targetIP}...`;
-  },
+
   download: (args) => {
     const username = loginManager.getUsername() || "Guest";
 
@@ -227,6 +219,15 @@ const toolCommandMap = {
       role: args[0],
     });
     return `Initializing rootkit for role ${args[0]} on IP ${targetIP}...`;
+  },
+  mine: (args) => {
+    if (args.length !== 1) {
+      return "Usage: mine <targetIP>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    const targetIP = args[0];
+    socket.emit("startMining", { username, targetIP });
+    return `Mining IP ${targetIP}...`;
   },
 };
 

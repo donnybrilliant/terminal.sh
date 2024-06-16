@@ -8,8 +8,6 @@ import {
 import { getUsers, getUserByUsername, saveUsers } from "../utils/userUtils.js";
 import { logAction } from "../utils/logger.js";
 
-let passwordCracked = false;
-
 function getFileFromPath(fileSystem, filePath) {
   const pathParts = filePath.split("/");
   let currentDir = fileSystem;
@@ -670,7 +668,6 @@ export function setupGameHandlers(socket, io) {
       return;
     }
 
-    passwordCracked = true;
     logAction(username, `Cracked password for role ${role} on IP: ${targetIP}`);
     socket.emit("passwordCrackerResult", {
       success: true,
