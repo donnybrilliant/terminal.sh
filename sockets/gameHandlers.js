@@ -48,6 +48,27 @@ export function setupGameHandlers(socket, io) {
     }
   });
 
+  socket.on("scanConnectedIPs", async ({ username, targetIP }) => {
+    const targetServer = await checkTargetIP(targetIP);
+
+    if (targetServer) {
+      logAction(username, `Scanned connected IPs on: ${targetIP}`);
+      socket.emit("scanIPResult", {
+        success: true,
+        message: `Connected IPs for ${targetIP}`,
+        error: null,
+        data: targetServer.connectedIPs,
+      });
+    } else {
+      return socket.emit("scanIPResult", {
+        success: false,
+        message: "Scan failed",
+        error: "IP not found",
+        data: null,
+      });
+    }
+  });
+
   socket.on("hackIP", async ({ username, targetIP }) => {
     const { user } = await checkUser(username);
     if (!user) {

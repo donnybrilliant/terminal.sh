@@ -93,16 +93,21 @@ const baseCommandMap = {
   },
   logout: async () => await loginManager.logout(),
   scan: (args) => {
-    if (args.length === 0) {
-      const username = loginManager.getUsername() || "Guest";
-      socket.emit("scanInternet", { username });
-      return "Scanning internet for IP addresses...";
-    } else if (args.length === 1) {
-      const username = loginManager.getUsername() || "Guest";
-      socket.emit("scanIP", { username, targetIP: args[0] });
-      return `Scanning IP ${args[0]} for services...`;
+    const username = loginManager.getUsername() || "Guest";
+    if (isInSSHMode()) {
+      const targetIP = currentSSHSession.targetIP;
+      socket.emit("scanConnectedIPs", { username, targetIP });
+      return `Scanning connected IPs on ${targetIP}...`;
     } else {
-      return "Usage: scan <targetIP>";
+      if (args.length === 0) {
+        socket.emit("scanInternet", { username });
+        return "Scanning internet for IP addresses...";
+      } else if (args.length === 1) {
+        socket.emit("scanIP", { username, targetIP: args[0] });
+        return `Scanning IP ${args[0]} for services...`;
+      } else {
+        return "Usage: scan <targetIP>";
+      }
     }
   },
   hackIP: (args) => {
@@ -181,12 +186,13 @@ const toolCommandMap = {
       return "Usage: user_enum";
     }
     const username = loginManager.getUsername() || "Guest";
-    const targetIP = currentSSHSession.targetIP;
-    if (!targetIP) {
-      return "No active SSH session.";
+    if (isInSSHMode()) {
+      const targetIP = currentSSHSession.targetIP;
+      socket.emit("user_enum", { username, targetIP });
+      return `Enumerating users on IP ${targetIP}...`;
+    } else {
+      return "Local user enumeration is not implemented.";
     }
-    socket.emit("user_enum", { username, targetIP });
-    return `Enumerating users on IP ${targetIP}...`;
   },
   password_cracker: (args) => {
     if (args.length !== 1 || args[0] === "") {
@@ -225,13 +231,15 @@ const toolCommandMap = {
       return "Usage: miner <start/stop>";
     }
     const username = loginManager.getUsername() || "Guest";
-    const targetIP = currentSSHSession.targetIP;
-    if (args[0] === "start") {
-      socket.emit("startMining", { username, targetIP });
-      return `Starting mining on IP ${targetIP}...`;
-    } else if (args[0] === "stop") {
-      socket.emit("stopMining", { username, targetIP });
-      return `Stopping mining on IP ${targetIP}...`;
+    if (isInSSHMode()) {
+      const targetIP = currentSSHSession.targetIP;
+      if (args.length === 1 && args[0] === "stop") {
+        socket.emit("stopMining", { username, targetIP });
+        return `Stopping mining on ${targetIP}...`;
+      } else if (args.length === 1 && args[0] === "start") {
+        socket.emit("startMining", { username, targetIP });
+        return `Mining IP ${targetIP}...`;
+      }
     } else {
       return "Usage: miner <start/stop>";
     }
