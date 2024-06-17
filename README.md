@@ -23,13 +23,17 @@
 
 ### Improvements
 
+- download minerv2 etc
+- save one server instead of all internet file
+- change everything to saveUser singular.
+
+- dynamic miners choosing resources as args.
 - emphasize workflow! if this then that, without rootkit you cant run anything on the server almost.
 - local/server differentiation and tools that work on both.
 - backdoor to control miners from a distance ++
 - TOOLS ARE TOO STATIC!
 - Guest restrictions (no alliances done - tool restrictions - what more?)
 - remove/change login command from ssh
-- Check over gameHandlers, they might not do what I want
 - refactor data/.json handling/structure
 - move fileData handling from login.js to fileSystem.js?
 - improve cd to autocomplete full paths.

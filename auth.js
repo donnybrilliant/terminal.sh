@@ -51,13 +51,9 @@ passport.use(
         }
       } else {
         const lowercaseUsername = username.toLowerCase();
-        if (
-          lowercaseUsername === "admin" ||
-          lowercaseUsername === "user" ||
-          lowercaseUsername === "guest"
-        ) {
+        if (lowercaseUsername === "guest") {
           return done(null, false, {
-            message: "Username cannot be 'admin', 'user', or 'guest'.",
+            message: "Username cannot be 'guest'.",
           });
         }
 
@@ -84,7 +80,6 @@ passport.use(
             items: [],
             currency: 500,
           },
-          activeMiners: [],
         };
         users.push(user);
 

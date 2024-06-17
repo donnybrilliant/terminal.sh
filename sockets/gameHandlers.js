@@ -2,99 +2,16 @@ import {
   readJSONFile,
   writeJSONFile,
   INTERNET_FILE_PATH,
-  USERS_FILE_PATH,
   TOOLS_FILE_PATH,
 } from "../utils/fileUtils.js";
-import { getUsers, getUserByUsername, saveUsers } from "../utils/userUtils.js";
+import {
+  checkUser,
+  checkTargetIP,
+  getFileFromPath,
+  saveUser,
+} from "../utils/userUtils.js";
 import { logAction } from "../utils/logger.js";
-
-function getFileFromPath(fileSystem, filePath) {
-  const pathParts = filePath.split("/");
-  let currentDir = fileSystem;
-
-  for (const part of pathParts) {
-    if (currentDir[part]) {
-      currentDir = currentDir[part];
-    } else {
-      return null;
-    }
-  }
-
-  return currentDir;
-}
-
-let miningIntervals = {};
-
-async function saveMiningState(users) {
-  writeJSONFile(USERS_FILE_PATH, users);
-}
-
-function startMiningTimer(user, targetIP, users, io) {
-  const miningInterval = setInterval(async () => {
-    const now = Date.now();
-    const elapsedTime = (now - user.activeMiners[targetIP].startTime) / 1000; // seconds
-
-    const cryptoMined = elapsedTime * 0.1; // Assuming 0.1 crypto per second
-    user.resources.crypto += cryptoMined;
-    user.activeMiners[targetIP].startTime = now; // reset the start time
-
-    await saveMiningState(users);
-
-    io.to(user.socketId).emit("miningUpdate", {
-      success: true,
-      message: `Mining ongoing on ${targetIP}. Earned ${cryptoMined} crypto.`,
-    });
-  }, 5000); // Update every 5 seconds
-
-  miningIntervals[user.id] = miningInterval;
-}
-
-async function stopMining(user, targetIP, users, io) {
-  if (
-    miningIntervals[user.id] &&
-    user.activeMiners &&
-    user.activeMiners[targetIP]
-  ) {
-    clearInterval(miningIntervals[user.id]);
-    delete miningIntervals[user.id];
-
-    const internet = await readJSONFile(INTERNET_FILE_PATH);
-    const targetServer = internet[targetIP];
-
-    // Restore resources when mining stops
-    const minerResourceUsage = user.activeMiners[targetIP].resourceUsage;
-    targetServer.usedResources.cpu = Math.max(
-      targetServer.usedResources.cpu - minerResourceUsage.cpu,
-      0
-    );
-    targetServer.usedResources.bandwidth = Math.max(
-      targetServer.usedResources.bandwidth - minerResourceUsage.bandwidth,
-      0
-    );
-    targetServer.usedResources.ram = Math.max(
-      targetServer.usedResources.ram - minerResourceUsage.ram,
-      0
-    );
-    delete targetServer.activeMiners[user.username];
-
-    delete user.activeMiners[targetIP];
-
-    await Promise.all([
-      writeJSONFile(USERS_FILE_PATH, users),
-      writeJSONFile(INTERNET_FILE_PATH, internet),
-    ]);
-
-    io.to(user.socketId).emit("miningUpdate", {
-      success: true,
-      message: `Mining stopped on ${targetIP}.`,
-    });
-  } else {
-    io.to(user.socketId).emit("miningUpdate", {
-      success: false,
-      message: `No active mining found on ${targetIP}.`,
-    });
-  }
-}
+import { startMining, stopMining } from "../game/mining.js";
 
 export function setupGameHandlers(socket, io) {
   socket.on("scanInternet", async ({ username }) => {
@@ -111,19 +28,18 @@ export function setupGameHandlers(socket, io) {
   });
 
   socket.on("scanIP", async ({ username, targetIP }) => {
-    const internet = await readJSONFile(INTERNET_FILE_PATH);
-    const target = internet[targetIP];
+    const targetServer = await checkTargetIP(targetIP);
 
-    if (target) {
+    if (targetServer) {
       logAction(username, `Scanned IP: ${targetIP}`);
       socket.emit("scanIPResult", {
         success: true,
         message: `Scan result for ${targetIP}`,
         error: null,
-        data: target,
+        data: targetServer,
       });
     } else {
-      socket.emit("scanIPResult", {
+      return socket.emit("scanIPResult", {
         success: false,
         message: "Scan failed",
         error: "IP not found",
@@ -133,54 +49,56 @@ export function setupGameHandlers(socket, io) {
   });
 
   socket.on("hackIP", async ({ username, targetIP }) => {
-    const users = await getUsers();
-    const user = getUserByUsername(username);
+    const { user } = await checkUser(username);
+    if (!user) {
+      return socket.emit("hackResult", {
+        success: false,
+        message: "Hack failed",
+        error: "User not found",
+        data: null,
+      });
+    }
 
-    if (user) {
-      const internet = await readJSONFile(INTERNET_FILE_PATH);
-      const target = internet[targetIP];
+    const targetServer = await checkTargetIP(targetIP);
+    if (!targetServer) {
+      return socket.emit("hackResult", {
+        success: false,
+        message: "Hack failed",
+        error: "IP not found",
+        data: null,
+      });
+    }
 
-      if (target) {
-        if (
-          user.tools.includes("exploit_kit") ||
-          user.resources.cpu > target.securityLevel
-        ) {
-          user.resources = {
-            ...user.resources,
-            ...target.resources,
-          };
-          user.tools.push(...target.tools);
+    if (
+      user.tools.includes("exploit_kit") ||
+      user.resources.cpu > targetServer.securityLevel
+    ) {
+      user.resources = {
+        ...user.resources,
+        ...targetServer.resources,
+      };
+      user.tools.push(...targetServer.tools);
 
-          await saveUsers(users);
-          logAction(username, `Hacked IP: ${targetIP}`);
-          socket.emit("hackResult", {
-            success: true,
-            message: `Successfully hacked ${targetIP}`,
-            error: null,
-            data: target,
-          });
-        } else {
-          socket.emit("hackResult", {
-            success: false,
-            message: "Hack failed",
-            error: "Insufficient resources",
-            data: null,
-          });
-        }
-      } else {
-        socket.emit("hackResult", {
-          success: false,
-          message: "Hack failed",
-          error: "IP not found",
-          data: null,
-        });
-      }
+      await saveUser(user);
+      logAction(username, `Hacked IP: ${targetIP}`);
+      socket.emit("hackResult", {
+        success: true,
+        message: `Successfully hacked ${targetIP}`,
+        error: null,
+        data: targetServer,
+      });
+    } else {
+      socket.emit("hackResult", {
+        success: false,
+        message: "Hack failed",
+        error: "Insufficient resources",
+        data: null,
+      });
     }
   });
 
   socket.on("startMining", async ({ username, targetIP }) => {
-    const users = await readJSONFile(USERS_FILE_PATH);
-    const user = users.find((u) => u.username === username);
+    const { user } = await checkUser(username);
     if (!user) {
       return socket.emit("miningResult", {
         success: false,
@@ -189,21 +107,7 @@ export function setupGameHandlers(socket, io) {
         data: null,
       });
     }
-
-    const minerTool = user.tools.find((tool) => tool.name === "Crypto Miner");
-    if (!minerTool) {
-      return socket.emit("miningResult", {
-        success: false,
-        message: "Mining failed",
-        error: "Crypto Miner tool not found",
-        data: null,
-      });
-    }
-
-    const minerResourceUsage = minerTool.resources;
-
-    const internet = await readJSONFile(INTERNET_FILE_PATH);
-    const targetServer = internet[targetIP];
+    const targetServer = await checkTargetIP(targetIP);
     if (!targetServer) {
       return socket.emit("miningResult", {
         success: false,
@@ -213,71 +117,11 @@ export function setupGameHandlers(socket, io) {
       });
     }
 
-    if (!targetServer.usedResources) {
-      targetServer.usedResources = { cpu: 0, bandwidth: 0, ram: 0 };
-    }
-
-    if (!targetServer.activeMiners) {
-      targetServer.activeMiners = {};
-    }
-
-    const availableResources = {
-      cpu: targetServer.resources.cpu - targetServer.usedResources.cpu,
-      bandwidth:
-        targetServer.resources.bandwidth - targetServer.usedResources.bandwidth,
-      ram: targetServer.resources.ram - targetServer.usedResources.ram,
-    };
-
-    if (
-      availableResources.cpu < minerResourceUsage.cpu ||
-      availableResources.bandwidth < minerResourceUsage.bandwidth ||
-      availableResources.ram < minerResourceUsage.ram
-    ) {
-      return socket.emit("miningResult", {
-        success: false,
-        message: "Mining failed",
-        error: "Not enough resources on target server",
-        data: null,
-      });
-    }
-
-    if (!user.activeMiners) {
-      user.activeMiners = {};
-    }
-
-    if (!user.activeMiners[targetIP]) {
-      user.activeMiners[targetIP] = {
-        startTime: Date.now(),
-        resourceUsage: minerResourceUsage,
-      };
-    }
-
-    targetServer.activeMiners[user.ip] = {
-      startTime: Date.now(),
-      resourceUsage: minerResourceUsage,
-    };
-    targetServer.usedResources.cpu += minerResourceUsage.cpu;
-    targetServer.usedResources.bandwidth += minerResourceUsage.bandwidth;
-    targetServer.usedResources.ram += minerResourceUsage.ram;
-
-    await Promise.all([
-      writeJSONFile(USERS_FILE_PATH, users),
-      writeJSONFile(INTERNET_FILE_PATH, internet),
-    ]);
-
-    startMiningTimer(user, targetIP, users, io);
-
-    socket.emit("miningResult", {
-      success: true,
-      message: "Mining started on target server",
-      error: null,
-      data: null,
-    });
+    await startMining(user, targetServer, targetIP, socket);
   });
 
   socket.on("stopMining", async ({ username, targetIP }) => {
-    const users = await readJSONFile(USERS_FILE_PATH);
-    const user = users.find((u) => u.username === username);
+    const { user } = await checkUser(username);
     if (!user) {
       return socket.emit("miningResult", {
         success: false,
@@ -286,13 +130,20 @@ export function setupGameHandlers(socket, io) {
         data: null,
       });
     }
+    const targetServer = await checkTargetIP(targetIP);
+    if (!targetServer) {
+      return socket.emit("miningResult", {
+        success: false,
+        message: "Mining failed",
+        error: "Target server not found",
+      });
+    }
 
-    await stopMining(user, targetIP, users, io);
+    await stopMining(user, targetServer, targetIP, socket);
   });
 
   socket.on("download", async ({ username, targetIP, toolName, filePath }) => {
-    const users = await readJSONFile(USERS_FILE_PATH);
-    const user = users.find((u) => u.username === username);
+    const { user } = await checkUser(username);
     if (!user) {
       return socket.emit("downloadResult", {
         success: false,
@@ -303,8 +154,7 @@ export function setupGameHandlers(socket, io) {
 
     if (targetIP && toolName) {
       // Handle tool download
-      const internet = await readJSONFile(INTERNET_FILE_PATH);
-      const targetServer = internet[targetIP];
+      const targetServer = await checkTargetIP(targetIP);
       if (!targetServer) {
         return socket.emit("downloadResult", {
           success: false,
@@ -339,7 +189,7 @@ export function setupGameHandlers(socket, io) {
         user.home.bin[toolName] = newTool;
       }
 
-      await writeJSONFile(USERS_FILE_PATH, users);
+      await saveUser(user);
       return socket.emit("downloadResult", {
         success: true,
         message: `${newTool.name} downloaded successfully`,
@@ -350,8 +200,8 @@ export function setupGameHandlers(socket, io) {
     if (filePath) {
       // Handle file download
       // Check if it is a tool - then add it to the user.tools
-      const targetServer = await getFileFromPath(fileData, filePath);
-      if (!targetServer || !targetServer.isDownloadable) {
+      const file = await getFileFromPath(fileData, filePath);
+      if (!file || !file.isDownloadable) {
         return socket.emit("downloadResult", {
           success: false,
           message: "Download failed",
@@ -360,9 +210,9 @@ export function setupGameHandlers(socket, io) {
       }
 
       user.home.downloads = user.home.downloads || {};
-      user.home.downloads[filePath] = targetServer.content;
+      user.home.downloads[filePath] = file.content;
 
-      await writeJSONFile(USERS_FILE_PATH, users);
+      await saveUser(user);
       return socket.emit("downloadResult", {
         success: true,
         message: `${filePath} downloaded successfully`,
@@ -378,44 +228,38 @@ export function setupGameHandlers(socket, io) {
   });
 
   socket.on("ssh_exploit", async ({ username, targetIP }) => {
-    const users = await getUsers();
-    const user = getUserByUsername(username);
-
+    const { user } = await checkUser(username);
     if (!user) {
-      socket.emit("sshExploitResult", {
+      return socket.emit("sshExploitResult", {
         success: false,
         message: "Exploit failed",
         error: "User not found",
         data: null,
       });
-      return;
     }
 
-    const internet = await readJSONFile(INTERNET_FILE_PATH);
-    const target = internet[targetIP];
+    const targetServer = await checkTargetIP(targetIP);
 
-    if (!target) {
-      socket.emit("sshExploitResult", {
+    if (!targetServer) {
+      return socket.emit("sshExploitResult", {
         success: false,
         message: "Exploit failed",
         error: "Target IP not found",
         data: null,
       });
-      return;
     }
 
-    const sshService = target.services.find(
+    const sshService = targetServer.services.find(
       (service) => service.name === "ssh"
     );
 
     if (!sshService) {
-      socket.emit("sshExploitResult", {
+      return socket.emit("sshExploitResult", {
         success: false,
         message: "Exploit failed",
         error: "SSH service not found",
         data: null,
       });
-      return;
     }
 
     const vulnerabilities = sshService.vulnerabilities;
@@ -428,13 +272,12 @@ export function setupGameHandlers(socket, io) {
       );
 
     if (matchingExploits.length === 0) {
-      socket.emit("sshExploitResult", {
+      return socket.emit("sshExploitResult", {
         success: false,
         message: "Exploit failed",
         error: "No matching vulnerabilities found",
         data: null,
       });
-      return;
     }
 
     // Add detailed information to exploitedServers
@@ -452,71 +295,66 @@ export function setupGameHandlers(socket, io) {
       }
     });
 
-    await writeJSONFile(USERS_FILE_PATH, users);
+    await saveUser(user);
 
     logAction(username, `Exploited SSH on IP: ${targetIP}`);
     socket.emit("sshExploitResult", {
       success: true,
       message: `Successfully exploited SSH on ${targetIP}`,
       error: null,
-      data: target,
+      data: targetServer,
     });
   });
 
   socket.on("password_sniffer", async ({ username, targetIP }) => {
     try {
-      const users = await getUsers();
-      const user = getUserByUsername(username);
+      const { user } = await checkUser(username);
 
       if (!user) {
-        socket.emit("passwordSnifferResult", {
+        return socket.emit("passwordSnifferResult", {
           success: false,
           message: "Password sniffer failed",
           error: "User not found",
           data: null,
         });
-        return;
       }
 
-      const internet = await readJSONFile(INTERNET_FILE_PATH);
-      const target = internet[targetIP];
+      const targetServer = await checkTargetIP(targetIP);
 
-      if (!target) {
-        socket.emit("passwordSnifferResult", {
+      if (!targetServer) {
+        return socket.emit("passwordSnifferResult", {
           success: false,
           message: "Password sniffer failed",
           error: "Target IP not found",
           data: null,
         });
-        return;
       }
 
-      const sshService = target.services.find(
+      const sshService = targetServer.services.find(
         (service) => service.name === "ssh"
       );
 
       if (!sshService) {
-        socket.emit("passwordSnifferResult", {
+        return socket.emit("passwordSnifferResult", {
           success: false,
           message: "Password sniffer failed",
           error: "SSH service not found",
           data: null,
         });
-        return;
       }
 
+      // handle this differently
       const passwordVulnerability = sshService.vulnerabilities.find(
         (vul) => vul.type === "password"
       );
 
       if (!passwordVulnerability) {
-        socket.emit("passwordSnifferResult", {
+        return socket.emit("passwordSnifferResult", {
           success: false,
           message: "Password sniffer failed",
           error: "Password vulnerability not found",
           data: null,
         });
-        return;
       }
 
       const requiredVulnerabilities = sshService.vulnerabilities
@@ -538,29 +376,27 @@ export function setupGameHandlers(socket, io) {
       );
 
       if (!allRequiredExploited) {
-        socket.emit("passwordSnifferResult", {
+        return socket.emit("passwordSnifferResult", {
           success: false,
           message: "Password sniffer failed",
           error: "Prerequisite vulnerabilities not exploited",
           data: null,
         });
-        return;
       }
 
       const tool = user.tools.find((tool) => tool.name === "Password Sniffer");
       const toolLevel = tool ? tool.level : 0;
-      const availableRoles = target.roles
+      const availableRoles = targetServer.roles
         .filter((role) => role.level <= toolLevel)
         .sort((a, b) => a.level - b.level);
 
       if (availableRoles.length === 0) {
-        socket.emit("passwordSnifferResult", {
+        return socket.emit("passwordSnifferResult", {
           success: false,
           message: "Password sniffer failed",
           error: "No user roles can be accessed with the current tool level",
           data: null,
         });
-        return;
       }
 
       const accessedRole = availableRoles[0];
@@ -583,9 +419,9 @@ export function setupGameHandlers(socket, io) {
         });
       }
 
-      await writeJSONFile(USERS_FILE_PATH, users);
+      await saveUser(user);
 
-      const remainingRoles = target.roles.filter(
+      const remainingRoles = targetServer.roles.filter(
         (role) => role.level > toolLevel
       ).length;
 
@@ -599,7 +435,7 @@ export function setupGameHandlers(socket, io) {
         success: true,
         message: responseMessage,
         error: null,
-        data: target,
+        data: targetServer,
       });
     } catch (error) {
       console.error("Error in password_sniffer handler:", error);
@@ -613,41 +449,36 @@ export function setupGameHandlers(socket, io) {
   });
 
   socket.on("ssh", async ({ username, targetIP }) => {
-    const users = await getUsers();
-    const user = getUserByUsername(username);
+    const { user } = await checkUser(username);
 
     if (!user) {
-      socket.emit("sshResult", {
+      return socket.emit("sshResult", {
         success: false,
         message: "SSH Connection failed",
         error: "User not found",
       });
-      return;
     }
 
-    const internet = await readJSONFile(INTERNET_FILE_PATH);
-    const target = internet[targetIP];
+    const targetServer = await checkTargetIP(targetIP);
 
-    if (!target) {
-      socket.emit("sshResult", {
+    if (!targetServer) {
+      return socket.emit("sshResult", {
         success: false,
         message: "SSH Connection failed",
         error: "Target IP not found",
       });
-      return;
     }
 
-    const sshService = target.services.find(
+    const sshService = targetServer.services.find(
       (service) => service.name === "ssh"
     );
 
     if (!sshService) {
-      socket.emit("sshResult", {
+      return socket.emit("sshResult", {
         success: false,
         message: "SSH Connection failed",
         error: "Service not found",
       });
-      return;
     }
 
     const requiredVulnerabilities = sshService.vulnerabilities.map(
@@ -664,12 +495,11 @@ export function setupGameHandlers(socket, io) {
     );
 
     if (!allRequiredExploited) {
-      socket.emit("sshResult", {
+      return socket.emit("sshResult", {
         success: false,
         message: "SSH Connection failed",
         error: "Prerequisite vulnerabilities not exploited",
       });
-      return;
     }
 
     // Should check user role and permissions here in the future
@@ -678,7 +508,7 @@ export function setupGameHandlers(socket, io) {
 
     let eventData = null;
     if (hasExploitedRole) {
-      eventData = target;
+      eventData = targetServer;
     }
 
     logAction(username, `Connected to SSH on IP: ${targetIP}`);
@@ -692,8 +522,7 @@ export function setupGameHandlers(socket, io) {
   });
 
   socket.on("user_enum", async ({ username, targetIP }) => {
-    const users = await getUsers();
-    const user = getUserByUsername(username);
+    const { user } = await checkUser(username);
 
     if (!user) {
       socket.emit("userEnumResult", {
@@ -704,10 +533,9 @@ export function setupGameHandlers(socket, io) {
       return;
     }
 
-    const internet = await readJSONFile(INTERNET_FILE_PATH);
-    const target = internet[targetIP];
+    const targetServer = await checkTargetIP(targetIP);
 
-    if (!target) {
+    if (!targetServer) {
       socket.emit("userEnumResult", {
         success: false,
         message: "Enumeration failed",
@@ -720,45 +548,40 @@ export function setupGameHandlers(socket, io) {
     socket.emit("userEnumResult", {
       success: true,
       message: `User enumeration on ${targetIP} succeeded`,
-      data: target.roles,
+      data: targetServer.roles,
     });
   });
 
   socket.on("password_cracker", async ({ username, targetIP, role }) => {
-    const users = await getUsers();
-    const user = getUserByUsername(username);
+    const { user } = await checkUser(username);
 
     if (!user) {
-      socket.emit("passwordCrackerResult", {
+      return socket.emit("passwordCrackerResult", {
         success: false,
         message: "Cracking failed",
         error: "User not found",
       });
-      return;
     }
 
-    const internet = await readJSONFile(INTERNET_FILE_PATH);
-    const target = internet[targetIP];
-    if (!target) {
-      socket.emit("passwordCrackerResult", {
+    const targetServer = await checkTargetIP(targetIP);
+    if (!targetServer) {
+      return socket.emit("passwordCrackerResult", {
         success: false,
         message: "Cracking failed",
         error: "Target IP not found",
       });
-      return;
     }
 
-    const sshService = target.services.find(
+    const sshService = targetServer.services.find(
       (service) => service.name === "ssh"
     );
 
     if (!sshService) {
-      socket.emit("passwordCrackerResult", {
+      return socket.emit("passwordCrackerResult", {
         success: false,
         message: "Cracking failed",
         error: "SSH service not found",
       });
-      return;
     }
 
     const requiredVulnerabilities = sshService.vulnerabilities.map(
@@ -772,48 +595,43 @@ export function setupGameHandlers(socket, io) {
     );
 
     if (!allRequiredExploited) {
-      socket.emit("passwordCrackerResult", {
+      return socket.emit("passwordCrackerResult", {
         success: false,
         message: "Cracking failed",
         error: "Prerequisite vulnerabilities not exploited",
       });
-      return;
     }
 
-    const roleDetails = target.roles.find((r) => r.role === role);
+    const roleDetails = targetServer.roles.find((r) => r.role === role);
 
     if (!roleDetails) {
-      socket.emit("passwordCrackerResult", {
+      return socket.emit("passwordCrackerResult", {
         success: false,
         message: "Cracking failed",
         error: "Role not found",
       });
-      return;
     }
 
     const tool = user.tools.find((tool) => tool.name === "Password Cracker");
-    console.log(tool);
     if (!tool || roleDetails.level > tool.exploits[0].level) {
-      socket.emit("passwordCrackerResult", {
+      return socket.emit("passwordCrackerResult", {
         success: false,
         message: "Cracking failed",
         error: "Role level too high for the tool",
       });
-      return;
     }
 
     logAction(username, `Cracked password for role ${role} on IP: ${targetIP}`);
     socket.emit("passwordCrackerResult", {
       success: true,
       message: `Password cracked for role ${role} on ${targetIP}`,
-      data: target,
+      data: targetServer,
       load: true,
     });
   });
 
   socket.on("rootkit", async ({ username, targetIP, role }) => {
-    const users = await getUsers();
-    const user = getUserByUsername(username);
+    const { user } = await checkUser(username);
 
     if (!user) {
       socket.emit("rootkitResult", {
@@ -824,47 +642,35 @@ export function setupGameHandlers(socket, io) {
       return;
     }
 
-    const internet = await readJSONFile(INTERNET_FILE_PATH);
-    const target = internet[targetIP];
-    if (!target) {
-      socket.emit("rootkitResult", {
+    const targetServer = await checkTargetIP(targetIP);
+    if (!targetServer) {
+      return socket.emit("rootkitResult", {
         success: false,
         message: "Rootkit failed",
         error: "Target IP not found",
       });
-      return;
     }
 
-    const sshService = target.services.find(
+    const sshService = targetServer.services.find(
       (service) => service.name === "ssh"
     );
 
     if (!sshService) {
-      socket.emit("rootkitResult", {
+      return socket.emit("rootkitResult", {
         success: false,
         message: "Rootkit failed",
         error: "SSH service not found",
       });
-      return;
     }
+
     user.exploitedServers[targetIP].roles =
       user.exploitedServers[targetIP].roles || [];
 
     if (user.exploitedServers[targetIP].roles.includes(role)) {
-      socket.emit("rootkitResult", {
+      return socket.emit("rootkitResult", {
         success: true,
         message: "Rootkit already installed",
       });
-      return;
-    }
-
-    if (!passwordCracked) {
-      socket.emit("rootkitResult", {
-        success: false,
-        message: "Rootkit failed",
-        error: "Password is not cracked",
-      });
-      return;
     }
 
     const requiredVulnerabilities = sshService.vulnerabilities.map(
@@ -878,23 +684,21 @@ export function setupGameHandlers(socket, io) {
     );
 
     if (!allRequiredExploited) {
-      socket.emit("rootkitResult", {
+      return socket.emit("rootkitResult", {
         success: false,
         message: "Rootkit failed",
         error: "Prerequisite vulnerabilities not exploited",
       });
-      return;
     }
 
-    const roleDetails = target.roles.find((r) => r.role === role);
+    const roleDetails = targetServer.roles.find((r) => r.role === role);
 
     if (!roleDetails) {
-      socket.emit("rootkitResult", {
+      return socket.emit("rootkitResult", {
         success: false,
         message: "Rootkit failed",
         error: "Role not found",
       });
-      return;
     }
 
     // Add a rootkit value instead?
@@ -903,7 +707,7 @@ export function setupGameHandlers(socket, io) {
       user.exploitedServers[targetIP].roles.push(role);
     }
 
-    await writeJSONFile(USERS_FILE_PATH, users);
+    await saveUser(user);
 
     logAction(
       username,

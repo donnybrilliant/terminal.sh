@@ -1,4 +1,9 @@
-import { readJSONFile, writeJSONFile, USERS_FILE_PATH } from "./fileUtils.js";
+import {
+  readJSONFile,
+  writeJSONFile,
+  USERS_FILE_PATH,
+  INTERNET_FILE_PATH,
+} from "./fileUtils.js";
 
 let users = [];
 let onlineUsers = new Set();
@@ -21,6 +26,18 @@ export async function saveUsers() {
     await writeJSONFile(USERS_FILE_PATH, users);
   } catch (err) {
     console.error("Error saving users:", err);
+  }
+}
+
+export async function saveUser(user) {
+  try {
+    const userIndex = users.findIndex((u) => u.username === user.username);
+    if (userIndex >= 0) {
+      users[userIndex] = user;
+      await writeJSONFile(USERS_FILE_PATH, users);
+    }
+  } catch (err) {
+    console.error("Error saving user:", err);
   }
 }
 
@@ -69,4 +86,31 @@ export function findUserSocket(username, namespace) {
 
 export function getUserByUsername(username) {
   return users.find((user) => user.username === username);
+}
+
+export async function checkUser(username) {
+  const users = await getUsers();
+  const user = getUserByUsername(username);
+  return { users, user };
+}
+
+export async function checkTargetIP(targetIP) {
+  const internet = await readJSONFile(INTERNET_FILE_PATH);
+  const targetServer = internet[targetIP];
+  return targetServer;
+}
+
+export function getFileFromPath(fileSystem, filePath) {
+  const pathParts = filePath.split("/");
+  let currentDir = fileSystem;
+
+  for (const part of pathParts) {
+    if (currentDir[part]) {
+      currentDir = currentDir[part];
+    } else {
+      return null;
+    }
+  }
+
+  return currentDir;
 }
