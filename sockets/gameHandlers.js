@@ -23,6 +23,79 @@ function getFileFromPath(fileSystem, filePath) {
   return currentDir;
 }
 
+let miningIntervals = {};
+
+async function saveMiningState(users) {
+  writeJSONFile(USERS_FILE_PATH, users);
+}
+
+function startMiningTimer(user, targetIP, users, io) {
+  const miningInterval = setInterval(async () => {
+    const now = Date.now();
+    const elapsedTime = (now - user.activeMiners[targetIP].startTime) / 1000; // seconds
+
+    const cryptoMined = elapsedTime * 0.1; // Assuming 0.1 crypto per second
+    user.resources.crypto += cryptoMined;
+    user.activeMiners[targetIP].startTime = now; // reset the start time
+
+    await saveMiningState(users);
+
+    io.to(user.socketId).emit("miningUpdate", {
+      success: true,
+      message: `Mining ongoing on ${targetIP}. Earned ${cryptoMined} crypto.`,
+    });
+  }, 5000); // Update every 5 seconds
+
+  miningIntervals[user.id] = miningInterval;
+}
+
+async function stopMining(user, targetIP, users, io) {
+  if (
+    miningIntervals[user.id] &&
+    user.activeMiners &&
+    user.activeMiners[targetIP]
+  ) {
+    clearInterval(miningIntervals[user.id]);
+    delete miningIntervals[user.id];
+
+    const internet = await readJSONFile(INTERNET_FILE_PATH);
+    const targetServer = internet[targetIP];
+
+    // Restore resources when mining stops
+    const minerResourceUsage = user.activeMiners[targetIP].resourceUsage;
+    targetServer.usedResources.cpu = Math.max(
+      targetServer.usedResources.cpu - minerResourceUsage.cpu,
+      0
+    );
+    targetServer.usedResources.bandwidth = Math.max(
+      targetServer.usedResources.bandwidth - minerResourceUsage.bandwidth,
+      0
+    );
+    targetServer.usedResources.ram = Math.max(
+      targetServer.usedResources.ram - minerResourceUsage.ram,
+      0
+    );
+    delete targetServer.activeMiners[user.username];
+
+    delete user.activeMiners[targetIP];
+
+    await Promise.all([
+      writeJSONFile(USERS_FILE_PATH, users),
+      writeJSONFile(INTERNET_FILE_PATH, internet),
+    ]);
+
+    io.to(user.socketId).emit("miningUpdate", {
+      success: true,
+      message: `Mining stopped on ${targetIP}.`,
+    });
+  } else {
+    io.to(user.socketId).emit("miningUpdate", {
+      success: false,
+      message: `No active mining found on ${targetIP}.`,
+    });
+  }
+}
+
 export function setupGameHandlers(socket, io) {
   socket.on("scanInternet", async ({ username }) => {
     const internet = await readJSONFile(INTERNET_FILE_PATH);
@@ -117,6 +190,18 @@ export function setupGameHandlers(socket, io) {
       });
     }
 
+    const minerTool = user.tools.find((tool) => tool.name === "Crypto Miner");
+    if (!minerTool) {
+      return socket.emit("miningResult", {
+        success: false,
+        message: "Mining failed",
+        error: "Crypto Miner tool not found",
+        data: null,
+      });
+    }
+
+    const minerResourceUsage = minerTool.resources;
+
     const internet = await readJSONFile(INTERNET_FILE_PATH);
     const targetServer = internet[targetIP];
     if (!targetServer) {
@@ -127,11 +212,26 @@ export function setupGameHandlers(socket, io) {
         data: null,
       });
     }
-    console.log(Math.floor(targetServer.resources.cpu / 25));
-    console.log(targetServer.activeMiners);
+
+    if (!targetServer.usedResources) {
+      targetServer.usedResources = { cpu: 0, bandwidth: 0, ram: 0 };
+    }
+
+    if (!targetServer.activeMiners) {
+      targetServer.activeMiners = {};
+    }
+
+    const availableResources = {
+      cpu: targetServer.resources.cpu - targetServer.usedResources.cpu,
+      bandwidth:
+        targetServer.resources.bandwidth - targetServer.usedResources.bandwidth,
+      ram: targetServer.resources.ram - targetServer.usedResources.ram,
+    };
 
     if (
-      targetServer.activeMiners >= Math.floor(targetServer.resources.cpu / 25)
+      availableResources.cpu < minerResourceUsage.cpu ||
+      availableResources.bandwidth < minerResourceUsage.bandwidth ||
+      availableResources.ram < minerResourceUsage.ram
     ) {
       return socket.emit("miningResult", {
         success: false,
@@ -141,12 +241,31 @@ export function setupGameHandlers(socket, io) {
       });
     }
 
-    user.activeMiners.push({ targetIP, startTime: Date.now() });
-    targetServer.activeMiners += 1;
+    if (!user.activeMiners) {
+      user.activeMiners = {};
+    }
+
+    if (!user.activeMiners[targetIP]) {
+      user.activeMiners[targetIP] = {
+        startTime: Date.now(),
+        resourceUsage: minerResourceUsage,
+      };
+    }
+
+    targetServer.activeMiners[user.ip] = {
+      startTime: Date.now(),
+      resourceUsage: minerResourceUsage,
+    };
+    targetServer.usedResources.cpu += minerResourceUsage.cpu;
+    targetServer.usedResources.bandwidth += minerResourceUsage.bandwidth;
+    targetServer.usedResources.ram += minerResourceUsage.ram;
+
     await Promise.all([
       writeJSONFile(USERS_FILE_PATH, users),
       writeJSONFile(INTERNET_FILE_PATH, internet),
     ]);
+
+    startMiningTimer(user, targetIP, users, io);
 
     socket.emit("miningResult", {
       success: true,
@@ -154,6 +273,21 @@ export function setupGameHandlers(socket, io) {
       error: null,
       data: null,
     });
+  });
+
+  socket.on("stopMining", async ({ username, targetIP }) => {
+    const users = await readJSONFile(USERS_FILE_PATH);
+    const user = users.find((u) => u.username === username);
+    if (!user) {
+      return socket.emit("miningResult", {
+        success: false,
+        message: "Stopping mining failed",
+        error: "User not found",
+        data: null,
+      });
+    }
+
+    await stopMining(user, targetIP, users, io);
   });
 
   socket.on("download", async ({ username, targetIP, toolName, filePath }) => {

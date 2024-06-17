@@ -16,6 +16,7 @@ export function initializeGame() {
   socket.on("scanIPResult", (data) => handleGameMessage(data));
   socket.on("hackResult", (data) => handleGameMessage(data));
   socket.on("miningResult", (data) => handleGameMessage(data));
+  socket.on("miningUpdate", (data) => handleGameMessage(data));
   socket.on("downloadResult", (data) => handleGameMessage(data));
   socket.on("sshExploitResult", (data) => handleGameMessage(data));
   socket.on("passwordSnifferResult", (data) => handleGameMessage(data));

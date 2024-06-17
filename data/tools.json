@@ -392,7 +392,7 @@
       },
       "special": "Generates passive income over time."
     },
-    "crypto_miner": {
+    "miner": {
       "name": "Crypto Miner",
       "function": "Mines cryptocurrency from compromised systems.",
       "resources": {

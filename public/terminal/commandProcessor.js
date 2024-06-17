@@ -220,14 +220,21 @@ const toolCommandMap = {
     });
     return `Initializing rootkit for role ${args[0]} on IP ${targetIP}...`;
   },
-  mine: (args) => {
+  miner: (args) => {
     if (args.length !== 1) {
-      return "Usage: mine <targetIP>";
+      return "Usage: miner <start/stop>";
     }
     const username = loginManager.getUsername() || "Guest";
-    const targetIP = args[0];
-    socket.emit("startMining", { username, targetIP });
-    return `Mining IP ${targetIP}...`;
+    const targetIP = currentSSHSession.targetIP;
+    if (args[0] === "start") {
+      socket.emit("startMining", { username, targetIP });
+      return `Starting mining on IP ${targetIP}...`;
+    } else if (args[0] === "stop") {
+      socket.emit("stopMining", { username, targetIP });
+      return `Stopping mining on IP ${targetIP}...`;
+    } else {
+      return "Usage: miner <start/stop>";
+    }
   },
 };
 

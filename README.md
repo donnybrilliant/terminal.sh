@@ -18,14 +18,17 @@
 - hidden files and a tool to find them (.files?) ls -a?
 - another way to upgrade tools?
 - shoult i be using socket.emit => callback instead of socket.on? With callback the user cant do anything while it works, which is good?
-- tool information on server might not be the smartest.
 - need to check vulnerable boolean on server.services on connection to server
+- settimeout based on tool level vs exploit level, with loader
 
 ### Improvements
 
+- emphasize workflow! if this then that, without rootkit you cant run anything on the server almost.
+- local/server differentiation and tools that work on both.
+- backdoor to control miners from a distance ++
 - TOOLS ARE TOO STATIC!
 - Guest restrictions (no alliances done - tool restrictions - what more?)
-- remove login command from ssh
+- remove/change login command from ssh
 - Check over gameHandlers, they might not do what I want
 - refactor data/.json handling/structure
 - move fileData handling from login.js to fileSystem.js?
@@ -35,6 +38,7 @@
 - .trim() command arguments?
 - I should use utils more places getUsers etc
 - I should set up auth checks with checkAuth instead. (Should this return a username? or is it enough with the req.socket?)
+- Differentiante between scan in ssh and regular mode.
 
 ### Fixes
 
@@ -229,40 +233,3 @@ mechanisms that activate when resources are overused.
   - Bandwidth:
     - Bandwidth-intensive operations should consume more bandwidth, requiring players to balance their network usage.
     - Stealing bandwidth can temporarily boost a player's capabilities but should be balanced against other operations.
-
-### Attack
-
-- Network Scanning
-  - Tool: port_scanner
-  - Action: Scan the network to identify active IP addresses and open ports.
-  - Objective: Identify potential targets on the network.
-- Service and Port Scanning
-  - Tool: port_scanner
-  - Action: Scan specific IP addresses for open ports and running services.
-  - Objective: Identify services running on the target IP that are susceptible to weak passwords.
-- Identify Vulnerabilities
-  - Tool: security_scanner (optional)
-  - Action: Scan the identified services for known vulnerabilities.
-  - Objective: Confirm the presence of vulnerabilities such as weak passwords.
-- Exploit Vulnerabilities
-  - Tool: exploit_kit
-  - Action: Use an exploit kit to gain initial access if vulnerabilities other than weak passwords are found.
-  - Objective: Gain initial access to the target system.
-- Brute Force Passwords
-  - Tool: password_cracker
-  - Action: Use the password cracker tool to brute force login credentials for the identified services.
-  - Objective: Gain authenticated access to the target service.
-- Elevate Privileges and Establish Persistence
-  - Tool: rootkit
-  - Action: Install a rootkit or other malware to maintain access.
-  - Objective: Ensure continued access to the system.
-- Post-Exploitation Actions
-  - Tools: Various (e.g., data_exfiltrator, crypto_miner, network_sniffer)
-  - Actions:
-    - Data Exfiltration: Steal sensitive data.
-    - Resource Stealing: Utilize the system's resources for mining cryptocurrency.
-    - Browse Filesystem: Explore and manipulate files and directories.
-    - Clean Logs: Use log_cleaner to erase traces of the attack.
-  - Objective: Achieve the attacker's goals (data theft, resource exploitation, etc.).
-
-This organized structure should help you manage the various aspects of your project more effectively.

@@ -17,9 +17,12 @@
       "advanced_exploit_kit",
       "network_sniffer",
       "user_enum",
-      "rootkit"
+      "rootkit",
+      "miner"
     ],
-    "connectedIPs": ["1.1.1.1"],
+    "connectedIPs": [
+      "1.1.1.1"
+    ],
     "services": [
       {
         "name": "ftp",
@@ -40,7 +43,9 @@
     "fileSystem": {
       "home": {
         "admin": {
-          "README.txt": { "content": "Admin home directory." }
+          "README.txt": {
+            "content": "Admin home directory."
+          }
         }
       }
     },
@@ -55,8 +60,14 @@
       "crypto": 10,
       "data": 5000
     },
-    "tools": ["exploit_kit", "password_sniffer"],
-    "connectedIPs": ["192.168.0.1", "repo"],
+    "tools": [
+      "exploit_kit",
+      "password_sniffer"
+    ],
+    "connectedIPs": [
+      "192.168.0.1",
+      "repo"
+    ],
     "services": [
       {
         "name": "ssh",
@@ -207,10 +218,22 @@
         }
       }
     },
-
-    "activeMiners": 0
+    "usedResources": {
+      "cpu": 0,
+      "bandwidth": 0,
+      "ram": 0
+    },
+    "activeMiners": {
+      "150.37.80.228": {
+        "startTime": 1718615103525,
+        "resourceUsage": {
+          "cpu": 25,
+          "bandwidth": 0.2,
+          "ram": 1
+        }
+      }
+    }
   },
-
   "192.168.0.1": {
     "securityLevel": 1,
     "resources": {
@@ -220,8 +243,16 @@
       "crypto": 0.5,
       "data": 1000
     },
-    "tools": ["password_cracker", "ssh_exploit", "password_sniffer"],
-    "connectedIPs": ["192.168.0.2", "192.168.0.3", "1.1.1.1"],
+    "tools": [
+      "password_cracker",
+      "ssh_exploit",
+      "password_sniffer"
+    ],
+    "connectedIPs": [
+      "192.168.0.2",
+      "192.168.0.3",
+      "1.1.1.1"
+    ],
     "services": [
       {
         "name": "ssh",
@@ -285,7 +316,6 @@
     },
     "activeMiners": 0
   },
-
   "192.168.0.2": {
     "securityLevel": 2,
     "resources": {
@@ -295,8 +325,13 @@
       "crypto": 1,
       "data": 1200
     },
-    "tools": ["port_scanner"],
-    "connectedIPs": ["192.168.0.1", "192.168.0.4"],
+    "tools": [
+      "port_scanner"
+    ],
+    "connectedIPs": [
+      "192.168.0.1",
+      "192.168.0.4"
+    ],
     "services": [
       {
         "name": "ftp",
@@ -357,8 +392,12 @@
       "crypto": 0.2,
       "data": 300
     },
-    "tools": ["network_sniffer"],
-    "connectedIPs": ["192.168.0.1"],
+    "tools": [
+      "network_sniffer"
+    ],
+    "connectedIPs": [
+      "192.168.0.1"
+    ],
     "services": [
       {
         "name": "telnet",
@@ -423,8 +462,13 @@
       "crypto": 5,
       "data": 2500
     },
-    "tools": ["exploit_kit"],
-    "connectedIPs": ["192.168.0.2", "192.168.0.5"],
+    "tools": [
+      "exploit_kit"
+    ],
+    "connectedIPs": [
+      "192.168.0.2",
+      "192.168.0.5"
+    ],
     "services": [
       {
         "name": "smtp",
@@ -488,8 +532,12 @@
       "crypto": 10,
       "data": 5000
     },
-    "tools": ["advanced_exploit_kit"],
-    "connectedIPs": ["192.168.0.4"],
+    "tools": [
+      "advanced_exploit_kit"
+    ],
+    "connectedIPs": [
+      "192.168.0.4"
+    ],
     "services": [
       {
         "name": "rdp",
