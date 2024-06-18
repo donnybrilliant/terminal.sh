@@ -70,9 +70,11 @@ passport.use(
           resources: {
             cpu: 200,
             bandwidth: 300,
-            crypto: 15.0,
-            data: 1200,
             ram: 24,
+          },
+          wallet: {
+            crypto: 15,
+            data: 1200,
           },
           tools: [],
           achievements: [],

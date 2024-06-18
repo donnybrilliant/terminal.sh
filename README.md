@@ -1,3 +1,8 @@
+# TODO:
+
+- list commands (tools on server, tools on user etc)
+- bin/commands content with cat
+
 ### Initialization
 
 - Initialization (good?)
@@ -23,7 +28,6 @@
 
 ### Improvements
 
-- download minerv2 etc
 - save one server instead of all internet file
 - change everything to saveUser singular.
 

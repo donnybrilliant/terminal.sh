@@ -138,12 +138,10 @@ const baseCommandMap = {
     return `Downloading file from ${filePath} on IP ${targetIP}...`;
   },
   server: () => {
-    socket.emit("requestHardwareInfo");
-    socket.on("hardwareInfo", (data) => {
-      console.log("Received hardware info:", data);
-      // Use this information as needed
-    });
-    return "Hardware info received. Check the console.";
+    const username = loginManager.getUsername();
+    const targetIP = currentSSHSession.targetIP;
+    socket.emit("hardwareInfo", { username, targetIP });
+    return "Checking hardware info..";
   },
   ssh: (args) => {
     if (args.length !== 1) {

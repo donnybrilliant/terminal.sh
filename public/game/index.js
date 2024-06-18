@@ -25,6 +25,7 @@ export function initializeGame() {
   socket.on("passwordCrackerResult", (data) => handleGameMessage(data));
   socket.on("sshResult", (data) => handleGameMessage(data));
   socket.on("rootkitResult", (data) => handleGameMessage(data));
+  socket.on("hardwareResult", (data) => handleGameMessage(data));
 }
 
 function handleGameMessage(data) {

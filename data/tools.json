@@ -78,6 +78,15 @@
         }
       ]
     },
+    "ssh_patch": {
+      "name": "ssh_exploit",
+      "exploits": [
+        {
+          "type": "remote_code_execution",
+          "level": 50
+        }
+      ]
+    },
     "exploit_kit": {
       "name": "Exploit Kit",
       "function": "Exploits known vulnerabilities to gain access.",
