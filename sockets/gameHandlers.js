@@ -4,14 +4,14 @@ import {
   INTERNET_FILE_PATH,
   TOOLS_FILE_PATH,
 } from "../utils/fileUtils.js";
-import {
-  checkUser,
-  checkTargetIP,
-  getFileFromPath,
-  saveUser,
-} from "../utils/userUtils.js";
+import { checkUser, checkTargetIP, saveUser } from "../utils/userUtils.js";
 import { logAction } from "../utils/logger.js";
 import { startMining, stopMining } from "../game/mining.js";
+import {
+  getToolData,
+  getFileFromPath,
+  mergeTools,
+} from "../utils/toolUtils.js";
 
 export function setupGameHandlers(socket, io) {
   socket.on("scanInternet", async ({ username }) => {
@@ -69,55 +69,6 @@ export function setupGameHandlers(socket, io) {
     }
   });
 
-  socket.on("hackIP", async ({ username, targetIP }) => {
-    const { user } = await checkUser(username);
-    if (!user) {
-      return socket.emit("hackResult", {
-        success: false,
-        message: "Hack failed",
-        error: "User not found",
-        data: null,
-      });
-    }
-
-    const targetServer = await checkTargetIP(targetIP);
-    if (!targetServer) {
-      return socket.emit("hackResult", {
-        success: false,
-        message: "Hack failed",
-        error: "IP not found",
-        data: null,
-      });
-    }
-
-    if (
-      user.tools.includes("exploit_kit") ||
-      user.resources.cpu > targetServer.securityLevel
-    ) {
-      user.resources = {
-        ...user.resources,
-        ...targetServer.resources,
-      };
-      user.tools.push(...targetServer.tools);
-
-      await saveUser(user);
-      logAction(username, `Hacked IP: ${targetIP}`);
-      socket.emit("hackResult", {
-        success: true,
-        message: `Successfully hacked ${targetIP}`,
-        error: null,
-        data: targetServer,
-      });
-    } else {
-      socket.emit("hackResult", {
-        success: false,
-        message: "Hack failed",
-        error: "Insufficient resources",
-        data: null,
-      });
-    }
-  });
-
   socket.on("startMining", async ({ username, targetIP }) => {
     const { user } = await checkUser(username);
     if (!user) {
@@ -163,7 +114,78 @@ export function setupGameHandlers(socket, io) {
     await stopMining(user, targetServer, targetIP, socket);
   });
 
-  socket.on("download", async ({ username, targetIP, toolName, filePath }) => {
+  socket.on("getTool", async ({ username, targetIP, toolName }) => {
+    const { user } = await checkUser(username);
+    if (!user) {
+      return socket.emit("getToolResult", {
+        success: false,
+        message: "Download failed",
+        error: "User not found",
+      });
+    }
+
+    const targetServer = await checkTargetIP(targetIP);
+    if (!targetServer) {
+      return socket.emit("getToolResult", {
+        success: false,
+        message: "Download failed",
+        error: "Target server not found",
+      });
+    }
+
+    if (!targetServer.tools.includes(toolName)) {
+      return socket.emit("getToolResult", {
+        success: false,
+        message: "Download failed",
+        error: "Tool not found on target server",
+      });
+    }
+
+    const newTool = await getToolData(toolName);
+    if (!newTool) {
+      return socket.emit("getToolResult", {
+        success: false,
+        message: "Download failed",
+        error: "Tool data not found",
+      });
+    }
+
+    const currentTool = user.tools.find((tool) => tool.name === newTool.name);
+
+    if (!currentTool) {
+      // Check if the new tool is complete
+      if (!newTool.resources || !newTool.exploits) {
+        return socket.emit("getToolResult", {
+          success: false,
+          message: "Download failed",
+          error: "Patch not installed. Base tool is required first.",
+        });
+      }
+
+      user.tools.push(newTool);
+      user.home.bin = user.home.bin || {};
+      user.home.bin[newTool.name] = newTool;
+      await saveUser(user);
+      return socket.emit("getToolResult", {
+        success: true,
+        message: `${newTool.name} downloaded successfully from ${targetIP}`,
+        tool: newTool,
+      });
+    } else {
+      const mergedTool = mergeTools(currentTool, newTool);
+      user.tools = user.tools.filter((tool) => tool.name !== newTool.name);
+      user.tools.push(mergedTool);
+      user.home.bin[mergedTool.name] = mergedTool;
+      await saveUser(user);
+      return socket.emit("getToolResult", {
+        success: true,
+        message: `${mergedTool.name} upgraded successfully from ${targetIP}`,
+        tool: mergedTool,
+      });
+    }
+  });
+
+  socket.on("download", async ({ username, targetIP, filePath }) => {
     const { user } = await checkUser(username);
     if (!user) {
       return socket.emit("downloadResult", {
@@ -172,80 +194,77 @@ export function setupGameHandlers(socket, io) {
         error: "User not found",
       });
     }
+    const targetServer = await checkTargetIP(targetIP);
+    if (!targetServer) {
+      return socket.emit("downloadResult", {
+        success: false,
+        message: "Download failed",
+        error: "Target server not found",
+      });
+    }
 
-    if (targetIP && toolName) {
-      // Handle tool download
-      const targetServer = await checkTargetIP(targetIP);
-      if (!targetServer) {
-        return socket.emit("downloadResult", {
-          success: false,
-          message: "Download failed",
-          error: "Target server not found",
-        });
-      }
+    const fileData = getFileFromPath(targetServer.fileSystem, filePath);
+    if (!fileData) {
+      return socket.emit("downloadResult", {
+        success: false,
+        message: "Download failed",
+        error: "File not found",
+      });
+    } else if (!fileData.isDownloadable) {
+      return socket.emit("downloadResult", {
+        success: false,
+        message: "Download failed",
+        error: "File is not downloadable",
+      });
+    }
 
-      const tools = await readJSONFile(TOOLS_FILE_PATH);
-      if (!targetServer.tools.includes(toolName)) {
-        return socket.emit("downloadResult", {
-          success: false,
-          message: "Download failed",
-          error: "Tool not found on target server",
-        });
-      }
+    if (fileData.isTool) {
+      const currentTool = user.tools.find(
+        (tool) => tool.name === fileData.name
+      );
 
-      const newTool = tools.tools[toolName];
-      if (!newTool) {
-        return socket.emit("downloadResult", {
-          success: false,
-          message: "Download failed",
-          error: "Tool data not found",
-        });
-      }
+      if (!currentTool) {
+        // Check if the new tool is complete
+        if (!fileData.resources || !fileData.exploits) {
+          return socket.emit("getToolResult", {
+            success: false,
+            message: "Download failed",
+            error: "Patch not installed. Base tool is required first.",
+          });
+        }
 
-      const currentTool = user.tools.find((tool) => tool.name === toolName);
-      if (!currentTool || (currentTool && currentTool.level < newTool.level)) {
-        user.tools = user.tools.filter((tool) => tool.name !== toolName); // Remove existing tool if present
-        user.tools.push(newTool);
+        user.tools.push(fileData);
         user.home.bin = user.home.bin || {};
-        user.home.bin[toolName] = newTool;
-      }
-
-      await saveUser(user);
-      return socket.emit("downloadResult", {
-        success: true,
-        message: `${newTool.name} downloaded successfully`,
-        toolName,
-      });
-    }
-
-    if (filePath) {
-      // Handle file download
-      // Check if it is a tool - then add it to the user.tools
-      const file = await getFileFromPath(fileData, filePath);
-      if (!file || !file.isDownloadable) {
-        return socket.emit("downloadResult", {
-          success: false,
-          message: "Download failed",
-          error: "File not found or not downloadable",
+        user.home.bin[fileData.name] = fileData;
+        await saveUser(user);
+        return socket.emit("getToolResult", {
+          success: true,
+          message: `${fileData.name} downloaded successfully from ${targetIP}`,
+          tool: fileData,
+        });
+      } else {
+        const mergedTool = mergeTools(currentTool, fileData);
+        user.tools = user.tools.filter((tool) => tool.name !== fileData.name);
+        user.tools.push(mergedTool);
+        user.home.bin[fileData.name] = mergedTool;
+        await saveUser(user);
+        return socket.emit("getToolResult", {
+          success: true,
+          message: `${fileData.name} upgraded successfully from ${targetIP}`,
+          tool: mergedTool,
         });
       }
-
+    } else {
       user.home.downloads = user.home.downloads || {};
-      user.home.downloads[filePath] = file.content;
+      user.home.downloads[filePath] = fileData;
 
       await saveUser(user);
       return socket.emit("downloadResult", {
         success: true,
-        message: `${filePath} downloaded successfully`,
-        fileName: filePath,
+        message: `${filePath} downloaded successfully from ${targetIP}`,
+        file: fileData,
       });
     }
-
-    return socket.emit("downloadResult", {
-      success: false,
-      message: "Download failed",
-      error: "No valid download target specified",
-    });
   });
 
   socket.on("ssh_exploit", async ({ username, targetIP }) => {
@@ -633,7 +652,8 @@ export function setupGameHandlers(socket, io) {
       });
     }
 
-    const tool = user.tools.find((tool) => tool.name === "Password Cracker");
+    // Change to exploits.type === password
+    const tool = user.tools.find((tool) => tool.name === "password_cracker");
     if (!tool || roleDetails.level > tool.exploits[0].level) {
       return socket.emit("passwordCrackerResult", {
         success: false,

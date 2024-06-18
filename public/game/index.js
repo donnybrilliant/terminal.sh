@@ -14,10 +14,11 @@ import { startSSHSession } from "../ssh/index.js";
 export function initializeGame() {
   socket.on("scanInternetResult", (data) => handleGameMessage(data));
   socket.on("scanIPResult", (data) => handleGameMessage(data));
-  socket.on("hackResult", (data) => handleGameMessage(data));
   socket.on("miningResult", (data) => handleGameMessage(data));
   socket.on("miningUpdate", (data) => handleGameMessage(data));
   socket.on("downloadResult", (data) => handleGameMessage(data));
+  socket.on("getToolResult", (data) => handleGameMessage(data));
+  socket.on("getResult", (data) => handleGameMessage(data));
   socket.on("sshExploitResult", (data) => handleGameMessage(data));
   socket.on("passwordSnifferResult", (data) => handleGameMessage(data));
   socket.on("userEnumResult", (data) => handleGameMessage(data));
@@ -35,7 +36,7 @@ function handleGameMessage(data) {
     message,
     error,
     data: eventData,
-    toolName,
+    tool,
     targetIP,
     ssh,
     load,
@@ -50,8 +51,8 @@ function handleGameMessage(data) {
       //term.write(`${formatJSON(eventData)}\r\n`);
       term.write("Check the console for eventData.\r\n");
     }
-    if (toolName) {
-      appendToolToFileData(toolName);
+    if (tool) {
+      appendToolToFileData(tool);
       updateCommandList();
     }
     if (ssh) {

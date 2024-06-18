@@ -31,7 +31,7 @@
 - emphasize workflow! if this then that, without rootkit you cant run anything on the server almost.
 - local/server differentiation and tools that work on both.
 - backdoor to control miners from a distance ++
-- TOOLS ARE TOO STATIC!
+- TOOLS ARE TOO STATIC! - merge and rename tools etc.
 - Guest restrictions (no alliances done - tool restrictions - what more?)
 - remove/change login command from ssh
 - refactor data/.json handling/structure

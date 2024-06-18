@@ -14,6 +14,9 @@ export function startMiningTimer(user, targetIP, socket) {
 
     await saveUser(user);
 
+    logAction(
+      user.username`Mining on ${targetIP}. Earned ${cryptoMined} crypto.`
+    );
     socket.emit("miningUpdate", {
       success: true,
       message: `Mining ongoing on ${targetIP}. Earned ${cryptoMined} crypto.`,
@@ -81,8 +84,8 @@ export async function startMining(user, targetServer, targetIP, socket) {
     }),
   ]);
 
+  logAction(user.username, `Started mining on: ${targetIP}`);
   startMiningTimer(user, targetIP, socket);
-
   socket.emit("miningResult", {
     success: true,
     message: "Mining started on target server",
@@ -126,6 +129,7 @@ export async function stopMining(user, targetServer, targetIP, socket) {
       }),
     ]);
 
+    logAction(user.username, `Stopped mining on: ${targetIP}`);
     socket.emit("miningUpdate", {
       success: true,
       message: `Mining stopped on ${targetIP}.`,

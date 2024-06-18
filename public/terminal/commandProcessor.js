@@ -15,7 +15,7 @@ import {
   isInChatMode,
   handleChatCommand,
 } from "../chat/index.js";
-import { fileData } from "./fileSystem.js";
+import { fileData, getCurrentPath } from "./fileSystem.js";
 import {
   currentSSHSession,
   isInSSHMode,
@@ -110,38 +110,32 @@ const baseCommandMap = {
       }
     }
   },
-  hackIP: (args) => {
-    if (args.length !== 1) {
-      return "Usage: hackIP <targetIP>";
+
+  get: (args) => {
+    if (args.length !== 2) {
+      return "Usage: get <targetIP> <toolName>";
     }
     const username = loginManager.getUsername() || "Guest";
-    socket.emit("hackIP", { username, targetIP: args[0] });
-    return `Attempting to hack IP ${args[0]}...`;
+    const [targetIP, toolName] = args;
+    socket.emit("getTool", { username, targetIP, toolName });
+    return `Getting ${toolName} from IP ${targetIP}...`;
   },
-
   download: (args) => {
-    const username = loginManager.getUsername() || "Guest";
-
-    if (args.length === 2) {
-      // Original format: download ip toolName
-      const [targetIP, toolName] = args;
-      socket.emit("download", {
-        username,
-        targetIP,
-        toolName,
-      });
-      return `Downloading ${toolName} from IP ${targetIP}...`;
-    } else if (args.length === 1) {
-      // New format: download filePath
-      const filePath = args[0];
-      socket.emit("download", {
-        username,
-        filePath,
-      });
-      return `Downloading file from ${filePath}...`;
-    } else {
-      return "Usage: download <targetIP> <toolName> or download <filePath>";
+    if (args.length !== 1) {
+      return "Usage: download <filePath>";
     }
+    const username = loginManager.getUsername() || "Guest";
+    const targetIP = currentSSHSession.targetIP;
+    if (!targetIP) {
+      return "No active SSH session.";
+    }
+    const currentPath = getCurrentPath(true); // Assuming SSH mode
+    const filePath = args[0].startsWith("/")
+      ? args[0]
+      : `${currentPath}/${args[0]}`;
+    console.log(filePath);
+    socket.emit("download", { username, targetIP, filePath });
+    return `Downloading file from ${filePath} on IP ${targetIP}...`;
   },
   server: () => {
     socket.emit("requestHardwareInfo");

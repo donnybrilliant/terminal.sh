@@ -99,18 +99,3 @@ export async function checkTargetIP(targetIP) {
   const targetServer = internet[targetIP];
   return targetServer;
 }
-
-export function getFileFromPath(fileSystem, filePath) {
-  const pathParts = filePath.split("/");
-  let currentDir = fileSystem;
-
-  for (const part of pathParts) {
-    if (currentDir[part]) {
-      currentDir = currentDir[part];
-    } else {
-      return null;
-    }
-  }
-
-  return currentDir;
-}

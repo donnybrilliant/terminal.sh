@@ -1,7 +1,7 @@
 {
   "tools": {
     "password_cracker": {
-      "name": "Password Cracker",
+      "name": "password_cracker",
       "function": "Cracks passwords using brute force.",
       "resources": {
         "cpu": 10,
@@ -15,6 +15,16 @@
         }
       ]
     },
+    "pass_patch": {
+      "name": "password_cracker",
+      "exploits": [
+        {
+          "type": "password",
+          "level": 20
+        }
+      ]
+    },
+
     "password_sniffer": {
       "name": "Password Sniffer",
       "function": "Sniffs for user roles on a target IP and cracks passwords starting from the lowest user role level.",
@@ -49,7 +59,7 @@
       }
     },
     "ssh_exploit": {
-      "name": "SSH Exploit",
+      "name": "ssh_exploit",
       "function": "Exploits vulnerabilities in SSH to gain access.",
       "services": "ssh",
       "resources": {

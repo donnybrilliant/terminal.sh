@@ -134,14 +134,14 @@ function getFileNames(isSSH = false) {
 }
 
 // Function to append a tool to file data
-function appendToolToFileData(toolName, isSSH = false) {
+function appendToolToFileData(tool, isSSH = false) {
   const username = loginManager.getUsername();
   const currentData = isSSH ? sshFileData : fileData;
   if (username && username.trim() !== "") {
     if (!currentData.home.users[username].bin) {
       currentData.home.users[username].bin = {};
     }
-    currentData.home.users[username].bin[toolName] = { content: toolName };
+    currentData.home.users[username].bin[tool.name] = tool;
   }
 }
 
