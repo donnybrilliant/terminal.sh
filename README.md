@@ -7,6 +7,7 @@
 - set up resource usage locally too (running on servers cost a fraction locally too for receiving data i guess)
 - set up loading states for:
   - packet capture/packet decoder, which does the same as lan sniffer, except it sends packets continously.
+- timeouts and intervals are dependent on level
 - check over info tools
 - bin/commands content with cat
 

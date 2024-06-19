@@ -1,30 +1,14 @@
-import { writeJSONFile, INTERNET_FILE_PATH } from "../utils/fileUtils.js";
+// mining.js
+
+import {
+  writeJSONFile,
+  readJSONFile,
+  INTERNET_FILE_PATH,
+} from "../utils/fileUtils.js";
 import { saveUser } from "../utils/userUtils.js";
+import { logAction } from "../utils/logger.js";
 
 let miningIntervals = {};
-
-export function startMiningTimer(user, targetIP, socket) {
-  const miningInterval = setInterval(async () => {
-    const now = Date.now();
-    const elapsedTime = (now - user.activeMiners[targetIP].startTime) / 1000; // seconds
-
-    const cryptoMined = elapsedTime * 0.1; // Assuming 0.1 crypto per second
-    user.resources.crypto += cryptoMined;
-    user.activeMiners[targetIP].startTime = now; // reset the start time
-
-    await saveUser(user);
-
-    logAction(
-      user.username`Mining on ${targetIP}. Earned ${cryptoMined} crypto.`
-    );
-    socket.emit("miningUpdate", {
-      success: true,
-      message: `Mining ongoing on ${targetIP}. Earned ${cryptoMined} crypto.`,
-    });
-  }, 5000); // Update every 5 seconds
-
-  miningIntervals[user.id] = miningInterval;
-}
 
 export async function startMining(user, targetServer, targetIP, socket) {
   const minerTool = user.tools.find((tool) => tool.name === "crypto_miner");
@@ -78,10 +62,7 @@ export async function startMining(user, targetServer, targetIP, socket) {
 
   await Promise.all([
     saveUser(user),
-    writeJSONFile(INTERNET_FILE_PATH, {
-      ...targetServer,
-      [targetIP]: targetServer,
-    }),
+    updateInternetFile(targetServer, targetIP),
   ]);
 
   logAction(user.username, `Started mining on: ${targetIP}`);
@@ -92,6 +73,30 @@ export async function startMining(user, targetServer, targetIP, socket) {
     error: null,
     data: null,
   });
+}
+
+function startMiningTimer(user, targetIP, socket) {
+  const miningInterval = setInterval(async () => {
+    const now = Date.now();
+    const elapsedTime = (now - user.activeMiners[targetIP].startTime) / 1000; // seconds
+
+    const cryptoMined = elapsedTime * 0.1; // Assuming 0.1 crypto per second
+    user.wallet.crypto += cryptoMined;
+    user.activeMiners[targetIP].startTime = now; // reset the start time
+
+    await saveUser(user);
+
+    logAction(
+      user.username,
+      `Mining on ${targetIP}. Earned ${cryptoMined} crypto.`
+    );
+    socket.emit("miningUpdate", {
+      success: true,
+      message: `Mining ongoing on ${targetIP}. Earned ${cryptoMined} crypto.`,
+    });
+  }, 5000); // Update every 5 seconds
+
+  miningIntervals[user.id] = miningInterval;
 }
 
 export async function stopMining(user, targetServer, targetIP, socket) {
@@ -123,10 +128,7 @@ export async function stopMining(user, targetServer, targetIP, socket) {
 
     await Promise.all([
       saveUser(user),
-      writeJSONFile(INTERNET_FILE_PATH, {
-        ...targetServer,
-        [targetIP]: targetServer,
-      }),
+      updateInternetFile(targetServer, targetIP),
     ]);
 
     logAction(user.username, `Stopped mining on: ${targetIP}`);
@@ -140,4 +142,10 @@ export async function stopMining(user, targetServer, targetIP, socket) {
       message: `No active mining found on ${targetIP}.`,
     });
   }
+}
+
+async function updateInternetFile(targetServer, targetIP) {
+  const internetData = await readJSONFile(INTERNET_FILE_PATH);
+  internetData[targetIP] = targetServer;
+  await writeJSONFile(INTERNET_FILE_PATH, internetData);
 }

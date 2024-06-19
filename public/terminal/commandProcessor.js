@@ -264,9 +264,9 @@ const toolCommandMap = {
     });
     return `Initializing rootkit for role ${args[0]} on IP ${targetIP}...`;
   },
-  miner: (args) => {
+  crypto_miner: (args) => {
     if (args.length !== 1) {
-      return "Usage: miner <start/stop>";
+      return "Usage: crypto_miner <start/stop>";
     }
     const username = loginManager.getUsername() || "Guest";
     if (isInSSHMode()) {
