@@ -48,6 +48,7 @@
 - I should use utils more places getUsers etc
 - I should set up auth checks with checkAuth instead. (Should this return a username? or is it enough with the req.socket?)
 - Differentiante between scan in ssh and regular mode.
+- download - inspect - install - merge - uninstall etc - is this a wanted workflow? or keep it basic like now?
 
 ### Fixes
 

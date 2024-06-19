@@ -26,6 +26,12 @@ export function initializeGame() {
   socket.on("sshResult", (data) => handleGameMessage(data));
   socket.on("rootkitResult", (data) => handleGameMessage(data));
   socket.on("hardwareResult", (data) => handleGameMessage(data));
+  socket.on("walletResult", (data) => handleGameMessage(data));
+  socket.on("ifconfigResult", (data) => handleGameMessage(data));
+  socket.on("exploitedResult", (data) => handleGameMessage(data));
+  socket.on("toolsResult", (data) => handleGameMessage(data));
+  socket.on("minerResult", (data) => handleGameMessage(data));
+  socket.on("userinfoResult", (data) => handleGameMessage(data));
 }
 
 function handleGameMessage(data) {

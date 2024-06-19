@@ -69,4 +69,106 @@ export function setupSystemHandlers(socket) {
         data: { cpu: cpuInfo, memory: memInfo, os: osInfo },
       }); */
   });
+
+  socket.on("wallet", async ({ username }) => {
+    const { user } = await checkUser(username);
+    if (!user) {
+      return socket.emit("walletResult", {
+        success: false,
+        message: "User not found",
+      });
+    }
+    socket.emit("walletResult", {
+      success: true,
+      data: user.wallet,
+    });
+  });
+
+  socket.on("ifconfig", async ({ username }) => {
+    const { user } = await checkUser(username);
+    if (!user) {
+      return socket.emit("ifconfigResult", {
+        success: false,
+        message: "User not found",
+      });
+    }
+    socket.emit("ifconfigResult", {
+      success: true,
+      data: {
+        name: user.username,
+        ip: user.ip,
+        mac: user.mac,
+      },
+    });
+  });
+
+  socket.on("exploited", async ({ username }) => {
+    const { user } = await checkUser(username);
+    if (!user) {
+      return socket.emit("exploitedResult", {
+        success: false,
+        message: "User not found",
+      });
+    }
+    socket.emit("exploitedResult", {
+      success: true,
+      data: user.exploitedServers,
+    });
+  });
+
+  socket.on("tools", async ({ username }) => {
+    const { user } = await checkUser(username);
+    if (!user) {
+      return socket.emit("toolsResult", {
+        success: false,
+        message: "User not found",
+      });
+    }
+    const tools = user.tools.map((tool) => ({
+      name: tool.name,
+      level: tool.level || "N/A",
+      // more stuff here..
+    }));
+    socket.emit("toolsResult", {
+      success: true,
+      data: tools,
+    });
+  });
+
+  socket.on("miners", async ({ username }) => {
+    const { user } = await checkUser(username);
+    if (!user) {
+      return socket.emit("minersResult", {
+        success: false,
+        message: "User not found",
+      });
+    }
+    socket.emit("minersResult", {
+      success: true,
+      data: user.miners || [],
+    });
+  });
+
+  socket.on("userinfo", async ({ username }) => {
+    const { user } = await checkUser(username);
+    if (!user) {
+      return socket.emit("userinfoResult", {
+        success: false,
+        message: "User not found",
+      });
+    }
+    const userInfo = {
+      name: user.username,
+      level: user.level,
+      achievements: user.achievements,
+      inventory: user.inventory,
+      experience: user.experience,
+      ip: user.ip,
+      wallet: user.wallet,
+    };
+    socket.emit("userinfoResult", {
+      success: true,
+      data: userInfo,
+    });
+  });
 }

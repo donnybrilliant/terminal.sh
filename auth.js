@@ -35,6 +35,20 @@ function generateUniqueIP(users) {
   return ip;
 }
 
+function generateUniqueMAC(users) {
+  const usedMACs = new Set(users.map((user) => user.mac));
+  let mac;
+  do {
+    mac = Array(6)
+      .fill(0)
+      .map(() =>
+        ("00" + Math.floor(Math.random() * 256).toString(16)).slice(-2)
+      )
+      .join(":");
+  } while (usedMACs.has(mac));
+  return mac;
+}
+
 passport.use(
   new LocalStrategy(async (username, password, done) => {
     try {
@@ -64,6 +78,7 @@ passport.use(
           username,
           password: hashedPassword,
           ip: generateUniqueIP(users),
+          mac: generateUniqueMAC(users),
           home: {},
           level: 0,
           experience: 0,

@@ -151,6 +151,40 @@ const baseCommandMap = {
     socket.emit("ssh", { username, targetIP });
     return `Connecting to ${targetIP}...`;
   },
+  wallet: () => {
+    const username = loginManager.getUsername();
+    socket.emit("wallet", { username });
+    return "Checking wallet...";
+  },
+  whoami: () => {
+    const username = loginManager.getUsername();
+    return username || "Guest";
+  },
+  ifconfig: () => {
+    const username = loginManager.getUsername();
+    socket.emit("ifconfig", { username });
+    return "Checking network interfaces...";
+  },
+  tools: () => {
+    const username = loginManager.getUsername();
+    socket.emit("tools", { username });
+    return "Checking available tools...";
+  },
+  exploited: () => {
+    const username = loginManager.getUsername();
+    socket.emit("exploited", { username });
+    return "Checking exploited servers...";
+  },
+  userinfo: () => {
+    const username = loginManager.getUsername();
+    socket.emit("userinfo", { username });
+    return "Checking user info...";
+  },
+  miners: () => {
+    const username = loginManager.getUsername();
+    socket.emit("miners", { username });
+    return "Checking miners...";
+  },
 };
 
 // Tool-specific Command map
