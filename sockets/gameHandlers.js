@@ -7,6 +7,7 @@ import {
 import { checkUser, checkTargetIP, saveUser } from "../utils/userUtils.js";
 import { logAction } from "../utils/logger.js";
 import { startMining, stopMining } from "../game/mining.js";
+import { startLanSniffing, stopLanSniffing } from "../game/sniffing.js";
 import {
   getToolData,
   getFileFromPath,
@@ -155,7 +156,7 @@ export function setupGameHandlers(socket, io) {
 
     if (!currentTool) {
       // Check if the new tool is complete
-      if (!newTool.resources || !newTool.exploits) {
+      if (newTool.isPatch) {
         return socket.emit("getToolResult", {
           success: false,
           message: "Download failed",
@@ -227,7 +228,7 @@ export function setupGameHandlers(socket, io) {
 
       if (!currentTool) {
         // Check if the new tool is complete
-        if (!fileData.resources || !fileData.exploits) {
+        if (fileData.isPatch) {
           return socket.emit("getToolResult", {
             success: false,
             message: "Download failed",
@@ -762,5 +763,50 @@ export function setupGameHandlers(socket, io) {
       success: true,
       message: `Rootkit initialized for role ${role} on ${targetIP}`,
     });
+  });
+
+  socket.on("startLanSniffing", async ({ username, targetIP }) => {
+    const { user } = await checkUser(username);
+    if (!user) {
+      return socket.emit("lanSnifferResult", {
+        success: false,
+        message: "LAN sniffing failed",
+        error: "User not found",
+        data: null,
+      });
+    }
+    const targetServer = await checkTargetIP(targetIP);
+    if (!targetServer) {
+      return socket.emit("lanSnifferResult", {
+        success: false,
+        message: "LAN sniffing failed",
+        error: "Target server not found",
+        data: null,
+      });
+    }
+
+    await startLanSniffing(user, targetServer, targetIP, socket);
+  });
+
+  socket.on("stopLanSniffing", async ({ username, targetIP }) => {
+    const { user } = await checkUser(username);
+    if (!user) {
+      return socket.emit("lanSnifferResult", {
+        success: false,
+        message: "Stopping LAN sniffing failed",
+        error: "User not found",
+        data: null,
+      });
+    }
+    const targetServer = await checkTargetIP(targetIP);
+    if (!targetServer) {
+      return socket.emit("lanSnifferResult", {
+        success: false,
+        message: "LAN sniffing failed",
+        error: "Target server not found",
+      });
+    }
+
+    await stopLanSniffing(user, targetServer, targetIP, socket);
   });
 }

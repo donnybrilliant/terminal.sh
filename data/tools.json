@@ -17,6 +17,7 @@
     },
     "pass_patch": {
       "name": "password_cracker",
+      "isPatch": true,
       "exploits": [
         {
           "type": "password",
@@ -40,6 +41,47 @@
         }
       ]
     },
+    "lan_sniffer": {
+      "name": "lan_sniffer",
+      "function": "Sniffs for new local network connections.",
+      "level": 1,
+      "resources": {
+        "cpu": 20,
+        "bandwidth": 0.3,
+        "ram": 8
+      }
+    },
+    "packet_capture": {
+      "name": "Packet Capture",
+      "function": "Captures packets from the network.",
+      "level": 1,
+      "resources": {
+        "cpu": 20,
+        "bandwidth": 0.3,
+        "ram": 8
+      }
+    },
+    "packet_decoder": {
+      "name": "Packet Decoder",
+      "function": "Decodes captured packets to extract information.",
+      "level": 1,
+      "resources": {
+        "cpu": 20,
+        "bandwidth": 0.3,
+        "ram": 8
+      }
+    },
+    "crypto_miner": {
+      "name": "crypto_miner",
+      "function": "Mines cryptocurrency from compromised systems.",
+      "level": 1,
+      "resources": {
+        "cpu": 25,
+        "bandwidth": 0.2,
+        "ram": 1
+      },
+      "special": "Generates passive income over time."
+    },
     "user_enum": {
       "name": "User Enumerator",
       "function": "Finds and deciphers users and their roles.",
@@ -49,12 +91,12 @@
         "ram": 4
       }
     },
-    "network_sniffer": {
-      "name": "Network Sniffer",
-      "function": "Sniffs network traffic to gather information.",
+    "rootkit": {
+      "name": "Rootkit",
+      "function": "Installs hidden access to a system for ongoing control.",
       "resources": {
-        "cpu": 8,
-        "bandwidth": 0.08,
+        "cpu": 20,
+        "bandwidth": 0.4,
         "ram": 4
       }
     },
@@ -80,6 +122,7 @@
     },
     "ssh_patch": {
       "name": "ssh_exploit",
+      "isPatch": true,
       "exploits": [
         {
           "type": "remote_code_execution",
@@ -227,13 +270,14 @@
         }
       ]
     },
-    "rootkit": {
-      "name": "Rootkit",
-      "function": "Installs hidden access to a system for ongoing control.",
+
+    "firewall_bypass_tool": {
+      "name": "Firewall Bypass Tool",
+      "function": "Bypasses firewall restrictions to access a target system.",
       "resources": {
         "cpu": 20,
         "bandwidth": 0.4,
-        "ram": 4
+        "ram": 6
       }
     },
     "data_exfiltrator": {
@@ -411,16 +455,7 @@
       },
       "special": "Generates passive income over time."
     },
-    "miner": {
-      "name": "Crypto Miner",
-      "function": "Mines cryptocurrency from compromised systems.",
-      "resources": {
-        "cpu": 25,
-        "bandwidth": 0.2,
-        "ram": 1
-      },
-      "special": "Generates passive income over time."
-    },
+
     "ai_hacker_bot": {
       "name": "AI Hacker Bot",
       "function": "An AI-powered bot that automates hacking tasks and learns over time.",

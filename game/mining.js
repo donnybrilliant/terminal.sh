@@ -27,7 +27,7 @@ export function startMiningTimer(user, targetIP, socket) {
 }
 
 export async function startMining(user, targetServer, targetIP, socket) {
-  const minerTool = user.tools.find((tool) => tool.name === "Crypto Miner");
+  const minerTool = user.tools.find((tool) => tool.name === "crypto_miner");
   if (!minerTool) {
     throw new Error("Crypto Miner tool not found");
   }

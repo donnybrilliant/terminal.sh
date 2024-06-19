@@ -22,9 +22,10 @@
       "network_sniffer",
       "user_enum",
       "rootkit",
-      "miner",
+      "crypto_miner",
       "pass_patch",
-      "ssh_patch"
+      "ssh_patch",
+      "lan_sniffer"
     ],
     "connectedIPs": [
       "1.1.1.1"
@@ -64,7 +65,7 @@
     "resources": {
       "cpu": 2500,
       "bandwidth": 500,
-      "ram": 4
+      "ram": 64
     },
     "wallet": {
       "crypto": 10,
@@ -170,6 +171,7 @@
             "content": "Patch for password_cracker.",
             "isDownloadable": true,
             "isTool": true,
+            "isPatch": true,
             "name": "password_cracker",
             "function": "Cracks passwords using brute force.",
             "resources": {
@@ -246,11 +248,76 @@
       }
     },
     "localNetwork": {
-      "10.42.127.115": {
-        "id": "7848321b-1cd4-48e6-afca-1b02203d5193",
-        "ip": "118.222.83.91",
-        "localIP": "10.42.127.115",
-        "mac": "8e:f1:21:5c:59:ac",
+      "10.52.249.0": {
+        "id": "805b3fda-dde1-43d3-9ae1-8fd6cdc31162",
+        "ip": "138.229.1.16",
+        "localIP": "10.52.249.0",
+        "mac": "79:d0:10:fb:54:89",
+        "securityLevel": 1,
+        "resources": {
+          "cpu": 2000,
+          "bandwidth": 500,
+          "ram": 8
+        },
+        "wallet": {
+          "crypto": 0.5,
+          "data": 1000
+        },
+        "tools": [
+          "password_cracker",
+          "ssh_exploit",
+          "password_sniffer"
+        ],
+        "services": [
+          {
+            "name": "ssh",
+            "description": "Secure Shell",
+            "port": 22,
+            "vulnerable": true,
+            "vulnerabilities": [
+              {
+                "type": "password",
+                "strength": "weak",
+                "level": 1
+              }
+            ]
+          },
+          {
+            "name": "http",
+            "description": "Hypertext Transfer Protocol",
+            "port": 80,
+            "vulnerable": true,
+            "vulnerabilities": [
+              {
+                "type": "xss",
+                "level": 20
+              }
+            ]
+          }
+        ],
+        "roles": [],
+        "logs": [],
+        "fileSystem": {
+          "home": {
+            "admin": {
+              "README.txt": {
+                "content": "Admin home directory."
+              }
+            }
+          },
+          "etc": {
+            "config": {
+              "content": "System configuration details."
+            }
+          }
+        },
+        "connectedIPs": []
+      },
+      "10.11.25.197": {
+        "id": "d1b4f61f-19e5-41ae-bada-a54f0adf1367",
+        "ip": "99.252.55.175",
+        "localIP": "10.11.25.197",
+        "mac": "42:ad:01:8f:ea:cb",
         "securityLevel": 1,
         "resources": {
           "cpu": 2000,
@@ -311,71 +378,12 @@
         },
         "connectedIPs": []
       }
-    }
-  },
-  "86.104.223.75": {
-    "id": "39fc862f-055f-4074-b05e-97fb69dd1c26",
-    "ip": "86.104.223.75",
-    "localIP": "10.152.113.102",
-    "mac": "d7:44:e4:1a:ac:79",
-    "securityLevel": 1,
-    "resources": {
-      "cpu": 2000,
-      "bandwidth": 500,
-      "ram": 8
     },
-    "wallet": {
-      "crypto": 0.5,
-      "data": 1000
+    "usedResources": {
+      "cpu": 0,
+      "bandwidth": 0,
+      "ram": 0
     },
-    "tools": [
-      "password_cracker",
-      "ssh_exploit",
-      "password_sniffer"
-    ],
-    "services": [
-      {
-        "name": "ssh",
-        "description": "Secure Shell",
-        "port": 22,
-        "vulnerable": true,
-        "vulnerabilities": [
-          {
-            "type": "password",
-            "strength": "weak",
-            "level": 1
-          }
-        ]
-      },
-      {
-        "name": "http",
-        "description": "Hypertext Transfer Protocol",
-        "port": 80,
-        "vulnerable": true,
-        "vulnerabilities": [
-          {
-            "type": "xss",
-            "level": 20
-          }
-        ]
-      }
-    ],
-    "roles": [],
-    "logs": [],
-    "fileSystem": {
-      "home": {
-        "admin": {
-          "README.txt": {
-            "content": "Admin home directory."
-          }
-        }
-      },
-      "etc": {
-        "config": {
-          "content": "System configuration details."
-        }
-      }
-    },
-    "connectedIPs": []
+    "activeSniffers": {}
   }
 }

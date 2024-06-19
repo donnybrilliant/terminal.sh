@@ -279,7 +279,25 @@ const toolCommandMap = {
         return `Mining IP ${targetIP}...`;
       }
     } else {
-      return "Usage: miner <start/stop>";
+      return "Local mining is not implemented.";
+    }
+  },
+  lan_sniffer: (args) => {
+    if (args.length !== 1) {
+      return "Usage: lan_sniffer <start/stop>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    if (isInSSHMode()) {
+      const targetIP = currentSSHSession.targetIP;
+      if (args.length === 1 && args[0] === "stop") {
+        socket.emit("stopLanSniffing", { username, targetIP });
+        return `Stopping mining on ${targetIP}...`;
+      } else if (args.length === 1 && args[0] === "start") {
+        socket.emit("startLanSniffing", { username, targetIP });
+        return `LAN Sniffing on IP ${targetIP}...`;
+      }
+    } else {
+      return "Local LAN sniffing is not implemented.";
     }
   },
 };

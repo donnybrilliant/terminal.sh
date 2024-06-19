@@ -1,5 +1,13 @@
 # TODO:
 
+- will there be an issue connecting to localNetwork with ssh? and use it just like any other server.
+- revisit scan command(!!!) for local networks/internet
+
+- create lan sniffer like mining
+- set up resource usage locally too (running on servers cost a fraction locally too for receiving data i guess)
+- set up loading states for:
+  - packet capture/packet decoder, which does the same as lan sniffer, except it sends packets continously.
+- check over info tools
 - bin/commands content with cat
 
 ### Initialization
@@ -31,7 +39,6 @@
 ### Improvements
 
 - save one server instead of all internet file
-- change everything to saveUser singular.
 
 - dynamic miners choosing resources as args.
 - emphasize workflow! if this then that, without rootkit you cant run anything on the server almost.
@@ -46,10 +53,11 @@
 - test edit mode
 - PROMPT! especially on SSH should be ip>
 - .trim() command arguments?
-- I should use utils more places getUsers etc
+- I should use utils more places getUsers, saveUser etc
 - I should set up auth checks with checkAuth instead. (Should this return a username? or is it enough with the req.socket?)
 - Differentiante between scan in ssh and regular mode.
 - download - inspect - install - merge - uninstall etc - is this a wanted workflow? or keep it basic like now?
+- let lanSniffingIntervals = {}; and mining might not be scalable for db
 
 ### Fixes
 
@@ -131,7 +139,7 @@
 - other players have dynamic ports open?
 - set up fake "wifi" to create new servers / server for phishing etc
 - make randomly generated file system for servers. ai? tools etc.
-- everything random! use deauth and some servers might never appear again.
+- everything random! use deauth and some servers might never appear again. shit deauth = more servers disappear.
 
 ### Economy
 

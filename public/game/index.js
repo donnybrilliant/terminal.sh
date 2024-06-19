@@ -34,6 +34,7 @@ export function initializeGame() {
   socket.on("userinfoResult", (data) => handleGameMessage(data));
   socket.on("createServerResult", (data) => handleGameMessage(data));
   socket.on("createLocalServerResult", (data) => handleGameMessage(data));
+  socket.on("lanSnifferResult", (data) => handleGameMessage(data));
 }
 
 function handleGameMessage(data) {
