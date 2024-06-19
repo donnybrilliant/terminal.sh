@@ -11,6 +11,7 @@ import {
   getToolData,
   getFileFromPath,
   mergeTools,
+  generateUniqueFileName,
 } from "../utils/toolUtils.js";
 
 export function setupGameHandlers(socket, io) {
@@ -204,6 +205,7 @@ export function setupGameHandlers(socket, io) {
     }
 
     const fileData = getFileFromPath(targetServer.fileSystem, filePath);
+
     if (!fileData) {
       return socket.emit("downloadResult", {
         success: false,
@@ -255,8 +257,10 @@ export function setupGameHandlers(socket, io) {
         });
       }
     } else {
+      let fileName = filePath.split("/").pop();
+      fileName = generateUniqueFileName(user.home.downloads, fileName);
       user.home.downloads = user.home.downloads || {};
-      user.home.downloads[filePath] = fileData;
+      user.home.downloads[fileName] = fileData;
 
       await saveUser(user);
       return socket.emit("downloadResult", {

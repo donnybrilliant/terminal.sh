@@ -65,3 +65,24 @@ export function getFileFromPath(fileSystem, filePath) {
 
   return currentDir;
 }
+
+// Function to generate a unique file name
+export function generateUniqueFileName(downloads, fileName) {
+  let baseName = fileName;
+  let ext = "";
+  const dotIndex = fileName.lastIndexOf(".");
+  if (dotIndex > 0) {
+    baseName = fileName.substring(0, dotIndex);
+    ext = fileName.substring(dotIndex);
+  }
+
+  let uniqueName = fileName;
+  let counter = 1;
+
+  while (downloads.hasOwnProperty(uniqueName)) {
+    uniqueName = `${baseName}-${counter}${ext}`;
+    counter++;
+  }
+
+  return uniqueName;
+}

@@ -133,7 +133,6 @@ const baseCommandMap = {
     const filePath = args[0].startsWith("/")
       ? args[0]
       : `${currentPath}/${args[0]}`;
-    console.log(filePath);
     socket.emit("download", { username, targetIP, filePath });
     return `Downloading file from ${filePath} on IP ${targetIP}...`;
   },

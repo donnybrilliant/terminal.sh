@@ -12,7 +12,6 @@
 - set name without auth
 - not authenticated, save as guest object, save on login?
 - name command in chat too
-- unique names generator for alliances?
 - autocomplete for /join with available user.alliance[] or the way socket keeps track of the rooms.
 - scan command (flags to show different info)
 - user roles list /etc/groups/ /etc/password
@@ -25,6 +24,8 @@
 - shoult i be using socket.emit => callback instead of socket.on? With callback the user cant do anything while it works, which is good?
 - need to check vulnerable boolean on server.services on connection to server
 - settimeout based on tool level vs exploit level, with loader
+- get zip files.
+- server/level generator
 
 ### Improvements
 
