@@ -1,6 +1,5 @@
 # TODO:
 
-- list commands (tools on server, tools on user etc)
 - bin/commands content with cat
 
 ### Initialization
@@ -25,7 +24,9 @@
 - need to check vulnerable boolean on server.services on connection to server
 - settimeout based on tool level vs exploit level, with loader
 - get zip files.
-- server/level generator
+- alliances add a new vpn network.
+- limit activeminer to one on each server
+- tool to open local network?
 
 ### Improvements
 
@@ -129,7 +130,7 @@
 - command that creates new dynamic servers?
 - other players have dynamic ports open?
 - set up fake "wifi" to create new servers / server for phishing etc
-- make randomly generated file system for servers. ai?
+- make randomly generated file system for servers. ai? tools etc.
 - everything random! use deauth and some servers might never appear again.
 
 ### Economy

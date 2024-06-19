@@ -32,6 +32,8 @@ export function initializeGame() {
   socket.on("toolsResult", (data) => handleGameMessage(data));
   socket.on("minerResult", (data) => handleGameMessage(data));
   socket.on("userinfoResult", (data) => handleGameMessage(data));
+  socket.on("createServerResult", (data) => handleGameMessage(data));
+  socket.on("createLocalServerResult", (data) => handleGameMessage(data));
 }
 
 function handleGameMessage(data) {

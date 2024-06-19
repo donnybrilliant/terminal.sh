@@ -185,6 +185,19 @@ const baseCommandMap = {
     socket.emit("miners", { username });
     return "Checking miners...";
   },
+  createServer: () => {
+    const username = loginManager.getUsername() || "Guest";
+    socket.emit("createServer", { username });
+    return "Creating server...";
+  },
+  createLocalServer: () => {
+    const username = loginManager.getUsername();
+    const targetIP = currentSSHSession.targetIP;
+    console.log(username);
+    const data = targetIP ? { targetIP } : { username };
+    socket.emit("createLocalServer", data);
+    return `Creating local server for ${targetIP || "local machine"}...`;
+  },
 };
 
 // Tool-specific Command map

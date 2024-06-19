@@ -1,5 +1,7 @@
 {
   "repo": {
+    "ip": "repo",
+    "localIP": "10.0.0.1",
     "securityLevel": 100,
     "resources": {
       "cpu": 10000,
@@ -24,7 +26,9 @@
       "pass_patch",
       "ssh_patch"
     ],
-    "connectedIPs": ["1.1.1.1"],
+    "connectedIPs": [
+      "1.1.1.1"
+    ],
     "services": [
       {
         "name": "ftp",
@@ -50,9 +54,12 @@
           }
         }
       }
-    }
+    },
+    "localNetwork": {}
   },
   "1.1.1.1": {
+    "ip": "1.1.1.1",
+    "localIP": "10.0.0.2",
     "securityLevel": 0,
     "resources": {
       "cpu": 2500,
@@ -63,8 +70,13 @@
       "crypto": 10,
       "data": 5000
     },
-    "tools": ["exploit_kit", "password_sniffer"],
-    "connectedIPs": ["192.168.0.1", "repo"],
+    "tools": [
+      "exploit_kit",
+      "password_sniffer"
+    ],
+    "connectedIPs": [
+      "repo"
+    ],
     "services": [
       {
         "name": "ssh",
@@ -232,9 +244,80 @@
           }
         }
       }
+    },
+    "localNetwork": {
+      "10.42.127.115": {
+        "id": "7848321b-1cd4-48e6-afca-1b02203d5193",
+        "ip": "118.222.83.91",
+        "localIP": "10.42.127.115",
+        "mac": "8e:f1:21:5c:59:ac",
+        "securityLevel": 1,
+        "resources": {
+          "cpu": 2000,
+          "bandwidth": 500,
+          "ram": 8
+        },
+        "wallet": {
+          "crypto": 0.5,
+          "data": 1000
+        },
+        "tools": [
+          "password_cracker",
+          "ssh_exploit",
+          "password_sniffer"
+        ],
+        "services": [
+          {
+            "name": "ssh",
+            "description": "Secure Shell",
+            "port": 22,
+            "vulnerable": true,
+            "vulnerabilities": [
+              {
+                "type": "password",
+                "strength": "weak",
+                "level": 1
+              }
+            ]
+          },
+          {
+            "name": "http",
+            "description": "Hypertext Transfer Protocol",
+            "port": 80,
+            "vulnerable": true,
+            "vulnerabilities": [
+              {
+                "type": "xss",
+                "level": 20
+              }
+            ]
+          }
+        ],
+        "roles": [],
+        "logs": [],
+        "fileSystem": {
+          "home": {
+            "admin": {
+              "README.txt": {
+                "content": "Admin home directory."
+              }
+            }
+          },
+          "etc": {
+            "config": {
+              "content": "System configuration details."
+            }
+          }
+        },
+        "connectedIPs": []
+      }
     }
   },
-  "192.168.0.1": {
+  "86.104.223.75": {
+    "id": "39fc862f-055f-4074-b05e-97fb69dd1c26",
+    "ip": "86.104.223.75",
+    "localIP": "10.152.113.102",
+    "mac": "d7:44:e4:1a:ac:79",
     "securityLevel": 1,
     "resources": {
       "cpu": 2000,
@@ -245,8 +328,11 @@
       "crypto": 0.5,
       "data": 1000
     },
-    "tools": ["password_cracker", "ssh_exploit", "password_sniffer"],
-    "connectedIPs": ["1.1.1.1"],
+    "tools": [
+      "password_cracker",
+      "ssh_exploit",
+      "password_sniffer"
+    ],
     "services": [
       {
         "name": "ssh",
@@ -274,16 +360,8 @@
         ]
       }
     ],
-    "logs": [
-      {
-        "timestamp": "2024-06-10T10:00:00Z",
-        "event": "Failed login attempt from 192.168.0.3"
-      },
-      {
-        "timestamp": "2024-06-10T11:00:00Z",
-        "event": "Successful login from 192.168.0.2"
-      }
-    ],
+    "roles": [],
+    "logs": [],
     "fileSystem": {
       "home": {
         "admin": {
@@ -296,17 +374,8 @@
         "config": {
           "content": "System configuration details."
         }
-      },
-      "var": {
-        "log": {
-          "syslog": {
-            "content": "System log contents."
-          },
-          "auth.log": {
-            "content": "Authentication log contents."
-          }
-        }
       }
-    }
+    },
+    "connectedIPs": []
   }
 }
