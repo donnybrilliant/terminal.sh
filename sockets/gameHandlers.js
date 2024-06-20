@@ -221,46 +221,16 @@ export function setupGameHandlers(socket, io) {
       });
     }
 
+    // Ensure downloads directory is initialized in user home
+    user.home.downloads = user.home.downloads || {};
+
     if (fileData.isTool) {
-      const currentTool = user.tools.find(
-        (tool) => tool.name === fileData.name
-      );
-
-      if (!currentTool) {
-        // Check if the new tool is complete
-        if (fileData.isPatch) {
-          return socket.emit("getToolResult", {
-            success: false,
-            message: "Download failed",
-            error: "Patch not installed. Base tool is required first.",
-          });
-        }
-
-        user.tools.push(fileData);
-        user.home.bin = user.home.bin || {};
-        user.home.bin[fileData.name] = fileData;
-        await saveUser(user);
-        return socket.emit("getToolResult", {
-          success: true,
-          message: `${fileData.name} downloaded successfully from ${targetIP}`,
-          tool: fileData,
-        });
-      } else {
-        const mergedTool = mergeTools(currentTool, fileData);
-        user.tools = user.tools.filter((tool) => tool.name !== fileData.name);
-        user.tools.push(mergedTool);
-        user.home.bin[fileData.name] = mergedTool;
-        await saveUser(user);
-        return socket.emit("getToolResult", {
-          success: true,
-          message: `${fileData.name} upgraded successfully from ${targetIP}`,
-          tool: mergedTool,
-        });
-      }
+      // Handle tool downloads...
+      return handleToolDownload(fileData, user, targetIP);
     } else {
+      // Handle regular downloadable files
       let fileName = filePath.split("/").pop();
       fileName = generateUniqueFileName(user.home.downloads, fileName);
-      user.home.downloads = user.home.downloads || {};
       user.home.downloads[fileName] = fileData;
 
       await saveUser(user);
@@ -271,6 +241,34 @@ export function setupGameHandlers(socket, io) {
       });
     }
   });
+
+  async function handleToolDownload(fileData, user, targetIP) {
+    const currentTool = user.tools.find((tool) => tool.name === fileData.name);
+    if (!currentTool) {
+      // Handle new tool installation
+      user.tools.push(fileData);
+      user.home.bin = user.home.bin || {};
+      user.home.bin[fileData.name] = fileData;
+      await saveUser(user);
+      return socket.emit("getToolResult", {
+        success: true,
+        message: `${fileData.name} downloaded successfully from ${targetIP}`,
+        tool: fileData,
+      });
+    } else {
+      // Handle tool update
+      const mergedTool = mergeTools(currentTool, fileData);
+      user.tools = user.tools.filter((tool) => tool.name !== fileData.name);
+      user.tools.push(mergedTool);
+      user.home.bin[mergedTool.name] = mergedTool;
+      await saveUser(user);
+      return socket.emit("getToolResult", {
+        success: true,
+        message: `${mergedTool.name} upgraded successfully from ${targetIP}`,
+        tool: mergedTool,
+      });
+    }
+  }
 
   socket.on("ssh_exploit", async ({ username, targetIP, parentIP }) => {
     const { user } = await checkUser(username);

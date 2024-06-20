@@ -256,7 +256,7 @@
           "crypto": 0.5,
           "data": 1000
         },
-        "tools": ["password_cracker", "ssh_exploit", "password_sniffer"],
+        "tools": ["lan_sniffer"],
         "services": [
           {
             "name": "ssh",
@@ -332,7 +332,7 @@
               "crypto": 0.5,
               "data": 1000
             },
-            "tools": ["password_cracker", "ssh_exploit", "password_sniffer"],
+            "tools": ["crypto_miner"],
             "services": [
               {
                 "name": "ssh",
@@ -382,16 +382,10 @@
                 "isTool": true,
                 "isPatch": true,
                 "name": "password_cracker",
-                "function": "Cracks passwords using brute force.",
-                "resources": {
-                  "cpu": 1,
-                  "bandwidth": 0.1,
-                  "ram": 1
-                },
                 "exploits": [
                   {
                     "type": "password",
-                    "level": 15
+                    "level": 666
                   }
                 ]
               },
