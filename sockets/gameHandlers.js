@@ -30,7 +30,7 @@ export function setupGameHandlers(socket, io) {
   });
 
   socket.on("scanIP", async ({ username, targetIP, parentIP }) => {
-    const targetServer = await checkTargetIP(targetIP, parentIP);
+    const { server: targetServer } = await checkTargetIP(targetIP, parentIP);
 
     if (targetServer) {
       logAction(username, `Scanned IP: ${targetIP}`);
@@ -51,7 +51,7 @@ export function setupGameHandlers(socket, io) {
   });
 
   socket.on("scanConnectedIPs", async ({ username, targetIP, parentIP }) => {
-    const targetServer = await checkTargetIP(targetIP, parentIP);
+    const { server: targetServer } = await checkTargetIP(targetIP, parentIP);
 
     if (targetServer) {
       logAction(username, `Scanned connected IPs on: ${targetIP}`);
@@ -81,7 +81,7 @@ export function setupGameHandlers(socket, io) {
         data: null,
       });
     }
-    const targetServer = await checkTargetIP(targetIP);
+    const { server: targetServer } = await checkTargetIP(targetIP);
     if (!targetServer) {
       return socket.emit("miningResult", {
         success: false,
@@ -104,7 +104,7 @@ export function setupGameHandlers(socket, io) {
         data: null,
       });
     }
-    const targetServer = await checkTargetIP(targetIP);
+    const { server: targetServer } = await checkTargetIP(targetIP);
     if (!targetServer) {
       return socket.emit("miningResult", {
         success: false,
@@ -126,7 +126,7 @@ export function setupGameHandlers(socket, io) {
       });
     }
 
-    const targetServer = await checkTargetIP(targetIP, parentIP);
+    const { server: targetServer } = await checkTargetIP(targetIP, parentIP);
     if (!targetServer) {
       return socket.emit("getToolResult", {
         success: false,
@@ -196,7 +196,7 @@ export function setupGameHandlers(socket, io) {
         error: "User not found",
       });
     }
-    const targetServer = await checkTargetIP(targetIP, parentIP);
+    const { server: targetServer } = await checkTargetIP(targetIP, parentIP);
     if (!targetServer) {
       return socket.emit("downloadResult", {
         success: false,
@@ -283,8 +283,8 @@ export function setupGameHandlers(socket, io) {
       });
     }
 
-    const targetServer = await checkTargetIP(targetIP, parentIP);
-
+    const checkResult = await checkTargetIP(targetIP, parentIP);
+    const { server: targetServer, path: exploitationPath } = checkResult;
     if (!targetServer) {
       return socket.emit("sshExploitResult", {
         success: false,
@@ -297,7 +297,6 @@ export function setupGameHandlers(socket, io) {
     const sshService = targetServer.services.find(
       (service) => service.name === "ssh"
     );
-
     if (!sshService) {
       return socket.emit("sshExploitResult", {
         success: false,
@@ -326,21 +325,20 @@ export function setupGameHandlers(socket, io) {
     }
 
     user.exploitedServers = user.exploitedServers || {};
-    const exploitedKey = parentIP
-      ? `${parentIP}.localNetwork.${targetIP}`
-      : targetIP;
-    user.exploitedServers[exploitedKey] =
-      user.exploitedServers[exploitedKey] || {};
-    user.exploitedServers[exploitedKey][sshService.name] =
-      user.exploitedServers[exploitedKey][sshService.name] || [];
+    user.exploitedServers[exploitationPath] =
+      user.exploitedServers[exploitationPath] || {};
+    user.exploitedServers[exploitationPath][sshService.name] =
+      user.exploitedServers[exploitationPath][sshService.name] || [];
 
     matchingExploits.forEach((exploit) => {
       if (
-        !user.exploitedServers[exploitedKey][sshService.name].includes(
+        !user.exploitedServers[exploitationPath][sshService.name].includes(
           exploit.type
         )
       ) {
-        user.exploitedServers[exploitedKey][sshService.name].push(exploit.type);
+        user.exploitedServers[exploitationPath][sshService.name].push(
+          exploit.type
+        );
       }
     });
 
@@ -368,7 +366,7 @@ export function setupGameHandlers(socket, io) {
         });
       }
 
-      const targetServer = await checkTargetIP(targetIP, parentIP);
+      const { server: targetServer } = await checkTargetIP(targetIP, parentIP);
 
       if (!targetServer) {
         return socket.emit("passwordSnifferResult", {
@@ -507,7 +505,9 @@ export function setupGameHandlers(socket, io) {
       });
     }
 
-    const targetServer = await checkTargetIP(targetIP, parentIP);
+    const checkResult = await checkTargetIP(targetIP, parentIP);
+    const { server: targetServer, path: exploitationPath } = checkResult;
+    console.log(exploitationPath);
 
     if (!targetServer) {
       return socket.emit("sshResult", {
@@ -538,20 +538,16 @@ export function setupGameHandlers(socket, io) {
     }
 
     // Check required vulnerabilities
+    user.exploitedServers = user.exploitedServers || {};
+    user.exploitedServers[exploitationPath] =
+      user.exploitedServers[exploitationPath] || {};
+    const exploitedVulnerabilities =
+      user.exploitedServers[exploitationPath].ssh || [];
+    const exploitedRoles = user.exploitedServers[exploitationPath].roles || [];
+
     const requiredVulnerabilities = sshService.vulnerabilities.map(
       (vul) => vul.type
     );
-
-    user.exploitedServers = user.exploitedServers || {};
-    const exploitedKey = parentIP
-      ? `${parentIP}.localNetwork.${targetIP}`
-      : targetIP;
-    user.exploitedServers[exploitedKey] =
-      user.exploitedServers[exploitedKey] || {};
-    const exploitedVulnerabilities =
-      user.exploitedServers[exploitedKey].ssh || [];
-    const exploitedRoles = user.exploitedServers[exploitedKey].roles || [];
-
     const allRequiredExploited = requiredVulnerabilities.every((vul) =>
       exploitedVulnerabilities.includes(vul)
     );
@@ -596,7 +592,7 @@ export function setupGameHandlers(socket, io) {
       return;
     }
 
-    const targetServer = await checkTargetIP(targetIP, parentIP);
+    const { server: targetServer } = await checkTargetIP(targetIP, parentIP);
 
     if (!targetServer) {
       socket.emit("userEnumResult", {
@@ -627,8 +623,8 @@ export function setupGameHandlers(socket, io) {
           error: "User not found",
         });
       }
-
-      const targetServer = await checkTargetIP(targetIP, parentIP);
+      const checkResult = await checkTargetIP(targetIP, parentIP);
+      const { server: targetServer, path: exploitationPath } = checkResult;
       if (!targetServer) {
         return socket.emit("passwordCrackerResult", {
           success: false,
@@ -652,13 +648,9 @@ export function setupGameHandlers(socket, io) {
       const requiredVulnerabilities = sshService.vulnerabilities.map(
         (vul) => vul.type
       );
-
       user.exploitedServers = user.exploitedServers || {};
-      const exploitedKey = parentIP
-        ? `${parentIP}.localNetwork.${targetIP}`
-        : targetIP;
       const exploitedVulnerabilities =
-        user.exploitedServers[exploitedKey]?.ssh || [];
+        user.exploitedServers[exploitationPath]?.ssh || [];
 
       const allRequiredExploited = requiredVulnerabilities.every((vul) =>
         exploitedVulnerabilities.includes(vul)
@@ -717,7 +709,7 @@ export function setupGameHandlers(socket, io) {
       return;
     }
 
-    const targetServer = await checkTargetIP(targetIP, parentIP);
+    const { server: targetServer } = await checkTargetIP(targetIP, parentIP);
     if (!targetServer) {
       return socket.emit("rootkitResult", {
         success: false,
@@ -814,7 +806,7 @@ export function setupGameHandlers(socket, io) {
         data: null,
       });
     }
-    const targetServer = await checkTargetIP(targetIP);
+    const { server: targetServer } = await checkTargetIP(targetIP);
     if (!targetServer) {
       return socket.emit("lanSnifferResult", {
         success: false,
@@ -837,7 +829,7 @@ export function setupGameHandlers(socket, io) {
         data: null,
       });
     }
-    const targetServer = await checkTargetIP(targetIP);
+    const { server: targetServer } = await checkTargetIP(targetIP);
     if (!targetServer) {
       return socket.emit("lanSnifferResult", {
         success: false,

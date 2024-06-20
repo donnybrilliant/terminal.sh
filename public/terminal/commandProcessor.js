@@ -263,11 +263,7 @@ const toolCommandMap = {
     }
     const username = loginManager.getUsername() || "Guest";
     const targetIP = args[0];
-    const parentIP =
-      currentSSHSession.parents.length > 0
-        ? currentSSHSession.parents[currentSSHSession.parents.length - 1]
-            .targetIP
-        : null;
+    const parentIP = currentSSHSession.targetIP;
     socket.emit("ssh_exploit", {
       username,
       targetIP,

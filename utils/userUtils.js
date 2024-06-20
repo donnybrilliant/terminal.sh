@@ -97,32 +97,38 @@ export async function checkUser(username) {
 export async function checkTargetIP(targetIP, parentIP = null) {
   const internet = await readJSONFile(INTERNET_FILE_PATH);
 
-  console.log(`Checking target IP: ${targetIP}, Parent IP: ${parentIP}`);
-
-  const findServer = (network, targetIP) => {
-    if (network[targetIP]) {
-      return network[targetIP];
+  // Helper function to recursively find the server and construct the path
+  const findServer = (network, ip, path) => {
+    if (network[ip]) {
+      // Append the current IP to the path if found and return the current network and the path
+      return {
+        server: network[ip],
+        path: path.length > 0 ? path + ".localNetwork." + ip : ip,
+      };
     }
+    // Loop through each network key looking for nested localNetworks
     for (const key in network) {
       if (network[key].localNetwork) {
-        const found = findServer(network[key].localNetwork, targetIP);
-        if (found) {
-          return found;
-        }
+        const newPath = path.length > 0 ? path + ".localNetwork." + key : key;
+        const result = findServer(network[key].localNetwork, ip, newPath);
+        if (result) return result; // Return as soon as a match is found
       }
     }
     return null;
   };
 
   if (parentIP) {
-    const parentServer = findServer(internet, parentIP);
-    if (parentServer && parentServer.localNetwork) {
-      const targetServer = findServer(parentServer.localNetwork, targetIP);
-      if (targetServer) {
-        return targetServer;
-      }
+    // Start from the parent network and construct the path from there
+    const parentResult = findServer(internet, parentIP, "");
+    if (parentResult && parentResult.server.localNetwork) {
+      return findServer(
+        parentResult.server.localNetwork,
+        targetIP,
+        parentResult.path
+      );
     }
+  } else {
+    // If no parentIP is specified, start from the root of the internet
+    return findServer(internet, targetIP, "");
   }
-
-  return findServer(internet, targetIP);
 }

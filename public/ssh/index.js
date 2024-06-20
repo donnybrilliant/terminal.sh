@@ -1,17 +1,13 @@
 // ssh/index.js
+
 import { term, loginManager, socket } from "../terminal/index.js";
 import {
   loadTargetFileSystem,
   loadFileSystem,
-  getCurrentDir,
-  setCurrentDir,
-  getCurrentPath,
-  getDirectoryNames,
 } from "../terminal/fileSystem.js";
 import { getCombinedCommandMap } from "../terminal/commandProcessor.js";
 
 let sshMode = false;
-let parentSSHSession = null;
 export let currentSSHSession = { targetIP: null, parents: [] }; // Allow for multiple parents
 
 export function startSSHSession(ip, parentSession = null) {
@@ -26,7 +22,7 @@ export function startSSHSession(ip, parentSession = null) {
     }
   }
   currentSSHSession.targetIP = ip;
-  console.log(currentSSHSession);
+  console.log("Updated currentSSHSession:", currentSSHSession);
   sshMode = true;
   renderSSHPrompt();
 }

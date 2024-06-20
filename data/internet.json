@@ -27,9 +27,7 @@
       "ssh_patch",
       "lan_sniffer"
     ],
-    "connectedIPs": [
-      "1.1.1.1"
-    ],
+    "connectedIPs": ["1.1.1.1"],
     "services": [
       {
         "name": "ftp",
@@ -71,13 +69,8 @@
       "crypto": 10,
       "data": 5000
     },
-    "tools": [
-      "exploit_kit",
-      "password_sniffer"
-    ],
-    "connectedIPs": [
-      "repo"
-    ],
+    "tools": ["exploit_kit", "password_sniffer"],
+    "connectedIPs": ["repo"],
     "services": [
       {
         "name": "ssh",
@@ -263,11 +256,7 @@
           "crypto": 0.5,
           "data": 1000
         },
-        "tools": [
-          "password_cracker",
-          "ssh_exploit",
-          "password_sniffer"
-        ],
+        "tools": ["password_cracker", "ssh_exploit", "password_sniffer"],
         "services": [
           {
             "name": "ssh",
@@ -306,11 +295,12 @@
           },
           {
             "role": "admin",
-            "level": 12
+            "level": 666
           }
         ],
         "logs": [],
         "fileSystem": {
+          "10.10.116.159": {},
           "home": {
             "admin": {
               "README.txt": {
@@ -320,7 +310,8 @@
           },
           "etc": {
             "config": {
-              "content": "System configuration details."
+              "content": "System configuration details.",
+              "isDownloadable": true
             }
           }
         },
@@ -341,11 +332,102 @@
               "crypto": 0.5,
               "data": 1000
             },
-            "tools": [
-              "password_cracker",
-              "ssh_exploit",
-              "password_sniffer"
+            "tools": ["password_cracker", "ssh_exploit", "password_sniffer"],
+            "services": [
+              {
+                "name": "ssh",
+                "description": "Secure Shell",
+                "port": 22,
+                "vulnerable": true,
+                "level": 10,
+                "vulnerabilities": [
+                  {
+                    "type": "remote_code_execution",
+                    "level": 20
+                  },
+                  {
+                    "type": "buffer_overflow",
+                    "level": 30
+                  }
+                ]
+              },
+              {
+                "name": "http",
+                "description": "Hypertext Transfer Protocol",
+                "port": 80,
+                "vulnerable": true,
+                "vulnerabilities": [
+                  {
+                    "type": "xss",
+                    "level": 20
+                  }
+                ]
+              }
             ],
+            "roles": [
+              {
+                "role": "user",
+                "level": 10
+              },
+              {
+                "role": "admin",
+                "level": 777
+              }
+            ],
+            "logs": [],
+            "fileSystem": {
+              "10.23.120.35": {
+                "content": "Patch for password_cracker.",
+                "isDownloadable": true,
+                "isTool": true,
+                "isPatch": true,
+                "name": "password_cracker",
+                "function": "Cracks passwords using brute force.",
+                "resources": {
+                  "cpu": 1,
+                  "bandwidth": 0.1,
+                  "ram": 1
+                },
+                "exploits": [
+                  {
+                    "type": "password",
+                    "level": 15
+                  }
+                ]
+              },
+              "home": {
+                "admin": {
+                  "README.txt": {
+                    "content": "Admin home directory."
+                  }
+                }
+              },
+              "etc": {
+                "config": {
+                  "content": "System configuration details.",
+                  "isDownloadable": true
+                }
+              }
+            },
+            "connectedIPs": [],
+            "localNetwork": {}
+          },
+          "10.32.251.24": {
+            "id": "2f4d8d43-7662-4a05-b353-71933e8061c0",
+            "ip": null,
+            "localIP": "10.32.251.24",
+            "mac": "b6:61:79:9a:1c:0e",
+            "securityLevel": 1,
+            "resources": {
+              "cpu": 2000,
+              "bandwidth": 500,
+              "ram": 8
+            },
+            "wallet": {
+              "crypto": 0.5,
+              "data": 1000
+            },
+            "tools": ["password_cracker", "ssh_exploit", "password_sniffer"],
             "services": [
               {
                 "name": "ssh",
