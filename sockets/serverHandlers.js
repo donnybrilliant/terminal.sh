@@ -9,6 +9,7 @@ import {
   SERVER_TEMPLATE,
 } from "../utils/fileUtils.js";
 import { generateLocalNetworkIP } from "../utils/ipUtils.js";
+import { checkTargetIP } from "../utils/userUtils.js";
 
 export function setupServerHandlers(socket) {
   socket.on("createServer", async ({ username }) => {
@@ -28,9 +29,9 @@ export function setupServerHandlers(socket) {
     }
   });
 
-  socket.on("createLocalServer", async ({ username, targetIP }) => {
+  socket.on("createLocalServer", async ({ username, targetIP, parentIP }) => {
     try {
-      const server = await createLocalServer(username, targetIP);
+      const server = await createLocalServer(username, targetIP, parentIP);
       socket.emit("createLocalServerResult", {
         success: true,
         message: "Local server created successfully",
@@ -63,7 +64,7 @@ export async function createInternetServer(username) {
   return server;
 }
 
-export async function createLocalServer(username, targetIP) {
+export async function createLocalServer(username, targetIP, parentIP) {
   const internet = await readJSONFile(INTERNET_FILE_PATH);
   const users = await readJSONFile(USERS_FILE_PATH);
   const serverConfig = await readJSONFile(SERVER_TEMPLATE);
@@ -75,20 +76,37 @@ export async function createLocalServer(username, targetIP) {
     )
   );
 
+  console.log("Starting createLocalServer...");
+  console.log("username:", username);
+  console.log("targetIP:", targetIP);
+  console.log("parentIP:", parentIP);
+
   let localIP;
   let targetType;
   let baseIP;
+  let parentServer = null;
 
   if (targetIP) {
-    const server = internet[targetIP];
-    if (!server) throw new Error("Server not found.");
-    localIP = generateLocalNetworkIP(server.localIP, usedIPs);
+    parentServer = await checkTargetIP(targetIP, parentIP);
+    console.log("Found parentServer:", parentServer);
+    if (!parentServer) {
+      throw new Error("Parent server not found for the specified target IP.");
+    }
+    if (!parentServer.localNetwork) {
+      parentServer.localNetwork = {}; // Initialize localNetwork if it doesn't exist
+    }
+    localIP = generateLocalNetworkIP(parentServer.localIP, usedIPs);
+    console.log("Generated localIP:", localIP);
     targetType = "server";
-    baseIP = server.localIP;
+    baseIP = parentServer.localIP;
   } else {
     const user = users.find((u) => u.username === username);
     if (!user) throw new Error("User not found.");
+    if (!user.localNetwork) {
+      user.localNetwork = {}; // Initialize localNetwork if it doesn't exist
+    }
     localIP = generateLocalNetworkIP(user.localIP, usedIPs);
+    console.log("Generated localIP for user:", localIP);
     targetType = "user";
     baseIP = user.localIP;
   }
@@ -99,6 +117,8 @@ export async function createLocalServer(username, targetIP) {
     localIP,
   };
 
+  console.log("Creating server with config:", serverConfigWithLocalIP);
+
   const server = await createServer(
     serverConfigWithLocalIP,
     internet,
@@ -107,20 +127,38 @@ export async function createLocalServer(username, targetIP) {
     true
   );
 
-  // Save server to the appropriate place in your JSON or database
+  console.log("Created server:", server);
+
   if (targetType === "user") {
     const user = users.find((u) => u.username === username);
-    if (!user.localNetwork) {
-      user.localNetwork = {};
-    }
     user.localNetwork[localIP] = server;
+    console.log("Updating user with new local server:", user);
     await writeJSONFile(USERS_FILE_PATH, users);
-  } else {
-    if (!internet[targetIP].localNetwork) {
-      internet[targetIP].localNetwork = {};
-    }
-    internet[targetIP].localNetwork[localIP] = server;
+  } else if (parentServer) {
+    parentServer.localNetwork[localIP] = server;
+    console.log("Updating parent server with new local server:", parentServer);
+
+    const updateNestedServer = (network, targetIP, updatedServer) => {
+      if (network[targetIP]) {
+        network[targetIP] = updatedServer;
+      } else {
+        for (const key in network) {
+          if (network[key].localNetwork) {
+            updateNestedServer(
+              network[key].localNetwork,
+              targetIP,
+              updatedServer
+            );
+          }
+        }
+      }
+    };
+
+    updateNestedServer(internet, targetIP, parentServer);
+
+    console.log("Writing to INTERNET_FILE_PATH:", INTERNET_FILE_PATH);
     await writeJSONFile(INTERNET_FILE_PATH, internet);
+    console.log("Updated internet:", JSON.stringify(internet, null, 2));
   }
 
   return server;

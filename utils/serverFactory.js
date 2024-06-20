@@ -28,6 +28,7 @@ export async function createServer(
     logs = [],
     fileSystem = {},
     connectedIPs = [],
+    localNetwork = {},
   } = config;
 
   const finalIP = isLocal ? null : generateUniqueIP(users, internet);
@@ -60,5 +61,6 @@ export async function createServer(
     logs,
     fileSystem,
     connectedIPs,
+    localNetwork,
   };
 }

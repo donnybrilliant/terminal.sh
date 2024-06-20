@@ -97,17 +97,32 @@ export async function checkUser(username) {
 export async function checkTargetIP(targetIP, parentIP = null) {
   const internet = await readJSONFile(INTERNET_FILE_PATH);
 
-  // If parentIP is provided, search within its localNetwork
-  if (parentIP && internet[parentIP] && internet[parentIP].localNetwork) {
-    if (internet[parentIP].localNetwork[targetIP]) {
-      return internet[parentIP].localNetwork[targetIP];
+  console.log(`Checking target IP: ${targetIP}, Parent IP: ${parentIP}`);
+
+  const findServer = (network, targetIP) => {
+    if (network[targetIP]) {
+      return network[targetIP];
+    }
+    for (const key in network) {
+      if (network[key].localNetwork) {
+        const found = findServer(network[key].localNetwork, targetIP);
+        if (found) {
+          return found;
+        }
+      }
+    }
+    return null;
+  };
+
+  if (parentIP) {
+    const parentServer = findServer(internet, parentIP);
+    if (parentServer && parentServer.localNetwork) {
+      const targetServer = findServer(parentServer.localNetwork, targetIP);
+      if (targetServer) {
+        return targetServer;
+      }
     }
   }
 
-  // Check if targetIP is in the main internet structure
-  if (internet[targetIP]) {
-    return internet[targetIP];
-  }
-
-  return null;
+  return findServer(internet, targetIP);
 }

@@ -1,9 +1,13 @@
 # TODO:
 
+- check localNetwork
+- fix ssh_exploit and others to follow same pattern
+- do i need an isinsshmode in commandprocessor now? -rootkit etc.
+- check over everything in commandprocessor
+
 - will there be an issue connecting to localNetwork with ssh? and use it just like any other server.
 - revisit scan command(!!!) for local networks/internet
 
-- create lan sniffer like mining
 - set up resource usage locally too (running on servers cost a fraction locally too for receiving data i guess)
 - set up loading states for:
   - packet capture/packet decoder, which does the same as lan sniffer, except it sends packets continously.
@@ -105,6 +109,7 @@
 - Better response system with colors - line breaks etc
 - term.write system (also change everything to (eol?) and writeln)
 - PROMPT! especially on SSH should be ip>
+- mobile gui version?
 
 ### GUI/TUI
 
@@ -253,3 +258,5 @@ mechanisms that activate when resources are overused.
   - Bandwidth:
     - Bandwidth-intensive operations should consume more bandwidth, requiring players to balance their network usage.
     - Stealing bandwidth can temporarily boost a player's capabilities but should be balanced against other operations.
+
+Skill Trees and Customization: Allow players to develop and customize their hacker profiles. Different skills could enhance various aspects of hacking, like speed, stealth, or strength of attacks. Players could specialize in different "hacker classes," such as a Cryptographer, Network Specialist, or Social Engineer.

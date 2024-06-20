@@ -66,5 +66,6 @@
       }
     }
   },
-  "connectedIPs": []
+  "connectedIPs": [],
+  "localNetwork": {}
 }

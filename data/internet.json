@@ -247,13 +247,166 @@
         }
       }
     },
-    "localNetwork": {},
-    "usedResources": {
-      "cpu": 0,
-      "bandwidth": 0,
-      "ram": 0
-    },
-    "activeSniffers": {},
-    "activeMiners": {}
+    "localNetwork": {
+      "10.10.116.159": {
+        "id": "a334c2a7-1bd7-45b2-bf0d-53891d2f2b20",
+        "ip": null,
+        "localIP": "10.10.116.159",
+        "mac": "1b:34:ae:36:10:8a",
+        "securityLevel": 1,
+        "resources": {
+          "cpu": 2000,
+          "bandwidth": 500,
+          "ram": 8
+        },
+        "wallet": {
+          "crypto": 0.5,
+          "data": 1000
+        },
+        "tools": [
+          "password_cracker",
+          "ssh_exploit",
+          "password_sniffer"
+        ],
+        "services": [
+          {
+            "name": "ssh",
+            "description": "Secure Shell",
+            "port": 22,
+            "vulnerable": true,
+            "level": 10,
+            "vulnerabilities": [
+              {
+                "type": "remote_code_execution",
+                "level": 20
+              },
+              {
+                "type": "buffer_overflow",
+                "level": 30
+              }
+            ]
+          },
+          {
+            "name": "http",
+            "description": "Hypertext Transfer Protocol",
+            "port": 80,
+            "vulnerable": true,
+            "vulnerabilities": [
+              {
+                "type": "xss",
+                "level": 20
+              }
+            ]
+          }
+        ],
+        "roles": [
+          {
+            "role": "user",
+            "level": 10
+          },
+          {
+            "role": "admin",
+            "level": 12
+          }
+        ],
+        "logs": [],
+        "fileSystem": {
+          "home": {
+            "admin": {
+              "README.txt": {
+                "content": "Admin home directory."
+              }
+            }
+          },
+          "etc": {
+            "config": {
+              "content": "System configuration details."
+            }
+          }
+        },
+        "connectedIPs": [],
+        "localNetwork": {
+          "10.23.120.35": {
+            "id": "0a46568e-8587-401b-9251-8b4f18e8acc8",
+            "ip": null,
+            "localIP": "10.23.120.35",
+            "mac": "dd:09:fa:bf:56:17",
+            "securityLevel": 1,
+            "resources": {
+              "cpu": 2000,
+              "bandwidth": 500,
+              "ram": 8
+            },
+            "wallet": {
+              "crypto": 0.5,
+              "data": 1000
+            },
+            "tools": [
+              "password_cracker",
+              "ssh_exploit",
+              "password_sniffer"
+            ],
+            "services": [
+              {
+                "name": "ssh",
+                "description": "Secure Shell",
+                "port": 22,
+                "vulnerable": true,
+                "level": 10,
+                "vulnerabilities": [
+                  {
+                    "type": "remote_code_execution",
+                    "level": 20
+                  },
+                  {
+                    "type": "buffer_overflow",
+                    "level": 30
+                  }
+                ]
+              },
+              {
+                "name": "http",
+                "description": "Hypertext Transfer Protocol",
+                "port": 80,
+                "vulnerable": true,
+                "vulnerabilities": [
+                  {
+                    "type": "xss",
+                    "level": 20
+                  }
+                ]
+              }
+            ],
+            "roles": [
+              {
+                "role": "user",
+                "level": 10
+              },
+              {
+                "role": "admin",
+                "level": 12
+              }
+            ],
+            "logs": [],
+            "fileSystem": {
+              "home": {
+                "admin": {
+                  "README.txt": {
+                    "content": "Admin home directory."
+                  }
+                }
+              },
+              "etc": {
+                "config": {
+                  "content": "System configuration details."
+                }
+              }
+            },
+            "connectedIPs": [],
+            "localNetwork": {}
+          }
+        }
+      }
+    }
   }
 }
