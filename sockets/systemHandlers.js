@@ -33,7 +33,7 @@ export function setupSystemHandlers(socket) {
     }
 
     if (targetIP) {
-      const targetServer = await checkTargetIP(targetIP);
+      const { server: targetServer } = await checkTargetIP(targetIP);
       if (!targetServer) {
         return socket.emit("hardwareResult", {
           success: false,

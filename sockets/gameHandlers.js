@@ -515,6 +515,33 @@ export function setupGameHandlers(socket, io) {
       });
     }
 
+    // SHOULD THIS DEPEND ON EXPLOITED SERVERS? HERE MIGHT BE GOOD TO CREATE A DIRECT CONNECTION TOOL (for exploited servers)?
+
+    // Determine if the target is a top-level or nested server
+    const isTopLevel = exploitationPath.split(".localNetwork.").length === 1;
+    console.log("Is Top Level:", isTopLevel);
+
+    // If the target is not a top-level server, ensure the user is connected to the parent node first
+    if (!isTopLevel) {
+      // Extract the immediate parent from the exploitation path
+      const parentPathSegments = exploitationPath.split(".localNetwork.");
+      const immediateParentPath = parentPathSegments
+        .slice(0, -1)
+        .join(".localNetwork.");
+      console.log("Immediate Parent Path:", immediateParentPath);
+
+      // Log the current exploited servers for debugging
+      console.log("Exploited Servers:", user.exploitedServers);
+
+      if (!user.exploitedServers[immediateParentPath]) {
+        return socket.emit("sshResult", {
+          success: false,
+          message: "SSH connection failed",
+          error: "You must connect to the parent node first",
+        });
+      }
+    }
+
     // Check for SSH exploits
     const sshService = targetServer.services.find(
       (service) => service.name === "ssh"

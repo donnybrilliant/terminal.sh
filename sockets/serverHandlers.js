@@ -87,7 +87,8 @@ export async function createLocalServer(username, targetIP, parentIP) {
   let parentServer = null;
 
   if (targetIP) {
-    parentServer = await checkTargetIP(targetIP, parentIP);
+    const checkResult = await checkTargetIP(targetIP, parentIP);
+    let { server: parentServer } = checkResult;
     console.log("Found parentServer:", parentServer);
     if (!parentServer) {
       throw new Error("Parent server not found for the specified target IP.");

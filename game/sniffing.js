@@ -86,7 +86,7 @@ function startLanSniffingTimer(user, targetIP, socket) {
     });
 
     // Remove resources and stop LAN sniffing
-    const targetServer = await checkTargetIP(targetIP);
+    const { server: targetServer } = await checkTargetIP(targetIP);
     await stopLanSniffing(user, targetServer, targetIP, socket);
   }, 60000); // Timeout set to 1 minute
 
