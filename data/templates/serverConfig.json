@@ -16,11 +16,15 @@
       "description": "Secure Shell",
       "port": 22,
       "vulnerable": true,
+      "level": 10,
       "vulnerabilities": [
         {
-          "type": "password",
-          "strength": "weak",
-          "level": 1
+          "type": "remote_code_execution",
+          "level": 20
+        },
+        {
+          "type": "buffer_overflow",
+          "level": 30
         }
       ]
     },
@@ -35,6 +39,16 @@
           "level": 20
         }
       ]
+    }
+  ],
+  "roles": [
+    {
+      "role": "user",
+      "level": 10
+    },
+    {
+      "role": "admin",
+      "level": 12
     }
   ],
   "logs": [],

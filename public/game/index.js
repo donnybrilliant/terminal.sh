@@ -9,7 +9,7 @@ import {
   loadTargetFileSystem,
   sshFileData,
 } from "../terminal/fileSystem.js";
-import { startSSHSession } from "../ssh/index.js";
+import { startSSHSession, currentSSHSession } from "../ssh/index.js";
 
 export function initializeGame() {
   socket.on("scanInternetResult", (data) => handleGameMessage(data));
@@ -35,6 +35,7 @@ export function initializeGame() {
   socket.on("createServerResult", (data) => handleGameMessage(data));
   socket.on("createLocalServerResult", (data) => handleGameMessage(data));
   socket.on("lanSnifferResult", (data) => handleGameMessage(data));
+  socket.on("scanLocalNetworkResult", (data) => handleGameMessage(data));
 }
 
 function handleGameMessage(data) {
@@ -61,12 +62,15 @@ function handleGameMessage(data) {
       //term.write(`${formatJSON(eventData)}\r\n`);
       term.write("Check the console for eventData.\r\n");
     }
+
+    // Rewrite this logic
     if (tool) {
       appendToolToFileData(tool);
       updateCommandList();
     }
     if (ssh) {
-      startSSHSession(targetIP);
+      const parentSession = currentSSHSession ? { ...currentSSHSession } : null;
+      startSSHSession(targetIP, parentSession);
       if (eventData) {
         loadTargetFileSystem(eventData);
       } else {

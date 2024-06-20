@@ -12,7 +12,8 @@ export async function createServer(
   config,
   internet = {},
   users = [],
-  baseLocalIP = null
+  baseLocalIP = null,
+  isLocal = false
 ) {
   const {
     ip = null,
@@ -29,7 +30,7 @@ export async function createServer(
     connectedIPs = [],
   } = config;
 
-  const finalIP = ip || generateUniqueIP(users, internet);
+  const finalIP = isLocal ? null : generateUniqueIP(users, internet);
   const finalLocalIP =
     localIP ||
     (baseLocalIP

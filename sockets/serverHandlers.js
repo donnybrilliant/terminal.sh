@@ -103,7 +103,8 @@ export async function createLocalServer(username, targetIP) {
     serverConfigWithLocalIP,
     internet,
     users,
-    baseIP
+    baseIP,
+    true
   );
 
   // Save server to the appropriate place in your JSON or database
