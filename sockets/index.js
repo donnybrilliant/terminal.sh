@@ -14,6 +14,7 @@ import {
   getOnlineUsers,
 } from "../utils/userUtils.js";
 import { setupSystemHandlers } from "./systemHandlers.js";
+import { setupServerHandlers } from "./serverHandlers.js";
 
 export function setupSocket(io) {
   io.on("connection", (socket) => {
@@ -23,6 +24,7 @@ export function setupSocket(io) {
     setupFileSystemHandlers(socket, io);
     setupGameHandlers(socket, io);
     setupSystemHandlers(socket, io);
+    setupServerHandlers(socket);
 
     socket.on("disconnect", () => {
       logAction(username, "User disconnected");

@@ -1,7 +1,7 @@
 {
   "tools": {
     "password_cracker": {
-      "name": "Password Cracker",
+      "name": "password_cracker",
       "function": "Cracks passwords using brute force.",
       "resources": {
         "cpu": 10,
@@ -15,8 +15,19 @@
         }
       ]
     },
+    "pass_patch": {
+      "name": "password_cracker",
+      "isPatch": true,
+      "exploits": [
+        {
+          "type": "password",
+          "level": 20
+        }
+      ]
+    },
+
     "password_sniffer": {
-      "name": "Password Sniffer",
+      "name": "password_sniffer",
       "function": "Sniffs for user roles on a target IP and cracks passwords starting from the lowest user role level.",
       "resources": {
         "cpu": 20,
@@ -30,8 +41,49 @@
         }
       ]
     },
+    "lan_sniffer": {
+      "name": "lan_sniffer",
+      "function": "Sniffs for new local network connections.",
+      "level": 1,
+      "resources": {
+        "cpu": 20,
+        "bandwidth": 0.3,
+        "ram": 8
+      }
+    },
+    "packet_capture": {
+      "name": "packet_capture",
+      "function": "Captures packets from the network.",
+      "level": 1,
+      "resources": {
+        "cpu": 20,
+        "bandwidth": 0.3,
+        "ram": 8
+      }
+    },
+    "packet_decoder": {
+      "name": "packet_decoder",
+      "function": "Decodes captured packets to extract information.",
+      "level": 1,
+      "resources": {
+        "cpu": 20,
+        "bandwidth": 0.3,
+        "ram": 8
+      }
+    },
+    "crypto_miner": {
+      "name": "crypto_miner",
+      "function": "Mines cryptocurrency from compromised systems.",
+      "level": 1,
+      "resources": {
+        "cpu": 25,
+        "bandwidth": 0.2,
+        "ram": 1
+      },
+      "special": "Generates passive income over time."
+    },
     "user_enum": {
-      "name": "User Enumerator",
+      "name": "user_enum",
       "function": "Finds and deciphers users and their roles.",
       "resources": {
         "cpu": 15,
@@ -39,17 +91,17 @@
         "ram": 4
       }
     },
-    "network_sniffer": {
-      "name": "Network Sniffer",
-      "function": "Sniffs network traffic to gather information.",
+    "rootkit": {
+      "name": "rootkit",
+      "function": "Installs hidden access to a system for ongoing control.",
       "resources": {
-        "cpu": 8,
-        "bandwidth": 0.08,
+        "cpu": 20,
+        "bandwidth": 0.4,
         "ram": 4
       }
     },
     "ssh_exploit": {
-      "name": "SSH Exploit",
+      "name": "ssh_exploit",
       "function": "Exploits vulnerabilities in SSH to gain access.",
       "services": "ssh",
       "resources": {
@@ -68,8 +120,18 @@
         }
       ]
     },
+    "ssh_patch": {
+      "name": "ssh_exploit",
+      "isPatch": true,
+      "exploits": [
+        {
+          "type": "remote_code_execution",
+          "level": 50
+        }
+      ]
+    },
     "exploit_kit": {
-      "name": "Exploit Kit",
+      "name": "exploit_kit",
       "function": "Exploits known vulnerabilities to gain access.",
       "resources": {
         "cpu": 20,
@@ -92,7 +154,7 @@
       ]
     },
     "advanced_exploit_kit": {
-      "name": "Advanced Exploit Kit",
+      "name": "advanced_exploit_kit",
       "function": "Exploits advanced vulnerabilities to gain access.",
       "resources": {
         "cpu": 50,
@@ -119,7 +181,7 @@
       ]
     },
     "sql_injector": {
-      "name": "SQL Injector",
+      "name": "sql_injector",
       "function": "Performs SQL injection attacks to manipulate databases.",
       "resources": {
         "cpu": 15,
@@ -134,7 +196,7 @@
       ]
     },
     "xss_exploit": {
-      "name": "XSS Exploit",
+      "name": "xss_exploit",
       "function": "Exploits cross-site scripting vulnerabilities.",
       "resources": {
         "cpu": 10,
@@ -149,7 +211,7 @@
       ]
     },
     "buffer_overflow_exploit": {
-      "name": "Buffer Overflow Exploit",
+      "name": "buffer_overflow_exploit",
       "function": "Exploits buffer overflow vulnerabilities to execute arbitrary code.",
       "resources": {
         "cpu": 25,
@@ -164,7 +226,7 @@
       ]
     },
     "remote_code_execution_exploit": {
-      "name": "Remote Code Execution Exploit",
+      "name": "remote_code_execution_exploit",
       "function": "Executes arbitrary code on a remote system.",
       "resources": {
         "cpu": 30,
@@ -179,7 +241,7 @@
       ]
     },
     "privilege_escalation_tool": {
-      "name": "Privilege Escalation Tool",
+      "name": "privilege_escalation_tool",
       "function": "Gains higher privileges than normally allowed.",
       "resources": {
         "cpu": 20,
@@ -194,7 +256,7 @@
       ]
     },
     "zero_day_exploit": {
-      "name": "Zero-Day Exploit",
+      "name": "zero_day_exploit",
       "function": "Uses an undisclosed vulnerability to gain access to a system.",
       "resources": {
         "cpu": 75,
@@ -208,17 +270,18 @@
         }
       ]
     },
-    "rootkit": {
-      "name": "Rootkit",
-      "function": "Installs hidden access to a system for ongoing control.",
+
+    "firewall_bypass_tool": {
+      "name": "firewall_bypass_tool",
+      "function": "Bypasses firewall restrictions to access a target system.",
       "resources": {
         "cpu": 20,
         "bandwidth": 0.4,
-        "ram": 4
+        "ram": 6
       }
     },
     "data_exfiltrator": {
-      "name": "Data Exfiltrator",
+      "name": "data_exfiltrator",
       "function": "Extracts large volumes of data from a target system.",
       "resources": {
         "cpu": 15,
@@ -227,7 +290,7 @@
       }
     },
     "log_cleaner": {
-      "name": "Log Cleaner",
+      "name": "log_cleaner",
       "function": "Erases traces of hacking activities from system logs.",
       "resources": {
         "cpu": 5,
@@ -236,7 +299,7 @@
       }
     },
     "social_engineering_toolkit": {
-      "name": "Social Engineering Toolkit",
+      "name": "social_engineering_toolkit",
       "function": "Uses social engineering tactics to gather information or access.",
       "resources": {
         "cpu": 10,
@@ -245,7 +308,7 @@
       }
     },
     "honeypot_detector": {
-      "name": "Honeypot Detector",
+      "name": "honeypot_detector",
       "function": "Identifies and avoids honeypots set up to trap hackers.",
       "resources": {
         "cpu": 15,
@@ -254,7 +317,7 @@
       }
     },
     "phishing_kit": {
-      "name": "Phishing Kit",
+      "name": "phishing_kit",
       "function": "Creates convincing phishing campaigns to steal credentials.",
       "resources": {
         "cpu": 12,
@@ -263,7 +326,7 @@
       }
     },
     "stealth_virus": {
-      "name": "Stealth Virus",
+      "name": "stealth_virus",
       "function": "Infects systems without being detected by antivirus software.",
       "resources": {
         "cpu": 25,
@@ -272,7 +335,7 @@
       }
     },
     "botnet_controller": {
-      "name": "Botnet Controller",
+      "name": "botnet_controller",
       "function": "Manages a network of compromised devices to perform various attacks.",
       "resources": {
         "cpu": 50,
@@ -281,7 +344,7 @@
       }
     },
     "encryption_breaker": {
-      "name": "Encryption Breaker",
+      "name": "encryption_breaker",
       "function": "Breaks through advanced encryption to access secured data.",
       "resources": {
         "cpu": 60,
@@ -290,7 +353,7 @@
       }
     },
     "malware_injector": {
-      "name": "Malware Injector",
+      "name": "malware_injector",
       "function": "Injects malicious software into target systems.",
       "resources": {
         "cpu": 30,
@@ -299,7 +362,7 @@
       }
     },
     "web_shell": {
-      "name": "Web Shell",
+      "name": "web_shell",
       "function": "Provides remote access to a compromised web server.",
       "resources": {
         "cpu": 10,
@@ -308,7 +371,7 @@
       }
     },
     "firmware_hacker": {
-      "name": "Firmware Hacker",
+      "name": "firmware_hacker",
       "function": "Modifies firmware to gain persistent low-level access.",
       "resources": {
         "cpu": 40,
@@ -317,7 +380,7 @@
       }
     },
     "security_scanner": {
-      "name": "Security Scanner",
+      "name": "security_scanner",
       "function": "Scans for vulnerabilities in a target system's security setup.",
       "resources": {
         "cpu": 20,
@@ -326,7 +389,7 @@
       }
     },
     "proxy_network": {
-      "name": "Proxy Network",
+      "name": "proxy_network",
       "function": "Uses a network of proxy servers to hide the hacker's location.",
       "resources": {
         "cpu": 5,
@@ -336,7 +399,7 @@
       "special": "Reduces traceability by 50%."
     },
     "ai_defender_bot": {
-      "name": "AI Defender Bot",
+      "name": "ai_defender_bot",
       "function": "Automates the defense of systems, identifying and neutralizing threats.",
       "resources": {
         "cpu": 80,
@@ -346,7 +409,7 @@
       "special": "Automatically defends against detected attacks, reducing damage by 50%."
     },
     "signal_interceptor": {
-      "name": "Signal Interceptor",
+      "name": "signal_interceptor",
       "function": "Intercepts and analyzes wireless signals for data extraction.",
       "resources": {
         "cpu": 35,
@@ -355,7 +418,7 @@
       }
     },
     "darknet_market_access": {
-      "name": "Darknet Market Access",
+      "name": "darknet_market_access",
       "function": "Provides access to a marketplace for buying and selling illegal goods.",
       "resources": {
         "cpu": 50,
@@ -365,7 +428,7 @@
       "special": "Allows trade of rare tools and exploits."
     },
     "crypto_wallet_hacker": {
-      "name": "Crypto Wallet Hacker",
+      "name": "crypto_wallet_hacker",
       "function": "Targets cryptocurrency wallets to steal funds.",
       "resources": {
         "cpu": 70,
@@ -374,7 +437,7 @@
       }
     },
     "ddos_cannon": {
-      "name": "DDoS Cannon",
+      "name": "ddos_cannon",
       "function": "Launches a Distributed Denial of Service attack to overwhelm a target.",
       "resources": {
         "cpu": 30,
@@ -383,7 +446,7 @@
       }
     },
     "bandwidth_miner": {
-      "name": "Bandwidth Miner",
+      "name": "bandwidth_miner",
       "function": "Mines bandwidth currency from compromised systems.",
       "resources": {
         "cpu": 25,
@@ -392,18 +455,9 @@
       },
       "special": "Generates passive income over time."
     },
-    "crypto_miner": {
-      "name": "Crypto Miner",
-      "function": "Mines cryptocurrency from compromised systems.",
-      "resources": {
-        "cpu": 25,
-        "bandwidth": 0.2,
-        "ram": 1
-      },
-      "special": "Generates passive income over time."
-    },
+
     "ai_hacker_bot": {
-      "name": "AI Hacker Bot",
+      "name": "ai_hacker_bot",
       "function": "An AI-powered bot that automates hacking tasks and learns over time.",
       "resources": {
         "cpu": 100,
@@ -413,7 +467,7 @@
       "special": "Improves efficiency with use, reducing resource costs by 10% for each successful hack."
     },
     "quantum_decryptor": {
-      "name": "Quantum Decryptor",
+      "name": "quantum_decryptor",
       "function": "Uses quantum computing to decrypt highly secure communications.",
       "resources": {
         "cpu": 200,

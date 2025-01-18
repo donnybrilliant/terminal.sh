@@ -15,7 +15,7 @@ import {
   isInChatMode,
   handleChatCommand,
 } from "../chat/index.js";
-import { fileData } from "./fileSystem.js";
+import { fileData, getCurrentPath } from "./fileSystem.js";
 import {
   currentSSHSession,
   isInSSHMode,
@@ -93,67 +93,151 @@ const baseCommandMap = {
   },
   logout: async () => await loginManager.logout(),
   scan: (args) => {
-    if (args.length === 0) {
-      const username = loginManager.getUsername() || "Guest";
-      socket.emit("scanInternet", { username });
-      return "Scanning internet for IP addresses...";
-    } else if (args.length === 1) {
-      const username = loginManager.getUsername() || "Guest";
-      socket.emit("scanIP", { username, targetIP: args[0] });
-      return `Scanning IP ${args[0]} for services...`;
-    } else {
-      return "Usage: scan <targetIP>";
-    }
-  },
-  hackIP: (args) => {
-    if (args.length !== 1) {
-      return "Usage: hackIP <targetIP>";
-    }
     const username = loginManager.getUsername() || "Guest";
-    socket.emit("hackIP", { username, targetIP: args[0] });
-    return `Attempting to hack IP ${args[0]}...`;
-  },
-
-  download: (args) => {
-    const username = loginManager.getUsername() || "Guest";
-
-    if (args.length === 2) {
-      // Original format: download ip toolName
-      const [targetIP, toolName] = args;
-      socket.emit("download", {
+    if (isInSSHMode()) {
+      const targetIP = currentSSHSession.targetIP;
+      const parentIP =
+        currentSSHSession.parents.length > 0
+          ? currentSSHSession.parents[currentSSHSession.parents.length - 1]
+              .targetIP
+          : null;
+      socket.emit("scanConnectedIPs", {
         username,
         targetIP,
-        toolName,
+        parentIP,
       });
-      return `Downloading ${toolName} from IP ${targetIP}...`;
-    } else if (args.length === 1) {
-      // New format: download filePath
-      const filePath = args[0];
-      socket.emit("download", {
-        username,
-        filePath,
-      });
-      return `Downloading file from ${filePath}...`;
+      return `Scanning connected IPs on ${targetIP}...`;
     } else {
-      return "Usage: download <targetIP> <toolName> or download <filePath>";
+      if (args.length === 0) {
+        socket.emit("scanInternet", { username });
+        return "Scanning internet for IP addresses...";
+      } else if (args.length === 1) {
+        const targetIP = args[0];
+        socket.emit("scanIP", {
+          username,
+          targetIP,
+          parentIP: null,
+        });
+        return `Scanning IP ${targetIP} for services...`;
+      } else {
+        return "Usage: scan <targetIP>";
+      }
     }
   },
+
+  get: (args) => {
+    if (args.length !== 2) {
+      return "Usage: get <targetIP> <toolName>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    const targetIP = args[0];
+    const toolName = args[1];
+    const parentIP = isInSSHMode()
+      ? currentSSHSession.parents.length > 0
+        ? currentSSHSession.parents[currentSSHSession.parents.length - 1]
+            .targetIP
+        : null
+      : null;
+    socket.emit("getTool", { username, targetIP, parentIP, toolName });
+    return `Getting ${toolName} from IP ${targetIP}...`;
+  },
+  download: (args) => {
+    if (args.length !== 1) {
+      return "Usage: download <filePath>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    const targetIP = currentSSHSession.targetIP;
+    const parentIP = isInSSHMode()
+      ? currentSSHSession.parents.length > 0
+        ? currentSSHSession.parents[currentSSHSession.parents.length - 1]
+            .targetIP
+        : null
+      : null;
+    const currentPath = getCurrentPath(true); // Assuming SSH mode
+    const filePath = args[0].startsWith("/")
+      ? args[0]
+      : `${currentPath}/${args[0]}`;
+    socket.emit("download", { username, targetIP, parentIP, filePath });
+    return `Downloading file from ${filePath} on IP ${targetIP}...`;
+  },
   server: () => {
-    socket.emit("requestHardwareInfo");
-    socket.on("hardwareInfo", (data) => {
-      console.log("Received hardware info:", data);
-      // Use this information as needed
-    });
-    return "Hardware info received. Check the console.";
+    const username = loginManager.getUsername();
+    const targetIP = currentSSHSession.targetIP;
+    socket.emit("hardwareInfo", { username, targetIP });
+    return "Checking hardware info..";
   },
   ssh: (args) => {
     if (args.length !== 1) {
       return "Usage: ssh <targetIP>";
     }
+
     const targetIP = args[0];
     const username = loginManager.getUsername();
-    socket.emit("ssh", { username, targetIP });
-    return `Connecting to ${targetIP}...`;
+
+    if (isInSSHMode()) {
+      const parentIP = currentSSHSession.targetIP;
+      const parentSession = { ...currentSSHSession };
+      socket.emit("ssh", {
+        username,
+        targetIP,
+        parentIP,
+      });
+      return `Connecting to local IP ${targetIP} on ${currentSSHSession.targetIP}...`;
+    } else {
+      // Not in SSH mode, treat targetIP as top-level IP
+      socket.emit("ssh", { username, targetIP });
+      return `Connecting to ${targetIP}...`;
+    }
+  },
+  wallet: () => {
+    const username = loginManager.getUsername();
+    socket.emit("wallet", { username });
+    return "Checking wallet...";
+  },
+  whoami: () => {
+    const username = loginManager.getUsername();
+    return username || "Guest";
+  },
+  ifconfig: () => {
+    const username = loginManager.getUsername();
+    socket.emit("ifconfig", { username });
+    return "Checking network interfaces...";
+  },
+  tools: () => {
+    const username = loginManager.getUsername();
+    socket.emit("tools", { username });
+    return "Checking available tools...";
+  },
+  exploited: () => {
+    const username = loginManager.getUsername();
+    socket.emit("exploited", { username });
+    return "Checking exploited servers...";
+  },
+  userinfo: () => {
+    const username = loginManager.getUsername();
+    socket.emit("userinfo", { username });
+    return "Checking user info...";
+  },
+  miners: () => {
+    const username = loginManager.getUsername();
+    socket.emit("miners", { username });
+    return "Checking miners...";
+  },
+  createServer: () => {
+    const username = loginManager.getUsername() || "Guest";
+    socket.emit("createServer", { username });
+    return "Creating server...";
+  },
+  createLocalServer: () => {
+    const username = loginManager.getUsername();
+    const targetIP = currentSSHSession.targetIP;
+    const parentIP =
+      currentSSHSession.parents.length > 0
+        ? currentSSHSession.parents[currentSSHSession.parents.length - 1]
+            .targetIP
+        : null;
+    socket.emit("createLocalServer", { username, targetIP, parentIP });
+    return `Creating local server for ${targetIP || "local machine"}...`;
   },
 };
 
@@ -165,7 +249,12 @@ const toolCommandMap = {
       return "Usage: password_sniffer <targetIP>";
     }
     const username = loginManager.getUsername() || "Guest";
-    socket.emit("password_sniffer", { username, targetIP: args[0] });
+    const parentIP =
+      currentSSHSession.parents.length > 0
+        ? currentSSHSession.parents[currentSSHSession.parents.length - 1]
+            .targetIP
+        : null;
+    socket.emit("password_sniffer", { username, targetIP: args[0], parentIP });
     return `Attempting to sniff password on IP ${args[0]}...`;
   },
   ssh_exploit: (args) => {
@@ -173,36 +262,57 @@ const toolCommandMap = {
       return "Usage: ssh_exploit <targetIP>";
     }
     const username = loginManager.getUsername() || "Guest";
-    socket.emit("ssh_exploit", { username, targetIP: args[0] });
-    return `Attempting to exploit SSH on IP ${args[0]}...`;
+    const targetIP = args[0];
+    const parentIP = currentSSHSession.targetIP;
+    socket.emit("ssh_exploit", {
+      username,
+      targetIP,
+      parentIP,
+    });
+    return `Attempting to exploit SSH on local IP ${targetIP}...`;
   },
-  user_enum: (args) => {
-    if (args.length !== 0) {
-      return "Usage: user_enum";
-    }
+  user_enum: () => {
     const username = loginManager.getUsername() || "Guest";
-    const targetIP = currentSSHSession.targetIP;
-    if (!targetIP) {
-      return "No active SSH session.";
+    if (isInSSHMode()) {
+      const targetIP = currentSSHSession.targetIP;
+      const parentIP =
+        currentSSHSession.parents.length > 0
+          ? currentSSHSession.parents[currentSSHSession.parents.length - 1]
+              .targetIP
+          : null;
+      socket.emit("user_enum", {
+        username,
+        targetIP,
+        parentIP,
+      });
+      return `Enumerating users on IP ${targetIP}...`;
+    } else {
+      return "User enumeration can only be performed in SSH mode.";
     }
-    socket.emit("user_enum", { username, targetIP });
-    return `Enumerating users on IP ${targetIP}...`;
   },
+
   password_cracker: (args) => {
     if (args.length !== 1 || args[0] === "") {
       return "Usage: password_cracker <role>";
     }
     const username = loginManager.getUsername() || "Guest";
-    const targetIP = currentSSHSession.targetIP;
-    if (!targetIP) {
-      return "No active SSH session.";
+    if (isInSSHMode()) {
+      const targetIP = currentSSHSession.targetIP;
+      const parentIP =
+        currentSSHSession.parents.length > 0
+          ? currentSSHSession.parents[currentSSHSession.parents.length - 1]
+              .targetIP
+          : null;
+      socket.emit("password_cracker", {
+        username,
+        targetIP,
+        parentIP,
+        role: args[0],
+      });
+      return `Attempting to crack password for role ${args[0]} on IP ${targetIP}...`;
+    } else {
+      return "Password cracking can only be performed in SSH mode.";
     }
-    socket.emit("password_cracker", {
-      username,
-      targetIP,
-      role: args[0],
-    });
-    return `Attempting to crack password for role ${args[0]} on IP ${targetIP}...`;
   },
   rootkit: (args) => {
     if (args.length !== 1 || args[0] === "") {
@@ -210,24 +320,58 @@ const toolCommandMap = {
     }
     const username = loginManager.getUsername() || "Guest";
     const targetIP = currentSSHSession.targetIP;
+    const parentIP =
+      currentSSHSession.parents.length > 0
+        ? currentSSHSession.parents[currentSSHSession.parents.length - 1]
+            .targetIP
+        : null;
+    // Probably good to have this check here before it goes to the backend? Or isInSSHMode? Should have this on the rest too..
     if (!targetIP) {
       return "No active SSH session.";
     }
     socket.emit("rootkit", {
       username,
       targetIP,
+      parentIP,
       role: args[0],
     });
     return `Initializing rootkit for role ${args[0]} on IP ${targetIP}...`;
   },
-  mine: (args) => {
+  crypto_miner: (args) => {
     if (args.length !== 1) {
-      return "Usage: mine <targetIP>";
+      return "Usage: crypto_miner <start/stop>";
     }
     const username = loginManager.getUsername() || "Guest";
-    const targetIP = args[0];
-    socket.emit("startMining", { username, targetIP });
-    return `Mining IP ${targetIP}...`;
+    if (isInSSHMode()) {
+      const targetIP = currentSSHSession.targetIP;
+      if (args.length === 1 && args[0] === "stop") {
+        socket.emit("stopMining", { username, targetIP });
+        return `Stopping mining on ${targetIP}...`;
+      } else if (args.length === 1 && args[0] === "start") {
+        socket.emit("startMining", { username, targetIP });
+        return `Mining IP ${targetIP}...`;
+      }
+    } else {
+      return "Local mining is not implemented.";
+    }
+  },
+  lan_sniffer: (args) => {
+    if (args.length !== 1) {
+      return "Usage: lan_sniffer <start/stop>";
+    }
+    const username = loginManager.getUsername() || "Guest";
+    if (isInSSHMode()) {
+      const targetIP = currentSSHSession.targetIP;
+      if (args.length === 1 && args[0] === "stop") {
+        socket.emit("stopLanSniffing", { username, targetIP });
+        return `Stopping mining on ${targetIP}...`;
+      } else if (args.length === 1 && args[0] === "start") {
+        socket.emit("startLanSniffing", { username, targetIP });
+        return `LAN Sniffing on IP ${targetIP}...`;
+      }
+    } else {
+      return "Local LAN sniffing is not implemented.";
+    }
   },
 };
 

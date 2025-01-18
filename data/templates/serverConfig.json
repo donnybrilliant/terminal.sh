@@ -1,0 +1,71 @@
+{
+  "securityLevel": 1,
+  "resources": {
+    "cpu": 2000,
+    "bandwidth": 500,
+    "ram": 8
+  },
+  "wallet": {
+    "crypto": 0.5,
+    "data": 1000
+  },
+  "tools": ["password_cracker", "ssh_exploit", "password_sniffer"],
+  "services": [
+    {
+      "name": "ssh",
+      "description": "Secure Shell",
+      "port": 22,
+      "vulnerable": true,
+      "level": 10,
+      "vulnerabilities": [
+        {
+          "type": "remote_code_execution",
+          "level": 20
+        },
+        {
+          "type": "buffer_overflow",
+          "level": 30
+        }
+      ]
+    },
+    {
+      "name": "http",
+      "description": "Hypertext Transfer Protocol",
+      "port": 80,
+      "vulnerable": true,
+      "vulnerabilities": [
+        {
+          "type": "xss",
+          "level": 20
+        }
+      ]
+    }
+  ],
+  "roles": [
+    {
+      "role": "user",
+      "level": 10
+    },
+    {
+      "role": "admin",
+      "level": 12
+    }
+  ],
+  "logs": [],
+  "fileSystem": {
+    "home": {
+      "admin": {
+        "README.txt": {
+          "content": "Admin home directory."
+        }
+      }
+    },
+    "etc": {
+      "config": {
+        "content": "System configuration details."
+      }
+    }
+  },
+  "connectedIPs": [],
+  "localNetwork": {}
+}

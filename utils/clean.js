@@ -4,10 +4,11 @@ import path from "path";
 // Paths to the files and directories we need to modify
 const dataDir = "./data";
 const messagesDir = path.join(dataDir, "messages");
+const usersFilePath = path.join(dataDir, "users.json");
+const internetFilePath = path.join(dataDir, "internet.json");
 const filesToEmpty = [
   path.join(messagesDir, "general.json"),
-  path.join(dataDir, "users.json"),
-  path.join(dataDir, "logs.json"), // Adding logs.json to the list
+  path.join(dataDir, "logs.json"),
 ];
 
 // Function to overwrite specified files with an empty array
@@ -37,6 +38,52 @@ const cleanMessagesDirectory = (dir) => {
   });
 };
 
+// Function to remove all users except 'admin' and 'user'
+const cleanUsersFile = (filePath) => {
+  fs.readFile(filePath, "utf8", (err, data) => {
+    if (err) return console.error(`Error reading ${filePath}: ${err}`);
+
+    let users = JSON.parse(data);
+    users = users.filter(
+      (user) => user.username === "admin" || user.username === "user"
+    );
+
+    fs.writeFile(filePath, JSON.stringify(users, null, 2), "utf8", (err) => {
+      if (err) return console.error(`Error writing to ${filePath}: ${err}`);
+      console.log(`Successfully cleaned ${filePath}.`);
+    });
+  });
+};
+
+// Function to remove 'activeMiners' and 'usedResources' from every server in internet.json
+const cleanInternetFile = (filePath) => {
+  fs.readFile(filePath, "utf8", (err, data) => {
+    if (err) return console.error(`Error reading ${filePath}: ${err}`);
+
+    let internetData = JSON.parse(data);
+    Object.keys(internetData).forEach((server) => {
+      if (internetData[server].activeMiners !== undefined) {
+        delete internetData[server].activeMiners;
+      }
+      if (internetData[server].usedResources !== undefined) {
+        delete internetData[server].usedResources;
+      }
+    });
+
+    fs.writeFile(
+      filePath,
+      JSON.stringify(internetData, null, 2),
+      "utf8",
+      (err) => {
+        if (err) return console.error(`Error writing to ${filePath}: ${err}`);
+        console.log(`Successfully cleaned ${filePath}.`);
+      }
+    );
+  });
+};
+
 // Execute the cleanup functions
 overwriteWithEmptyArray(filesToEmpty);
 cleanMessagesDirectory(messagesDir);
+cleanUsersFile(usersFilePath);
+cleanInternetFile(internetFilePath);

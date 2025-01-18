@@ -15,6 +15,7 @@ const TOOLS_FILE_PATH = path.join(DATA_DIR, "tools.json");
 const STORE_FILE_PATH = path.join(DATA_DIR, "store.json");
 const RESOURCES_FILE_PATH = path.join(DATA_DIR, "resources.json");
 const LOG_FILE_PATH = path.join(DATA_DIR, "logs.json");
+const SERVER_TEMPLATE = path.join(DATA_DIR, "/templates/serverConfig.json");
 
 const lock = new AsyncLock();
 const FILE_LOCK_KEY = "file_lock";
@@ -54,4 +55,5 @@ export {
   TOOLS_FILE_PATH,
   STORE_FILE_PATH,
   RESOURCES_FILE_PATH,
+  SERVER_TEMPLATE,
 };

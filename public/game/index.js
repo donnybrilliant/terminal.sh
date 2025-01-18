@@ -9,20 +9,33 @@ import {
   loadTargetFileSystem,
   sshFileData,
 } from "../terminal/fileSystem.js";
-import { startSSHSession } from "../ssh/index.js";
+import { startSSHSession, currentSSHSession } from "../ssh/index.js";
 
 export function initializeGame() {
   socket.on("scanInternetResult", (data) => handleGameMessage(data));
   socket.on("scanIPResult", (data) => handleGameMessage(data));
-  socket.on("hackResult", (data) => handleGameMessage(data));
   socket.on("miningResult", (data) => handleGameMessage(data));
+  socket.on("miningUpdate", (data) => handleGameMessage(data));
   socket.on("downloadResult", (data) => handleGameMessage(data));
+  socket.on("getToolResult", (data) => handleGameMessage(data));
+  socket.on("getResult", (data) => handleGameMessage(data));
   socket.on("sshExploitResult", (data) => handleGameMessage(data));
   socket.on("passwordSnifferResult", (data) => handleGameMessage(data));
   socket.on("userEnumResult", (data) => handleGameMessage(data));
   socket.on("passwordCrackerResult", (data) => handleGameMessage(data));
   socket.on("sshResult", (data) => handleGameMessage(data));
   socket.on("rootkitResult", (data) => handleGameMessage(data));
+  socket.on("hardwareResult", (data) => handleGameMessage(data));
+  socket.on("walletResult", (data) => handleGameMessage(data));
+  socket.on("ifconfigResult", (data) => handleGameMessage(data));
+  socket.on("exploitedResult", (data) => handleGameMessage(data));
+  socket.on("toolsResult", (data) => handleGameMessage(data));
+  socket.on("minerResult", (data) => handleGameMessage(data));
+  socket.on("userinfoResult", (data) => handleGameMessage(data));
+  socket.on("createServerResult", (data) => handleGameMessage(data));
+  socket.on("createLocalServerResult", (data) => handleGameMessage(data));
+  socket.on("lanSnifferResult", (data) => handleGameMessage(data));
+  socket.on("scanLocalNetworkResult", (data) => handleGameMessage(data));
 }
 
 function handleGameMessage(data) {
@@ -34,7 +47,7 @@ function handleGameMessage(data) {
     message,
     error,
     data: eventData,
-    toolName,
+    tool,
     targetIP,
     ssh,
     load,
@@ -49,12 +62,15 @@ function handleGameMessage(data) {
       //term.write(`${formatJSON(eventData)}\r\n`);
       term.write("Check the console for eventData.\r\n");
     }
-    if (toolName) {
-      appendToolToFileData(toolName);
+
+    // Rewrite this logic
+    if (tool) {
+      appendToolToFileData(tool);
       updateCommandList();
     }
     if (ssh) {
-      startSSHSession(targetIP);
+      const parentSession = currentSSHSession ? { ...currentSSHSession } : null;
+      startSSHSession(targetIP, parentSession);
       if (eventData) {
         loadTargetFileSystem(eventData);
       } else {

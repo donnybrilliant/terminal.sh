@@ -1,3 +1,25 @@
+# TODO:
+
+- createLocalServer not working ---
+
+- tools not being properly set up for autocomplete at some point (initialization?)
+- ssh :exit is weird..
+- why can i connect directly to a localNetwork? THIS COULD BE A TOOL!!!
+- fix get syntax if already on server to get <tool>
+
+- do i need an isinsshmode in commandprocessor now? -rootkit etc.
+- check over everything in commandprocessor
+
+- will there be an issue connecting to localNetwork with ssh? and use it just like any other server.
+- revisit scan command(!!!) for local networks/internet
+
+- set up resource usage locally too (running on servers cost a fraction locally too for receiving data i guess)
+- set up loading states for:
+  - packet capture/packet decoder, which does the same as lan sniffer, except it sends packets continously.
+- timeouts and intervals are dependent on level
+- check over info tools
+- bin/commands content with cat
+
 ### Initialization
 
 - Initialization (good?)
@@ -7,7 +29,6 @@
 - set name without auth
 - not authenticated, save as guest object, save on login?
 - name command in chat too
-- unique names generator for alliances?
 - autocomplete for /join with available user.alliance[] or the way socket keeps track of the rooms.
 - scan command (flags to show different info)
 - user roles list /etc/groups/ /etc/password
@@ -18,23 +39,36 @@
 - hidden files and a tool to find them (.files?) ls -a?
 - another way to upgrade tools?
 - shoult i be using socket.emit => callback instead of socket.on? With callback the user cant do anything while it works, which is good?
-- tool information on server might not be the smartest.
 - need to check vulnerable boolean on server.services on connection to server
+- settimeout based on tool level vs exploit level, with loader
+- get zip files.
+- alliances add a new vpn network.
+- limit activeminer to one on each server
+- tool to open local network?
+- voting system based on? resources etc?
 
 ### Improvements
 
-- TOOLS ARE TOO STATIC!
+- save one server instead of all internet file
+
+- dynamic miners choosing resources as args.
+- emphasize workflow! if this then that, without rootkit you cant run anything on the server almost.
+- local/server differentiation and tools that work on both.
+- backdoor to control miners from a distance ++
+- TOOLS ARE TOO STATIC! - merge and rename tools etc.
 - Guest restrictions (no alliances done - tool restrictions - what more?)
-- remove login command from ssh
-- Check over gameHandlers, they might not do what I want
+- remove/change login command from ssh
 - refactor data/.json handling/structure
 - move fileData handling from login.js to fileSystem.js?
 - improve cd to autocomplete full paths.
 - test edit mode
 - PROMPT! especially on SSH should be ip>
 - .trim() command arguments?
-- I should use utils more places getUsers etc
+- I should use utils more places getUsers, saveUser etc
 - I should set up auth checks with checkAuth instead. (Should this return a username? or is it enough with the req.socket?)
+- Differentiante between scan in ssh and regular mode.
+- download - inspect - install - merge - uninstall etc - is this a wanted workflow? or keep it basic like now?
+- let lanSniffingIntervals = {}; and mining might not be scalable for db
 
 ### Fixes
 
@@ -81,6 +115,7 @@
 - Better response system with colors - line breaks etc
 - term.write system (also change everything to (eol?) and writeln)
 - PROMPT! especially on SSH should be ip>
+- mobile gui version?
 
 ### GUI/TUI
 
@@ -115,8 +150,8 @@
 - command that creates new dynamic servers?
 - other players have dynamic ports open?
 - set up fake "wifi" to create new servers / server for phishing etc
-- make randomly generated file system for servers. ai?
-- everything random! use deauth and some servers might never appear again.
+- make randomly generated file system for servers. ai? tools etc.
+- everything random! use deauth and some servers might never appear again. shit deauth = more servers disappear.
 
 ### Economy
 
@@ -230,39 +265,4 @@ mechanisms that activate when resources are overused.
     - Bandwidth-intensive operations should consume more bandwidth, requiring players to balance their network usage.
     - Stealing bandwidth can temporarily boost a player's capabilities but should be balanced against other operations.
 
-### Attack
-
-- Network Scanning
-  - Tool: port_scanner
-  - Action: Scan the network to identify active IP addresses and open ports.
-  - Objective: Identify potential targets on the network.
-- Service and Port Scanning
-  - Tool: port_scanner
-  - Action: Scan specific IP addresses for open ports and running services.
-  - Objective: Identify services running on the target IP that are susceptible to weak passwords.
-- Identify Vulnerabilities
-  - Tool: security_scanner (optional)
-  - Action: Scan the identified services for known vulnerabilities.
-  - Objective: Confirm the presence of vulnerabilities such as weak passwords.
-- Exploit Vulnerabilities
-  - Tool: exploit_kit
-  - Action: Use an exploit kit to gain initial access if vulnerabilities other than weak passwords are found.
-  - Objective: Gain initial access to the target system.
-- Brute Force Passwords
-  - Tool: password_cracker
-  - Action: Use the password cracker tool to brute force login credentials for the identified services.
-  - Objective: Gain authenticated access to the target service.
-- Elevate Privileges and Establish Persistence
-  - Tool: rootkit
-  - Action: Install a rootkit or other malware to maintain access.
-  - Objective: Ensure continued access to the system.
-- Post-Exploitation Actions
-  - Tools: Various (e.g., data_exfiltrator, crypto_miner, network_sniffer)
-  - Actions:
-    - Data Exfiltration: Steal sensitive data.
-    - Resource Stealing: Utilize the system's resources for mining cryptocurrency.
-    - Browse Filesystem: Explore and manipulate files and directories.
-    - Clean Logs: Use log_cleaner to erase traces of the attack.
-  - Objective: Achieve the attacker's goals (data theft, resource exploitation, etc.).
-
-This organized structure should help you manage the various aspects of your project more effectively.
+Skill Trees and Customization: Allow players to develop and customize their hacker profiles. Different skills could enhance various aspects of hacking, like speed, stealth, or strength of attacks. Players could specialize in different "hacker classes," such as a Cryptographer, Network Specialist, or Social Engineer.

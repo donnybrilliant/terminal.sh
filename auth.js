@@ -8,7 +8,13 @@ import {
   readJSONFile,
   writeJSONFile,
   USERS_FILE_PATH,
+  INTERNET_FILE_PATH,
 } from "./utils/fileUtils.js";
+import {
+  generateUniqueIP,
+  generateLocalIP,
+  generateUniqueMAC,
+} from "./utils/ipUtils.js";
 
 const JWT_SECRET = "your_jwt_secret"; // Use a strong secret key in production
 
@@ -22,23 +28,11 @@ passport.deserializeUser(async (id, cb) => {
   cb(null, user);
 });
 
-// should be in a util
-function generateUniqueIP(users) {
-  const usedIPs = new Set(users.map((user) => user.ip));
-  let ip;
-  do {
-    ip = Array(4)
-      .fill(0)
-      .map(() => Math.floor(Math.random() * 256))
-      .join(".");
-  } while (usedIPs.has(ip));
-  return ip;
-}
-
 passport.use(
   new LocalStrategy(async (username, password, done) => {
     try {
       let users = await readJSONFile(USERS_FILE_PATH);
+      let internet = await readJSONFile(INTERNET_FILE_PATH);
       let user = users.find((u) => u.username === username);
 
       if (user) {
@@ -51,32 +45,36 @@ passport.use(
         }
       } else {
         const lowercaseUsername = username.toLowerCase();
-        if (
-          lowercaseUsername === "admin" ||
-          lowercaseUsername === "user" ||
-          lowercaseUsername === "guest"
-        ) {
+        if (lowercaseUsername === "guest") {
           return done(null, false, {
-            message: "Username cannot be 'admin', 'user', or 'guest'.",
+            message: "Username cannot be 'guest'.",
           });
         }
 
         // No user found, create new user
         const hashedPassword = await bcrypt.hash(password, 10);
+        const externalIP = generateUniqueIP(users, internet);
+        const localIP = generateLocalIP();
+        const mac = generateUniqueMAC(users, internet);
+
         user = {
           id: uuidv4(),
           username,
           password: hashedPassword,
-          ip: generateUniqueIP(users),
+          ip: externalIP,
+          localIP,
+          mac,
           home: {},
           level: 0,
           experience: 0,
           resources: {
             cpu: 200,
             bandwidth: 300,
-            crypto: 15.0,
-            data: 1200,
             ram: 24,
+          },
+          wallet: {
+            crypto: 15,
+            data: 1200,
           },
           tools: [],
           achievements: [],
@@ -84,7 +82,7 @@ passport.use(
             items: [],
             currency: 500,
           },
-          activeMiners: [],
+          localNetwork: {},
         };
         users.push(user);
 
