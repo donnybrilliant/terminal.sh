@@ -1,13 +1,12 @@
 # TODO:
 
-- createLocalServer not working
+- createLocalServer not working ---
 
 - tools not being properly set up for autocomplete at some point (initialization?)
 - ssh :exit is weird..
 - why can i connect directly to a localNetwork? THIS COULD BE A TOOL!!!
-- fix get syntax if already on server get <tool>
+- fix get syntax if already on server to get <tool>
 
-- fix ssh_exploit and others to follow same pattern
 - do i need an isinsshmode in commandprocessor now? -rootkit etc.
 - check over everything in commandprocessor
 
@@ -46,6 +45,7 @@
 - alliances add a new vpn network.
 - limit activeminer to one on each server
 - tool to open local network?
+- voting system based on? resources etc?
 
 ### Improvements
 
