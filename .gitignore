@@ -1,0 +1,44 @@
+# Binaries
+ssh4xx-server
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Database files (runtime data)
+*.db
+ssh4xx.db
+
+# Log files
+*.log
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# SSH keys
+*.pem
+host_key
+.ssh/
+ssh_host_key
+ssh_host_key.pub

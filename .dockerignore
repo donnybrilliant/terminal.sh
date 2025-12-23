@@ -1,0 +1,51 @@
+# Binaries
+ssh4xx-server
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Database files (runtime data, not build-time)
+*.db
+ssh4xx.db
+
+# Log files
+*.log
+
+# Test files
+*.test
+*.out
+
+# Documentation (not needed in container)
+*.md
+README.md
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# SSH keys (should be generated or mounted)
+*.pem
+host_key
+.ssh/
+ssh_host_key
+ssh_host_key.pub
+
+# Dependency directories (will be downloaded during build)
+vendor/
+
+# Go workspace file
+go.work
