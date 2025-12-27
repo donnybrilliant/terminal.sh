@@ -1,6 +1,8 @@
 package terminal
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"strings"
 	"time"
@@ -17,6 +19,72 @@ import (
 
 // Use time package to avoid unused import error
 var _ = time.Time{}
+
+// Distinct color palette for chat users (ANSI 256 colors - bright, distinct)
+var userColors = []string{
+	"#FF6B6B", // Coral Red
+	"#4ECDC4", // Teal
+	"#FFE66D", // Yellow
+	"#95E1D3", // Mint
+	"#F38181", // Salmon
+	"#AA96DA", // Lavender
+	"#FCBAD3", // Pink
+	"#A8D8EA", // Sky Blue
+	"#FF9F43", // Orange
+	"#6BCB77", // Green
+	"#4D96FF", // Blue
+	"#C9CBA3", // Sage
+	"#FFD93D", // Gold
+	"#6A0572", // Purple (adjusted for visibility)
+	"#FF8066", // Coral
+	"#98D8C8", // Seafoam
+}
+
+// Emoji palette for users (fun, expressive)
+var userEmojis = []string{
+	"🦊", "🐱", "🐶", "🦁", "🐯", "🐨", "🐼", "🐸",
+	"🦄", "🐙", "🦋", "🐝", "🦜", "🐳", "🦈", "🐬",
+	"🌸", "🌺", "🌻", "🌹", "🍀", "🌴", "🌵", "🍄",
+	"⭐", "🌙", "☀️", "🌈", "💫", "✨", "🔥", "💎",
+}
+
+// Emoji palette for rooms
+var roomEmojis = []string{
+	"🏠", "🏰", "🎪", "🎭", "🎨", "🎯", "🎲", "🎮",
+	"🚀", "🌍", "🏝️", "🗻", "🌋", "🏜️", "🌊", "🌌",
+	"📚", "🔬", "🔭", "💻", "🎵", "🎸", "🎹", "🎺",
+	"☕", "🍕", "🍜", "🍦", "🧁", "🎂", "🍿", "🥤",
+}
+
+// System message style
+var systemStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Italic(true)
+var systemNameStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700")).Bold(true)
+var timestampStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#666666"))
+
+// getUserColorAndEmoji returns a consistent color and emoji for a user in a specific room
+func getUserColorAndEmoji(userID, roomID uuid.UUID) (lipgloss.Style, string) {
+	// Hash the combination of userID and roomID for room-specific appearance
+	h := sha256.New()
+	h.Write(userID[:])
+	h.Write(roomID[:])
+	hash := h.Sum(nil)
+
+	// Use first 8 bytes for color index, next 8 for emoji index
+	colorIdx := binary.BigEndian.Uint64(hash[:8]) % uint64(len(userColors))
+	emojiIdx := binary.BigEndian.Uint64(hash[8:16]) % uint64(len(userEmojis))
+
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color(userColors[colorIdx])).Bold(true)
+	return style, userEmojis[emojiIdx]
+}
+
+// getRoomEmoji returns a consistent emoji for a room
+func getRoomEmoji(roomID uuid.UUID) string {
+	h := sha256.New()
+	h.Write(roomID[:])
+	hash := h.Sum(nil)
+	idx := binary.BigEndian.Uint64(hash[:8]) % uint64(len(roomEmojis))
+	return roomEmojis[idx]
+}
 
 // ChatModel handles the chat UI
 type ChatModel struct {
@@ -673,9 +741,21 @@ func (m *ChatModel) updateViewportContent(roomID uuid.UUID) {
 	var content strings.Builder
 
 	for _, msg := range messages {
-		timestamp := msg.CreatedAt.Format("15:04:05") // Uses time package
-		line := fmt.Sprintf("[%s] <%s> %s", timestamp, msg.Username, msg.Content)
-		content.WriteString(line)
+		timestamp := timestampStyle.Render(fmt.Sprintf("[%s]", msg.CreatedAt.Format("15:04:05")))
+
+		if msg.Username == "system" {
+			// System messages get special styling
+			name := systemNameStyle.Render("★ system")
+			msgContent := systemStyle.Render(msg.Content)
+			line := fmt.Sprintf("%s %s %s", timestamp, name, msgContent)
+			content.WriteString(line)
+		} else {
+			// Regular user messages with color and emoji
+			userStyle, emoji := getUserColorAndEmoji(msg.UserID, roomID)
+			name := userStyle.Render(fmt.Sprintf("%s %s", emoji, msg.Username))
+			line := fmt.Sprintf("%s %s %s", timestamp, name, msg.Content)
+			content.WriteString(line)
+		}
 		content.WriteString("\n")
 	}
 
@@ -697,18 +777,22 @@ func (m *ChatModel) View() string {
 	// Render tabs
 	if len(m.rooms) > 0 {
 		tabStyle := lipgloss.NewStyle().Padding(0, 1).MarginRight(1)
-		activeTabStyle := tabStyle.Copy().Bold(true).Foreground(lipgloss.Color("205"))
-		inactiveTabStyle := tabStyle.Copy().Foreground(lipgloss.Color("240"))
+		activeTabStyle := tabStyle.Copy().Bold(true).Foreground(lipgloss.Color("#FF79C6"))
+		inactiveTabStyle := tabStyle.Copy().Foreground(lipgloss.Color("#6272A4"))
 
 		for i, room := range m.rooms {
+			roomEmoji := getRoomEmoji(room.ID)
+			tabText := fmt.Sprintf("%s %s", roomEmoji, room.Name)
 			if i == m.tabIndex {
-				sb.WriteString(activeTabStyle.Render(room.Name))
+				sb.WriteString(activeTabStyle.Render(tabText))
 			} else {
-				sb.WriteString(inactiveTabStyle.Render(room.Name))
+				sb.WriteString(inactiveTabStyle.Render(tabText))
 			}
 		}
 		sb.WriteString("\n")
-		sb.WriteString(strings.Repeat("─", m.width))
+		// Styled divider
+		dividerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#44475A"))
+		sb.WriteString(dividerStyle.Render(strings.Repeat("─", m.width)))
 		sb.WriteString("\n")
 
 		// Render viewport
@@ -725,7 +809,8 @@ func (m *ChatModel) View() string {
 		for i := 0; i < emptyLines; i++ {
 			sb.WriteString("\n")
 		}
-		sb.WriteString("No rooms. Use /create <room> to create one, or /join <room> to join.")
+		noRoomStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Italic(true)
+		sb.WriteString(noRoomStyle.Render("🚪 No rooms. Use /create <room> to create one, or /join <room> to join."))
 	}
 
 	// Input on separate line

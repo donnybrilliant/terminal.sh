@@ -17,11 +17,11 @@ const (
 	// Alternate screen buffer (used for login - no scrollback)
 	enterAltScreen = "\x1b[?1049h"
 	exitAltScreen  = "\x1b[?1049l"
-
+	
 	// Cursor control
 	hideCursor = "\x1b[?25l"
 	showCursor = "\x1b[?25h"
-
+	
 	// Screen control
 	clearScreen     = "\x1b[2J"        // Clear visible screen
 	clearScrollback = "\x1b[3J"        // Clear scrollback buffer
@@ -64,10 +64,10 @@ func NewBubbleTeaBridge(conn *websocket.Conn, db *database.Database, userService
 	if height < 10 {
 		height = 24
 	}
-
+	
 	// Create login model (same as SSH)
 	loginModel := terminal.NewLoginModel(db, userService, chatService, "", "")
-
+	
 	bridge := &BubbleTeaBridge{
 		model:       loginModel,
 		conn:        conn,
@@ -80,7 +80,7 @@ func NewBubbleTeaBridge(conn *websocket.Conn, db *database.Database, userService
 		renderMode:  RenderModeFullScreen,
 		lastView:    "",
 	}
-
+	
 	// Initialize model
 	initCmd := bridge.model.Init()
 	if initCmd != nil {
@@ -90,7 +90,7 @@ func NewBubbleTeaBridge(conn *websocket.Conn, db *database.Database, userService
 			}
 		}()
 	}
-
+	
 	// Send initial window size
 	bridge.msgChan <- tea.WindowSizeMsg{
 		Width:  width,
@@ -137,11 +137,11 @@ func (b *BubbleTeaBridge) getChatModel() *terminal.ChatModel {
 // Clears screen completely before rendering - used for centered UI
 func prepareFullScreenOutput(view string) string {
 	var sb strings.Builder
-
+	
 	sb.WriteString(clearScreen)
 	sb.WriteString(cursorHome)
 	sb.WriteString(hideCursor)
-
+	
 	lines := strings.Split(view, "\n")
 	for i, line := range lines {
 		sb.WriteString(line)
@@ -150,7 +150,7 @@ func prepareFullScreenOutput(view string) string {
 			sb.WriteString("\r\n")
 		}
 	}
-
+	
 	return sb.String()
 }
 
@@ -180,7 +180,7 @@ func prepareChatOutput(view string) string {
 // If content starts with \n, we're appending after a command (move to next line first)
 func prepareIncrementalOutput(content string, startRow int) string {
 	var sb strings.Builder
-
+	
 	// Position cursor at specific row if requested
 	if startRow > 0 {
 		sb.WriteString(fmt.Sprintf("\x1b[%d;1H", startRow))
@@ -190,7 +190,7 @@ func prepareIncrementalOutput(content string, startRow int) string {
 		sb.WriteString("\r\n")      // Move to next line
 		content = content[1:]       // Remove the leading \n (we just handled it)
 	}
-
+	
 	// Convert \n to \r\n for proper terminal rendering
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {
@@ -199,7 +199,7 @@ func prepareIncrementalOutput(content string, startRow int) string {
 			sb.WriteString("\r\n")
 		}
 	}
-
+	
 	sb.WriteString(hideCursor)
 	return sb.String()
 }
@@ -220,14 +220,14 @@ func preparePromptUpdate(promptLine string, row int) string {
 func prepareClearScreen(content string, startRow int) string {
 	var sb strings.Builder
 	sb.WriteString(clearScreen)
-
+	
 	// Position at specific row or home
 	if startRow > 0 {
 		sb.WriteString(fmt.Sprintf("\x1b[%d;1H", startRow))
 	} else {
 		sb.WriteString(cursorHome)
 	}
-
+	
 	// Convert \n to \r\n
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {
@@ -236,7 +236,7 @@ func prepareClearScreen(content string, startRow int) string {
 			sb.WriteString("\r\n")
 		}
 	}
-
+	
 	sb.WriteString(hideCursor)
 	return sb.String()
 }
@@ -245,12 +245,12 @@ func prepareClearScreen(content string, startRow int) string {
 // Clears screen, positions content, handles line conversion
 func prepareShellOutput(view string, height int) string {
 	var sb strings.Builder
-
+	
 	// Clear screen and go home
 	sb.WriteString(clearScreen)
 	sb.WriteString(cursorHome)
 	sb.WriteString(hideCursor)
-
+	
 	// Convert \n to \r\n for proper terminal rendering
 	lines := strings.Split(view, "\n")
 	for i, line := range lines {
@@ -260,7 +260,7 @@ func prepareShellOutput(view string, height int) string {
 			sb.WriteString("\r\n")
 		}
 	}
-
+	
 	return sb.String()
 }
 
@@ -268,12 +268,12 @@ func prepareShellOutput(view string, height int) string {
 // Used after 'clear' command to truly clear everything
 func prepareShellOutputWithClear(view string, height int) string {
 	var sb strings.Builder
-
+	
 	// Clear screen AND scrollback buffer, then go home
 	sb.WriteString(clearAll)
 	sb.WriteString(cursorHome)
 	sb.WriteString(hideCursor)
-
+	
 	// Convert \n to \r\n for proper terminal rendering
 	lines := strings.Split(view, "\n")
 	for i, line := range lines {
@@ -283,7 +283,7 @@ func prepareShellOutputWithClear(view string, height int) string {
 			sb.WriteString("\r\n")
 		}
 	}
-
+	
 	return sb.String()
 }
 
@@ -324,18 +324,18 @@ func (b *BubbleTeaBridge) processMessages() {
 			}
 			b.conn.WriteJSON(exitMsg)
 			return
-
+			
 		case teaMsg := <-b.msgChan:
 			// Handle resize
 			if sizeMsg, ok := teaMsg.(tea.WindowSizeMsg); ok {
 				b.width = sizeMsg.Width
 				b.height = sizeMsg.Height
 			}
-
+			
 			// Update model
 			var cmd tea.Cmd
 			b.model, cmd = b.model.Update(teaMsg)
-
+			
 			// Execute any returned command
 			if cmd != nil {
 				go func(c tea.Cmd) {
@@ -348,7 +348,7 @@ func (b *BubbleTeaBridge) processMessages() {
 					}
 				}(cmd)
 			}
-
+			
 			// Check if we transitioned models
 			isLogin := b.isLoginModel()
 			isChat := b.isChatModel()
@@ -382,17 +382,17 @@ func (b *BubbleTeaBridge) processMessages() {
 
 			wasLogin = isLogin
 			wasChat = isChat
-
+			
 			// Render based on mode
 			if b.renderMode == RenderModeFullScreen {
 				// Login or Chat screen - full screen render
 				currentView := b.model.View()
-
+				
 				// Skip if unchanged
 				if currentView == b.lastView {
 					continue
 				}
-
+				
 				isChat := b.isChatModel()
 				var output string
 				if isChat {
@@ -411,20 +411,20 @@ func (b *BubbleTeaBridge) processMessages() {
 			} else {
 				// Shell mode - use full screen redraw for reliability
 				shell := b.getShellModel()
-
+				
 				// Check if we need to clear scrollback (after clear command)
 				needsClearScrollback := false
 				if shell != nil {
 					needsClearScrollback = shell.NeedsClearScrollback()
 				}
-
+				
 				currentView := b.model.View()
-
+				
 				// Skip if unchanged (unless we need to clear scrollback)
 				if currentView == b.lastView && !needsClearScrollback {
 					continue
 				}
-
+				
 				var output string
 				if needsClearScrollback {
 					// Clear everything including scrollback
@@ -432,7 +432,7 @@ func (b *BubbleTeaBridge) processMessages() {
 				} else {
 					output = prepareShellOutput(currentView, b.height)
 				}
-
+				
 				msg := OutputMessage{
 					Type: MessageTypeOutput,
 					Data: output,
@@ -449,13 +449,13 @@ func (b *BubbleTeaBridge) processMessages() {
 // HandleInput handles input messages from the WebSocket client
 func (b *BubbleTeaBridge) HandleInput(msg InputMessage) error {
 	keyMsg := convertToKeyMsg(msg)
-
+	
 	select {
 	case b.msgChan <- keyMsg:
 	default:
 		// Channel full, drop message
 	}
-
+	
 	return nil
 }
 
@@ -469,7 +469,7 @@ func (b *BubbleTeaBridge) HandleResize(msg ResizeMessage) error {
 	default:
 		// Channel full, drop message
 	}
-
+	
 	return nil
 }
 
@@ -489,7 +489,7 @@ func (b *BubbleTeaBridge) Close() {
 func convertToKeyMsg(msg InputMessage) tea.KeyMsg {
 	var keyType tea.KeyType
 	var runes []rune
-
+	
 	switch msg.Key {
 	case "Enter":
 		keyType = tea.KeyEnter
@@ -526,14 +526,14 @@ func convertToKeyMsg(msg InputMessage) tea.KeyMsg {
 			keyType = tea.KeyRunes
 		}
 	}
-
+	
 	alt := false
 	for _, mod := range msg.Modifiers {
 		if mod == "Alt" {
 			alt = true
 		}
 	}
-
+	
 	return tea.KeyMsg{
 		Type:  keyType,
 		Runes: runes,
