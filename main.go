@@ -9,17 +9,17 @@ import (
 	"syscall"
 	"time"
 
-	"ssh4xx-go/config"
-	"ssh4xx-go/database"
-	"ssh4xx-go/services"
-	"ssh4xx-go/terminal"
+	"terminal-sh/config"
+	"terminal-sh/database"
+	"terminal-sh/services"
+	"terminal-sh/terminal"
 )
 
 func main() {
 	cfg := config.Load()
 
 	fmt.Println("╔═══════════════════════════════════════╗")
-	fmt.Println("║   SSH4XX Server - Initializing        ║")
+	fmt.Println("║   terminal.sh Server - Initializing    ║")
 	fmt.Println("╚═══════════════════════════════════════╝")
 	fmt.Println()
 

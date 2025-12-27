@@ -1,5 +1,5 @@
 # Binaries
-ssh4xx-server
+terminal.sh
 *.exe
 *.exe~
 *.dll
@@ -8,7 +8,7 @@ ssh4xx-server
 
 # Database files (runtime data, not build-time)
 *.db
-ssh4xx.db
+terminal.db
 
 # Log files
 *.log

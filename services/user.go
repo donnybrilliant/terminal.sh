@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"ssh4xx-go/auth"
-	"ssh4xx-go/database"
-	"ssh4xx-go/models"
+	"terminal-sh/auth"
+	"terminal-sh/database"
+	"terminal-sh/models"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"

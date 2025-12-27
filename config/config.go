@@ -17,7 +17,7 @@ func Load() *Config {
 	host := getEnv("HOST", "0.0.0.0")
 	port := getEnvInt("PORT", 2222)
 	hostKeyPath := getEnv("HOSTKEY_PATH", "")
-	databasePath := getEnv("DATABASE_PATH", "ssh4xx.db")
+	databasePath := getEnv("DATABASE_PATH", "terminal.db")
 	jwtSecret := getEnv("JWT_SECRET", "change-this-secret-key-in-production")
 
 	return &Config{

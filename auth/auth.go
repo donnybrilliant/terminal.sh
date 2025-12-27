@@ -45,7 +45,7 @@ func (tm *TokenManager) GenerateToken(userID uuid.UUID, username string) (string
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    "ssh4xx-server",
+			Issuer:    "terminal.sh",
 		},
 	}
 

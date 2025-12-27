@@ -57,11 +57,16 @@ func NewVFS(username string) *VFS {
 	}
 	userDir.Children["README.txt"] = readme
 
-	return &VFS{
+	vfs := &VFS{
 		Root:     root,
 		Current:  userDir,
 		username: username,
 	}
+	
+	// Initialize system directories and commands
+	vfs.InitializeSystemCommands()
+	
+	return vfs
 }
 
 func (vfs *VFS) GetCurrentPath() string {
@@ -136,12 +141,22 @@ func (vfs *VFS) ChangeDir(path string) error {
 }
 
 func (vfs *VFS) ListDir() []*Node {
+	return vfs.ListDirWithOptions(false)
+}
+
+// ListDirWithOptions lists directory contents with options
+// showAll: if true, include hidden files (starting with .)
+func (vfs *VFS) ListDirWithOptions(showAll bool) []*Node {
 	if !vfs.Current.IsDir {
 		return []*Node{}
 	}
 
 	nodes := make([]*Node, 0, len(vfs.Current.Children))
 	for _, child := range vfs.Current.Children {
+		// Filter hidden files unless showAll is true
+		if !showAll && strings.HasPrefix(child.Name, ".") {
+			continue
+		}
 		nodes = append(nodes, child)
 	}
 	return nodes
@@ -338,5 +353,150 @@ func (vfs *VFS) RenameHomeDirectory(newUsername string) error {
 // GetUsername returns the current username
 func (vfs *VFS) GetUsername() string {
 	return vfs.username
+}
+
+// InitializeSystemCommands creates /bin and /usr/bin directories and populates them with command files
+func (vfs *VFS) InitializeSystemCommands() {
+	// Create /bin directory
+	binDir := &Node{
+		Name:     "bin",
+		IsDir:    true,
+		Children: make(map[string]*Node),
+		Parent:   vfs.Root,
+	}
+	vfs.Root.Children["bin"] = binDir
+	
+	// Create /usr directory
+	usrDir := &Node{
+		Name:     "usr",
+		IsDir:    true,
+		Children: make(map[string]*Node),
+		Parent:   vfs.Root,
+	}
+	vfs.Root.Children["usr"] = usrDir
+	
+	// Create /usr/bin directory
+	usrBinDir := &Node{
+		Name:     "bin",
+		IsDir:    true,
+		Children: make(map[string]*Node),
+		Parent:   usrDir,
+	}
+	usrDir.Children["bin"] = usrBinDir
+	
+	// Define system commands with their descriptions
+	systemCommands := map[string]string{
+		"ls":              "List directory contents",
+		"cd":              "Change directory",
+		"pwd":             "Print working directory",
+		"cat":             "Display file contents",
+		"touch":           "Create a new file",
+		"mkdir":           "Create a new directory",
+		"rm":              "Delete file or directory",
+		"cp":              "Copy files/folders",
+		"mv":              "Move or rename files/folders",
+		"edit":            "Edit a file",
+		"clear":           "Clear the screen",
+		"help":            "Show available commands",
+		"whoami":          "Display current username",
+		"name":            "Change username",
+		"ifconfig":        "Show network interfaces",
+		"scan":            "Scan internet or IP",
+		"ssh":             "Connect to a server",
+		"exit":            "Disconnect from server",
+		"server":          "Show current server info",
+		"createServer":    "Create a new server",
+		"createLocalServer": "Create local server",
+		"get":             "Download tool from server",
+		"tools":           "List owned tools",
+		"exploited":       "List exploited servers",
+		"wallet":          "Show wallet balance",
+		"crypto_miner":    "Start mining",
+		"stop_mining":     "Stop mining",
+		"miners":          "List active miners",
+		"userinfo":        "Show user information",
+		"info":            "Display browser/client info",
+	}
+	
+	// Create command files in /bin
+	for cmd, desc := range systemCommands {
+		cmdFile := &Node{
+			Name:    cmd,
+			IsDir:   false,
+			Content: desc,
+			Parent:  binDir,
+		}
+		binDir.Children[cmd] = cmdFile
+	}
+}
+
+// GetCommandDescription retrieves the description of a command from the filesystem
+func (vfs *VFS) GetCommandDescription(cmdName string) (string, error) {
+	// Check in /bin first
+	binPath := "/bin/" + cmdName
+	binNode := vfs.findNode(binPath)
+	if binNode != nil && !binNode.IsDir {
+		return binNode.Content, nil
+	}
+	
+	// Check in /usr/bin
+	usrBinPath := "/usr/bin/" + cmdName
+	usrBinNode := vfs.findNode(usrBinPath)
+	if usrBinNode != nil && !usrBinNode.IsDir {
+		return usrBinNode.Content, nil
+	}
+	
+	return "", fmt.Errorf("command not found: %s", cmdName)
+}
+
+// ListCommands lists all available commands from /bin and /usr/bin
+func (vfs *VFS) ListCommands() ([]string, []string) {
+	var binCommands []string
+	var usrBinCommands []string
+	
+	// List /bin commands
+	binNode := vfs.findNode("/bin")
+	if binNode != nil && binNode.IsDir {
+		for name := range binNode.Children {
+			if !binNode.Children[name].IsDir {
+				binCommands = append(binCommands, name)
+			}
+		}
+	}
+	
+	// List /usr/bin commands
+	usrBinNode := vfs.findNode("/usr/bin")
+	if usrBinNode != nil && usrBinNode.IsDir {
+		for name := range usrBinNode.Children {
+			if !usrBinNode.Children[name].IsDir {
+				usrBinCommands = append(usrBinCommands, name)
+			}
+		}
+	}
+	
+	return binCommands, usrBinCommands
+}
+
+// AddUserCommand adds a command file to /usr/bin (for user-acquired tools)
+func (vfs *VFS) AddUserCommand(cmdName, description string) error {
+	usrBinNode := vfs.findNode("/usr/bin")
+	if usrBinNode == nil || !usrBinNode.IsDir {
+		return fmt.Errorf("/usr/bin directory not found")
+	}
+	
+	// Check if command already exists
+	if _, exists := usrBinNode.Children[cmdName]; exists {
+		return fmt.Errorf("command %s already exists", cmdName)
+	}
+	
+	cmdFile := &Node{
+		Name:    cmdName,
+		IsDir:   false,
+		Content: description,
+		Parent:  usrBinNode,
+	}
+	usrBinNode.Children[cmdName] = cmdFile
+	
+	return nil
 }
 

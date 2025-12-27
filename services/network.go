@@ -2,12 +2,13 @@ package services
 
 import (
 	"fmt"
-	"ssh4xx-go/models"
+	"terminal-sh/models"
 )
 
 // NetworkService handles network scanning operations
 type NetworkService struct {
 	serverService *ServerService
+	shopService   *ShopService // Will be set if available
 }
 
 // NewNetworkService creates a new network service
@@ -15,6 +16,11 @@ func NewNetworkService(serverService *ServerService) *NetworkService {
 	return &NetworkService{
 		serverService: serverService,
 	}
+}
+
+// SetShopService sets the shop service (called after shop service is created)
+func (n *NetworkService) SetShopService(shopService *ShopService) {
+	n.shopService = shopService
 }
 
 // ScanInternet scans the internet for top-level servers
@@ -55,7 +61,7 @@ func (n *NetworkService) FormatScanResult(server *models.Server) string {
 		server.Wallet.Crypto, server.Wallet.Data)
 	
 	if len(server.Tools) > 0 {
-		result += fmt.Sprintf("Tools: %v\n", server.Tools)
+		result += fmt.Sprintf("Available Tools (use 'get %s <toolName>' to download): %v\n", server.IP, server.Tools)
 	}
 	
 	if len(server.Services) > 0 {
@@ -73,6 +79,14 @@ func (n *NetworkService) FormatScanResult(server *models.Server) string {
 	
 	if len(server.ConnectedIPs) > 0 {
 		result += fmt.Sprintf("Connected IPs: %v\n", server.ConnectedIPs)
+	}
+	
+	// Check if server has a shop
+	if n.shopService != nil {
+		shop, err := n.shopService.GetShopByServerIP(server.IP)
+		if err == nil {
+			result += fmt.Sprintf("Shop: [%s] %s (%s)\n", shop.ShopType, shop.Name, shop.Description)
+		}
 	}
 	
 	return result

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"ssh4xx-go/database"
-	"ssh4xx-go/models"
+	"terminal-sh/database"
+	"terminal-sh/models"
 
 	"github.com/google/uuid"
 )
@@ -31,8 +31,8 @@ func (s *MiningService) StartMining(userID uuid.UUID, serverIP string) error {
 		return fmt.Errorf("crypto_miner tool not owned")
 	}
 
-	// Get tool to check resource requirements
-	tool, err := s.toolService.GetToolByName("crypto_miner")
+	// CRITICAL: Get effective tool (with patches applied) to check resource requirements
+	tool, err := s.toolService.GetEffectiveTool(userID, "crypto_miner")
 	if err != nil {
 		return fmt.Errorf("crypto_miner tool not found")
 	}

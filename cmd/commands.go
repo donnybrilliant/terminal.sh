@@ -3,19 +3,21 @@ package cmd
 import (
 	"fmt"
 	"math/rand"
+	"terminal-sh/database"
+	"terminal-sh/filesystem"
+	"terminal-sh/models"
+	"terminal-sh/services"
 	"strings"
 	"time"
-	"ssh4xx-go/filesystem"
-	"ssh4xx-go/models"
-	"ssh4xx-go/services"
 
 	"github.com/google/uuid"
 )
 
 type CommandResult struct {
-	Output string
-	Error  error
-	Nodes  []*filesystem.Node // For ls command
+	Output     string
+	Error      error
+	Nodes      []*filesystem.Node // For ls command
+	LongFormat bool                // For ls -l format
 }
 
 type CommandHandler struct {
@@ -28,6 +30,11 @@ type CommandHandler struct {
 	toolService    *services.ToolService
 	exploitationService *services.ExploitationService
 	miningService  *services.MiningService
+	tutorialService *services.TutorialService
+	shopService    *services.ShopService
+	shopDiscovery  *services.ShopDiscovery
+	patchService   *services.PatchService
+	progressService *services.ProgressService
 	currentServerPath string // Current server path if in SSH mode
 	sessionID       *uuid.UUID // Current session ID
 	onSSHConnect    func(serverPath string) error // Callback for SSH connection
@@ -36,11 +43,19 @@ type CommandHandler struct {
 
 func NewCommandHandler(vfs *filesystem.VFS, user *models.User, userService *services.UserService) *CommandHandler {
 	serverService := services.NewServerService()
-	networkService := services.NewNetworkService(serverService)
-	sessionService := services.NewSessionService(serverService)
 	toolService := services.NewToolService(serverService)
+	patchService := services.NewPatchService(toolService)
+	toolService.SetPatchService(patchService) // Link patch service to tool service
+	networkService := services.NewNetworkService(serverService)
+	shopService := services.NewShopService(serverService)
+	networkService.SetShopService(shopService) // Link shop service to network service
+	shopDiscovery := services.NewShopDiscovery(shopService, serverService, patchService, toolService)
+	progressService := services.NewProgressService()
+	sessionService := services.NewSessionService(serverService)
 	exploitationService := services.NewExploitationService(toolService, serverService)
 	miningService := services.NewMiningService(toolService, serverService)
+	tutorialService, _ := services.NewTutorialService("tutorials.json") // Initialize tutorial service, ignore error for now
+	
 	return &CommandHandler{
 		vfs:            vfs,
 		user:           user,
@@ -51,6 +66,11 @@ func NewCommandHandler(vfs *filesystem.VFS, user *models.User, userService *serv
 		toolService:   toolService,
 		exploitationService: exploitationService,
 		miningService: miningService,
+		tutorialService: tutorialService,
+		shopService:   shopService,
+		shopDiscovery: shopDiscovery,
+		patchService:  patchService,
+		progressService: progressService,
 	}
 }
 
@@ -63,6 +83,42 @@ func (h *CommandHandler) SetSessionID(sessionID uuid.UUID) {
 func (h *CommandHandler) SetSSHCallbacks(onConnect func(serverPath string) error, onDisconnect func() error) {
 	h.onSSHConnect = onConnect
 	h.onSSHDisconnect = onDisconnect
+}
+
+// GetCurrentServerPath returns the current server path
+func (h *CommandHandler) GetCurrentServerPath() string {
+	return h.currentServerPath
+}
+
+// SetCurrentServerPath sets the current server path (for restoring from stack)
+func (h *CommandHandler) SetCurrentServerPath(path string) {
+	h.currentServerPath = path
+}
+
+// SyncUserToolsToVFS syncs user's owned tools to /usr/bin in the VFS
+func (h *CommandHandler) SyncUserToolsToVFS() error {
+	if h.user == nil {
+		return nil // No user, nothing to sync
+	}
+	
+	tools, err := h.toolService.GetUserTools(h.user.ID)
+	if err != nil {
+		return err
+	}
+	
+	for _, tool := range tools {
+		// Add tool as command in /usr/bin if it doesn't exist
+		_, err := h.vfs.GetCommandDescription(tool.Name)
+		if err != nil {
+			// Command doesn't exist, add it
+			if err := h.vfs.AddUserCommand(tool.Name, tool.Function); err != nil {
+				// Log error but continue with other tools
+				continue
+			}
+		}
+	}
+	
+	return nil
 }
 
 func (h *CommandHandler) Execute(command string) *CommandResult {
@@ -79,7 +135,7 @@ func (h *CommandHandler) Execute(command string) *CommandResult {
 	case "pwd":
 		return h.handlePWD()
 	case "ls":
-		return h.handleLS()
+		return h.handleLS(args)
 	case "cd":
 		return h.handleCD(args)
 	case "cat":
@@ -88,6 +144,8 @@ func (h *CommandHandler) Execute(command string) *CommandResult {
 		return h.handleCLEAR()
 	case "help":
 		return h.handleHELP()
+	case "tutorial":
+		return h.handleTUTORIAL(args)
 	case "login":
 		return h.handleLOGIN(args)
 	case "logout":
@@ -96,6 +154,8 @@ func (h *CommandHandler) Execute(command string) *CommandResult {
 		return h.handleREGISTER(args)
 	case "userinfo":
 		return h.handleUSERINFO()
+	case "info":
+		return h.handleINFO()
 	case "whoami":
 		return h.handleWHOAMI()
 	case "name":
@@ -120,6 +180,14 @@ func (h *CommandHandler) Execute(command string) *CommandResult {
 		return h.handleTOOLS()
 	case "exploited":
 		return h.handleEXPLOITED()
+	case "shop":
+		return h.handleSHOP(args)
+	case "buy":
+		return h.handleBUY(args)
+	case "patches":
+		return h.handlePATCH(args)
+	case "patch":
+		return h.handlePATCH(args)
 	case "crypto_miner":
 		return h.handleCRYPTOMINER(args)
 	case "stop_mining":
@@ -128,7 +196,7 @@ func (h *CommandHandler) Execute(command string) *CommandResult {
 		return h.handleMINERS()
 	case "wallet":
 		return h.handleWALLET()
-	case "password_cracker", "ssh_exploit", "user_enum", "lan_sniffer", "rootkit", "exploit_kit":
+	case "password_cracker", "password_sniffer", "ssh_exploit", "user_enum", "lan_sniffer", "rootkit", "exploit_kit", "advanced_exploit_kit", "sql_injector", "xss_exploit", "packet_capture", "packet_decoder":
 		return h.handleToolCommand(cmd, args)
 	case "touch":
 		return h.handleTOUCH(args)
@@ -148,11 +216,39 @@ func (h *CommandHandler) Execute(command string) *CommandResult {
 }
 
 func (h *CommandHandler) handlePWD() *CommandResult {
-	return &CommandResult{Output: h.vfs.GetCurrentPath()}
+	path := h.vfs.GetCurrentPath()
+	if path != "" {
+		path += "\n"
+	}
+	return &CommandResult{Output: path}
 }
 
-func (h *CommandHandler) handleLS() *CommandResult {
-	nodes := h.vfs.ListDir()
+func (h *CommandHandler) handleLS(args []string) *CommandResult {
+	// Parse flags
+	showAll := false    // -a flag
+	longFormat := false // -l flag
+	
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			// Parse flags (order-independent: -la = -al)
+			for _, char := range arg[1:] {
+				switch char {
+				case 'a':
+					showAll = true
+				case 'l':
+					longFormat = true
+				}
+			}
+		}
+	}
+	
+	nodes := h.vfs.ListDirWithOptions(showAll)
+	
+	if longFormat {
+		// Return nodes for long format rendering
+		return &CommandResult{Nodes: nodes, LongFormat: true}
+	}
+	
 	return &CommandResult{Nodes: nodes}
 }
 
@@ -178,6 +274,11 @@ func (h *CommandHandler) handleCAT(args []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 
+	// Ensure content ends with newline if not empty
+	if content != "" && !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+
 	return &CommandResult{Output: content}
 }
 
@@ -187,26 +288,86 @@ func (h *CommandHandler) handleCLEAR() *CommandResult {
 }
 
 func (h *CommandHandler) handleHELP() *CommandResult {
-	// Return a special marker that the terminal can use to render animated help
-	return &CommandResult{Output: "__ANIMATED_HELP__"}
+	// Read commands from filesystem
+	binCommands, usrBinCommands := h.vfs.ListCommands()
+	
+	var output strings.Builder
+	output.WriteString("Available Commands\n\n")
+	
+	// System Commands
+	output.WriteString("System Commands:\n")
+	for _, cmd := range binCommands {
+		desc, err := h.vfs.GetCommandDescription(cmd)
+		if err != nil {
+			desc = "No description available"
+		}
+		// Pad command name to 20 chars for alignment
+		cmdPadded := cmd
+		if len(cmdPadded) < 20 {
+			cmdPadded += strings.Repeat(" ", 20-len(cmdPadded))
+		}
+		output.WriteString(fmt.Sprintf("  %s - %s\n", cmdPadded, desc))
+	}
+	
+	// User Tools (from /usr/bin)
+	if len(usrBinCommands) > 0 {
+		output.WriteString("\nUser Tools:\n")
+		for _, cmd := range usrBinCommands {
+			desc, err := h.vfs.GetCommandDescription(cmd)
+			if err != nil {
+				desc = "No description available"
+			}
+			// Pad command name to 20 chars for alignment
+			cmdPadded := cmd
+			if len(cmdPadded) < 20 {
+				cmdPadded += strings.Repeat(" ", 20-len(cmdPadded))
+			}
+			output.WriteString(fmt.Sprintf("  %s - %s\n", cmdPadded, desc))
+		}
+	}
+	
+	// Tutorial command
+	output.WriteString("\nLearning:\n")
+	output.WriteString("  tutorial            - Show available tutorials\n")
+	output.WriteString("  tutorial <id>       - Start a tutorial\n")
+	
+	// Shop commands
+	output.WriteString("\nShopping:\n")
+	output.WriteString("  shop                - List discovered shops\n")
+	output.WriteString("  shop <shopID>       - Browse shop inventory\n")
+	output.WriteString("  buy <shopID> <item> - Purchase item from shop\n")
+	
+	// Patch commands
+	output.WriteString("\nTool Upgrades:\n")
+	output.WriteString("  patches             - List available patches\n")
+	output.WriteString("  patch <name> <tool> - Apply patch to tool\n")
+	output.WriteString("  patch info <name>   - Show patch details\n")
+	
+	// Ensure trailing newline
+	helpText := output.String()
+	if !strings.HasSuffix(helpText, "\n") {
+		helpText += "\n"
+	}
+
+	return &CommandResult{Output: helpText}
 }
 
 func (h *CommandHandler) handleLOGIN(args []string) *CommandResult {
 	if len(args) != 2 {
 		return &CommandResult{Error: fmt.Errorf("usage: login <username> <password>")}
 	}
-	return &CommandResult{Output: "Please authenticate via SSH password authentication"}
+	return &CommandResult{Output: "Please authenticate via SSH password authentication\n"}
 }
 
 func (h *CommandHandler) handleLOGOUT() *CommandResult {
-	return &CommandResult{Output: "Logout successful. Goodbye!"}
+	return &CommandResult{Output: "Logout successful. Goodbye!\n"}
 }
 
 func (h *CommandHandler) handleREGISTER(args []string) *CommandResult {
 	if len(args) != 2 {
 		return &CommandResult{Error: fmt.Errorf("usage: register <username> <password>")}
 	}
-	return &CommandResult{Output: "Please register via SSH password authentication (login with new credentials)"}
+	return &CommandResult{Output: "Please register via SSH password authentication (login with new credentials)\n"}
 }
 
 func (h *CommandHandler) handleUSERINFO() *CommandResult {
@@ -222,17 +383,38 @@ func (h *CommandHandler) handleUSERINFO() *CommandResult {
 	output += fmt.Sprintf("Experience: %d\n", h.user.Experience)
 	output += fmt.Sprintf("Resources: CPU=%d, Bandwidth=%.1f, RAM=%d\n", 
 		h.user.Resources.CPU, h.user.Resources.Bandwidth, h.user.Resources.RAM)
-	output += fmt.Sprintf("Wallet: Crypto=%.2f, Data=%.2f", 
+	output += fmt.Sprintf("Wallet: Crypto=%.2f, Data=%.2f\n", 
 		h.user.Wallet.Crypto, h.user.Wallet.Data)
+	
+	return &CommandResult{Output: output}
+}
+
+func (h *CommandHandler) handleINFO() *CommandResult {
+	// Display browser/client information (SSH session info)
+	output := "Client Information:\n"
+	output += "  Connection: SSH\n"
+	output += "  Protocol: SSH2\n"
+	if h.user != nil {
+		output += fmt.Sprintf("  Username: %s\n", h.user.Username)
+		output += fmt.Sprintf("  IP Address: %s\n", h.user.IP)
+	}
+	if h.sessionID != nil {
+		output += fmt.Sprintf("  Session ID: %s\n", h.sessionID.String())
+	}
+	output += "  Terminal: ANSI compatible\n"
 	
 	return &CommandResult{Output: output}
 }
 
 func (h *CommandHandler) handleWHOAMI() *CommandResult {
 	if h.user == nil {
-		return &CommandResult{Output: "guest"}
+		return &CommandResult{Output: "guest\n"}
 	}
-	return &CommandResult{Output: h.user.Username}
+	username := h.user.Username
+	if username != "" {
+		username += "\n"
+	}
+	return &CommandResult{Output: username}
 }
 
 func (h *CommandHandler) handleNAME(args []string) *CommandResult {
@@ -257,7 +439,7 @@ func (h *CommandHandler) handleNAME(args []string) *CommandResult {
 	
 	// Update local user object
 	h.user.Username = newUsername
-	return &CommandResult{Output: fmt.Sprintf("Username changed to %s", newUsername)}
+	return &CommandResult{Output: fmt.Sprintf("Username changed to %s\n", newUsername)}
 }
 
 func (h *CommandHandler) handleIFCONFIG() *CommandResult {
@@ -267,7 +449,7 @@ func (h *CommandHandler) handleIFCONFIG() *CommandResult {
 	
 	output := fmt.Sprintf("IP: %s\n", h.user.IP)
 	output += fmt.Sprintf("Local IP: %s\n", h.user.LocalIP)
-	output += fmt.Sprintf("MAC: %s", h.user.MAC)
+	output += fmt.Sprintf("MAC: %s\n", h.user.MAC)
 	
 	return &CommandResult{Output: output}
 }
@@ -285,12 +467,18 @@ func (h *CommandHandler) handleSCAN(args []string) *CommandResult {
 		}
 		
 		if len(servers) == 0 {
-			return &CommandResult{Output: "No servers found"}
+			return &CommandResult{Output: "No servers found\n"}
 		}
 		
 		output := "Found servers:\n"
 		for _, server := range servers {
-			output += fmt.Sprintf("  - %s (%s)\n", server.IP, server.LocalIP)
+			shopIndicator := ""
+			if h.shopService != nil {
+				if shop, err := h.shopService.GetShopByServerIP(server.IP); err == nil {
+					shopIndicator = fmt.Sprintf(" [SHOP: %s]", shop.ShopType)
+				}
+			}
+			output += fmt.Sprintf("  - %s (%s)%s\n", server.IP, server.LocalIP, shopIndicator)
 		}
 		return &CommandResult{Output: output}
 	}
@@ -309,12 +497,18 @@ func (h *CommandHandler) handleSCAN(args []string) *CommandResult {
 		}
 		
 		if len(servers) == 0 {
-			return &CommandResult{Output: "No connected servers found"}
+			return &CommandResult{Output: "No connected servers found\n"}
 		}
 		
 		output := "Connected servers:\n"
 		for _, server := range servers {
-			output += fmt.Sprintf("  - %s (%s)\n", server.IP, server.LocalIP)
+			shopIndicator := ""
+			if h.shopService != nil {
+				if shop, err := h.shopService.GetShopByServerIP(server.IP); err == nil {
+					shopIndicator = fmt.Sprintf(" [SHOP: %s]", shop.ShopType)
+				}
+			}
+			output += fmt.Sprintf("  - %s (%s)%s\n", server.IP, server.LocalIP, shopIndicator)
 		}
 		return &CommandResult{Output: output}
 	}
@@ -327,6 +521,10 @@ func (h *CommandHandler) handleSCAN(args []string) *CommandResult {
 		}
 		
 		output := h.networkService.FormatScanResult(server)
+		// Ensure output ends with newline
+		if output != "" && !strings.HasSuffix(output, "\n") {
+			output += "\n"
+		}
 		return &CommandResult{Output: output}
 	}
 
@@ -352,7 +550,7 @@ func (h *CommandHandler) handleSERVER() *CommandResult {
 	output += fmt.Sprintf("Security Level: %d\n", server.SecurityLevel)
 	output += fmt.Sprintf("Resources: CPU=%d, Bandwidth=%.1f, RAM=%d\n",
 		server.Resources.CPU, server.Resources.Bandwidth, server.Resources.RAM)
-	output += fmt.Sprintf("Wallet: Crypto=%.2f, Data=%.2f",
+	output += fmt.Sprintf("Wallet: Crypto=%.2f, Data=%.2f\n",
 		server.Wallet.Crypto, server.Wallet.Data)
 
 	return &CommandResult{Output: output}
@@ -374,7 +572,7 @@ func (h *CommandHandler) handleCREATESERVER(args []string) *CommandResult {
 
 	output := fmt.Sprintf("Server created successfully!\n")
 	output += fmt.Sprintf("IP: %s\n", server.IP)
-	output += fmt.Sprintf("Local IP: %s", server.LocalIP)
+	output += fmt.Sprintf("Local IP: %s\n", server.LocalIP)
 
 	return &CommandResult{Output: output}
 }
@@ -405,7 +603,7 @@ func (h *CommandHandler) handleCREATELOCALSERVER(args []string) *CommandResult {
 
 	output := fmt.Sprintf("Local server created successfully!\n")
 	output += fmt.Sprintf("IP: %s\n", server.IP)
-	output += fmt.Sprintf("Local IP: %s", server.LocalIP)
+	output += fmt.Sprintf("Local IP: %s\n", server.LocalIP)
 
 	return &CommandResult{Output: output}
 }
@@ -468,52 +666,27 @@ func (h *CommandHandler) handleSSH(args []string) *CommandResult {
 		newServerPath = h.currentServerPath + ".localNetwork." + server.IP
 	}
 
-	// Update current server path
-	h.currentServerPath = newServerPath
-
-	// Call SSH connect callback if set
-	if h.onSSHConnect != nil {
-		if err := h.onSSHConnect(newServerPath); err != nil {
-			return &CommandResult{Error: err}
-		}
+	// Show progress bar for SSH connection
+	if h.progressService != nil {
+		duration := h.progressService.CalculateOperationTime(services.OperationSSH, h.user.Resources)
+		durationSeconds := time.Duration(duration * float64(time.Second))
+		
+		showProgressBar(fmt.Sprintf("Connecting to %s...", targetIP), durationSeconds)
 	}
 
-	output := fmt.Sprintf("Connected to %s\n", server.IP)
-	output += fmt.Sprintf("Server path: %s", newServerPath)
-
-	return &CommandResult{Output: output}
+	// Return special marker for shell to handle stack push
+	// Shell will push current context, then update the path
+	return &CommandResult{Output: fmt.Sprintf("__SSH_CONNECT__%s", newServerPath)}
 }
 
 func (h *CommandHandler) handleEXIT() *CommandResult {
 	if h.currentServerPath == "" {
-		return &CommandResult{Output: "Not in SSH session"}
+		// Not in SSH session - return special marker to quit
+		return &CommandResult{Output: "__QUIT__"}
 	}
 
-	// Parse server path to get parent
-	parts := parseServerPathParts(h.currentServerPath)
-	
-	// Remove "localNetwork" and the last IP
-	// Path format: "1.1.1.1.localNetwork.10.0.0.5"
-	// We want to go back to "1.1.1.1"
-	if len(parts) >= 3 && parts[len(parts)-2] == "localNetwork" {
-		// Remove last two parts (localNetwork and IP)
-		h.currentServerPath = strings.Join(parts[:len(parts)-2], ".")
-	} else if len(parts) == 1 {
-		// Top-level server, disconnect completely
-		h.currentServerPath = ""
-	} else {
-		// Fallback: just remove last part
-		h.currentServerPath = strings.Join(parts[:len(parts)-1], ".")
-	}
-
-	// Call SSH disconnect callback if set
-	if h.onSSHDisconnect != nil {
-		if err := h.onSSHDisconnect(); err != nil {
-			return &CommandResult{Error: err}
-		}
-	}
-
-	return &CommandResult{Output: "Disconnected"}
+	// Return special marker for shell to handle stack pop
+	return &CommandResult{Output: "__EXIT_SSH__"}
 }
 
 func parseServerPathParts(path string) []string {
@@ -550,11 +723,23 @@ func (h *CommandHandler) handleGET(args []string) *CommandResult {
 	targetIP := args[0]
 	toolName := args[1]
 
+	// Calculate download time based on user resources
+	if h.progressService != nil {
+		duration := h.progressService.CalculateOperationTime(services.OperationDownload, h.user.Resources)
+		durationSeconds := time.Duration(duration * float64(time.Second))
+		
+		// Show progress bar
+		showProgressBar(fmt.Sprintf("Downloading %s from %s...", toolName, targetIP), durationSeconds)
+	}
+
 	if err := h.toolService.DownloadTool(h.user.ID, targetIP, toolName); err != nil {
 		return &CommandResult{Error: err}
 	}
 
-	output := fmt.Sprintf("Tool %s downloaded successfully from %s", toolName, targetIP)
+	// Sync tools to VFS so the new tool appears in help
+	h.SyncUserToolsToVFS()
+
+	output := fmt.Sprintf("Tool %s downloaded successfully from %s\n", toolName, targetIP)
 	return &CommandResult{Output: output}
 }
 
@@ -563,21 +748,53 @@ func (h *CommandHandler) handleTOOLS() *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("not authenticated")}
 	}
 
-	tools, err := h.toolService.GetUserTools(h.user.ID)
-	if err != nil {
-		return &CommandResult{Error: err}
+	// Get user's tool states (shows versions and patches)
+	var toolStates []models.UserToolState
+	if err := database.DB.Where("user_id = ?", h.user.ID).Preload("Tool").Find(&toolStates).Error; err != nil {
+		// Fallback to old method if no tool states
+		tools, err := h.toolService.GetUserTools(h.user.ID)
+		if err != nil {
+			return &CommandResult{Error: err}
+		}
+
+		if len(tools) == 0 {
+			return &CommandResult{Output: "No tools owned\n"}
+		}
+
+		output := "Owned tools:\n"
+		for _, tool := range tools {
+			output += fmt.Sprintf("  - %s: %s\n", tool.Name, tool.Function)
+			if len(tool.Exploits) > 0 {
+				output += "    Exploits: "
+				for i, exploit := range tool.Exploits {
+					if i > 0 {
+						output += ", "
+					}
+					output += fmt.Sprintf("%s (level %d)", exploit.Type, exploit.Level)
+				}
+				output += "\n"
+			}
+		}
+		return &CommandResult{Output: output}
 	}
 
-	if len(tools) == 0 {
-		return &CommandResult{Output: "No tools owned"}
+	if len(toolStates) == 0 {
+		return &CommandResult{Output: "No tools owned\n"}
 	}
 
 	output := "Owned tools:\n"
-	for _, tool := range tools {
+	for _, toolState := range toolStates {
+		tool := toolState.Tool
 		output += fmt.Sprintf("  - %s: %s\n", tool.Name, tool.Function)
-		if len(tool.Exploits) > 0 {
-			output += "    Exploits: "
-			for i, exploit := range tool.Exploits {
+		output += fmt.Sprintf("    Version: %d\n", toolState.Version)
+		
+		if len(toolState.AppliedPatches) > 0 {
+			output += fmt.Sprintf("    Patches: %s\n", strings.Join(toolState.AppliedPatches, ", "))
+		}
+		
+		if len(toolState.EffectiveExploits) > 0 {
+			output += "    Effective Exploits: "
+			for i, exploit := range toolState.EffectiveExploits {
 				if i > 0 {
 					output += ", "
 				}
@@ -601,7 +818,7 @@ func (h *CommandHandler) handleEXPLOITED() *CommandResult {
 	}
 
 	if len(exploited) == 0 {
-		return &CommandResult{Output: "No exploited servers"}
+		return &CommandResult{Output: "No exploited servers\n"}
 	}
 
 	output := "Exploited servers:\n"
@@ -637,7 +854,7 @@ func (h *CommandHandler) handleCRYPTOMINER(args []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 
-	output := fmt.Sprintf("Mining started on server %s", serverIP)
+	output := fmt.Sprintf("Mining started on server %s\n", serverIP)
 	return &CommandResult{Output: output}
 }
 
@@ -656,7 +873,7 @@ func (h *CommandHandler) handleSTOPMINING(args []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 
-	output := fmt.Sprintf("Mining stopped on server %s", serverIP)
+	output := fmt.Sprintf("Mining stopped on server %s\n", serverIP)
 	return &CommandResult{Output: output}
 }
 
@@ -671,7 +888,7 @@ func (h *CommandHandler) handleMINERS() *CommandResult {
 	}
 
 	if len(miners) == 0 {
-		return &CommandResult{Output: "No active miners"}
+		return &CommandResult{Output: "No active miners\n"}
 	}
 
 	output := "Active miners:\n"
@@ -698,7 +915,7 @@ func (h *CommandHandler) handleWALLET() *CommandResult {
 
 	output := fmt.Sprintf("Wallet Balance:\n")
 	output += fmt.Sprintf("  Crypto: %.2f\n", user.Wallet.Crypto)
-	output += fmt.Sprintf("  Data: %.2f", user.Wallet.Data)
+	output += fmt.Sprintf("  Data: %.2f\n", user.Wallet.Data)
 
 	return &CommandResult{Output: output}
 }
@@ -776,8 +993,91 @@ func (h *CommandHandler) handleEDIT(args []string) *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("usage: edit <filename>")}
 	}
 	
-	// For now, return a message - full edit mode would require more complex state management
-	return &CommandResult{Output: fmt.Sprintf("Edit mode for %s. Use ':save' to save, ':exit' to exit.\n(Note: Full edit mode not yet implemented)", args[0])}
+	// Return special marker to enter edit mode
+	// The shell will handle this and enter edit mode
+	return &CommandResult{Output: fmt.Sprintf("__EDIT_MODE__%s", args[0])}
+}
+
+func (h *CommandHandler) handleTUTORIAL(args []string) *CommandResult {
+	if h.tutorialService == nil {
+		return &CommandResult{Error: fmt.Errorf("tutorial service not available")}
+	}
+
+	// Reload tutorials in case they were edited
+	if err := h.tutorialService.ReloadTutorials(); err != nil {
+		return &CommandResult{Error: fmt.Errorf("failed to reload tutorials: %w", err)}
+	}
+
+	// If no args, list all tutorials
+	if len(args) == 0 {
+		tutorials := h.tutorialService.GetAllTutorials()
+		
+		var output strings.Builder
+		output.WriteString("Available Tutorials\n\n")
+		
+		if len(tutorials) == 0 {
+			output.WriteString("No tutorials available.\n")
+			output.WriteString("Edit tutorials.json to add tutorials.\n")
+		} else {
+			for _, tutorial := range tutorials {
+				output.WriteString(fmt.Sprintf("  %s - %s\n", tutorial.ID, tutorial.Name))
+				output.WriteString(fmt.Sprintf("    %s\n", tutorial.Description))
+				if len(tutorial.Prerequisites) > 0 {
+					output.WriteString(fmt.Sprintf("    Prerequisites: %s\n", strings.Join(tutorial.Prerequisites, ", ")))
+				}
+				output.WriteString(fmt.Sprintf("    Steps: %d\n\n", len(tutorial.Steps)))
+			}
+			output.WriteString("Usage: tutorial <tutorial_id>\n")
+			output.WriteString("Example: tutorial getting_started\n")
+		}
+		
+		return &CommandResult{Output: output.String()}
+	}
+
+	// Get specific tutorial
+	tutorialID := args[0]
+	tutorial, err := h.tutorialService.GetTutorialByID(tutorialID)
+	if err != nil {
+		return &CommandResult{Error: fmt.Errorf("tutorial not found: %s. Use 'tutorial' to list available tutorials", tutorialID)}
+	}
+
+	// Display tutorial
+	var output strings.Builder
+	output.WriteString(fmt.Sprintf("╔═══════════════════════════════════════╗\n"))
+	output.WriteString(fmt.Sprintf("║   Tutorial: %s\n", tutorial.Name))
+	output.WriteString(fmt.Sprintf("╚═══════════════════════════════════════╝\n\n"))
+	output.WriteString(fmt.Sprintf("%s\n\n", tutorial.Description))
+	
+	if len(tutorial.Prerequisites) > 0 {
+		output.WriteString("Prerequisites:\n")
+		for _, prereq := range tutorial.Prerequisites {
+			output.WriteString(fmt.Sprintf("  - %s\n", prereq))
+		}
+		output.WriteString("\n")
+	}
+
+	output.WriteString("Steps:\n\n")
+	for i, step := range tutorial.Steps {
+		output.WriteString(fmt.Sprintf("Step %d: %s\n", step.ID, step.Title))
+		output.WriteString(fmt.Sprintf("%s\n", step.Description))
+		
+		if len(step.Commands) > 0 {
+			output.WriteString("Example commands:\n")
+			for _, cmd := range step.Commands {
+				output.WriteString(fmt.Sprintf("  $ %s\n", cmd))
+			}
+		}
+		
+		if i < len(tutorial.Steps)-1 {
+			output.WriteString("\n")
+		}
+	}
+	
+	output.WriteString("\n")
+	output.WriteString(fmt.Sprintf("Tutorial file location: %s\n", h.tutorialService.GetTutorialPath()))
+	output.WriteString("Edit this file to modify tutorials.\n")
+
+	return &CommandResult{Output: output.String()}
 }
 
 func parseCommand(input string) []string {

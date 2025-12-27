@@ -5,8 +5,8 @@ import (
 	"math/rand"
 	"time"
 
-	"ssh4xx-go/database"
-	"ssh4xx-go/models"
+	"terminal-sh/database"
+	"terminal-sh/models"
 )
 
 // ServerService handles server-related operations
@@ -21,10 +21,15 @@ func NewServerService() *ServerService {
 	}
 }
 
-// GetServerByIP retrieves a server by its IP address
+// GetServerByIP retrieves a server by its IP address (checks both IP and LocalIP fields)
 func (s *ServerService) GetServerByIP(ip string) (*models.Server, error) {
 	var server models.Server
-	if err := database.DB.Where("ip = ?", ip).First(&server).Error; err != nil {
+	// Try IP field first (hostname)
+	if err := database.DB.Where("ip = ?", ip).First(&server).Error; err == nil {
+		return &server, nil
+	}
+	// Try LocalIP field (actual IP address)
+	if err := database.DB.Where("local_ip = ?", ip).First(&server).Error; err != nil {
 		return nil, err
 	}
 	return &server, nil

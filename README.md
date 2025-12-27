@@ -1,4 +1,4 @@
-# SSH4XX Server
+# terminal.sh Server
 
 A simple SSH server with a terminal interface built in Go, featuring a virtual filesystem and basic command support.
 
@@ -13,13 +13,13 @@ A simple SSH server with a terminal interface built in Go, featuring a virtual f
 ## Building
 
 ```bash
-go build -o ssh4xx-server .
+go build -o terminal.sh .
 ```
 
 ## Running
 
 ```bash
-./ssh4xx-server
+./terminal.sh
 ```
 
 The server will listen on `0.0.0.0:2222` by default.
@@ -35,7 +35,7 @@ Environment variables:
 Example:
 
 ```bash
-PORT=2222 HOST=0.0.0.0 ./ssh4xx-server
+PORT=2222 HOST=0.0.0.0 ./terminal.sh
 ```
 
 ## Connecting
@@ -58,13 +58,13 @@ ssh -p 2222 <username>@your-server-ip
 Build the Docker image:
 
 ```bash
-docker build -t ssh4xx-server .
+docker build -t terminal.sh .
 ```
 
 Run the container:
 
 ```bash
-docker run -p 2222:2222 -e PORT=2222 ssh4xx-server
+docker run -p 2222:2222 -e PORT=2222 terminal.sh
 ```
 
 ## Coolify Deployment
@@ -81,7 +81,7 @@ docker run -p 2222:2222 -e PORT=2222 ssh4xx-server
 Project structure:
 
 ```
-ssh4xx-go/
+terminal.sh/
 ├── main.go              # Entry point
 ├── cmd/                 # Command handlers
 ├── config/              # Configuration management

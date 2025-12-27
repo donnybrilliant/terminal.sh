@@ -2,13 +2,13 @@ package terminal
 
 import (
 	"fmt"
-	"ssh4xx-go/models"
-	"ssh4xx-go/services"
+	"terminal-sh/models"
+	"terminal-sh/services"
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
-	"ssh4xx-go/database"
+	"terminal-sh/database"
 )
 
 var (
@@ -247,7 +247,7 @@ func (m *LoginModel) View() string {
 	}
 
 	var s string
-	s += titleStyle.Render("╔═══════════════════════════════════════╗\n║      SSH4XX Server - Welcome!         ║\n╚═══════════════════════════════════════╝")
+	s += titleStyle.Render("╔═══════════════════════════════════════╗\n║   terminal.sh Server - Welcome!       ║\n╚═══════════════════════════════════════╝")
 	s += "\n\n"
 	s += welcomeStyle.Render("Enter your credentials to continue")
 	s += "\n\n"

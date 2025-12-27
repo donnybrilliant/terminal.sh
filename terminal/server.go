@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"ssh4xx-go/config"
-	"ssh4xx-go/services"
+	"terminal-sh/config"
+	"terminal-sh/services"
 	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"

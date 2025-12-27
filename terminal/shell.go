@@ -1,14 +1,16 @@
 package terminal
 
 import (
+	"fmt"
+	"terminal-sh/cmd"
+	"terminal-sh/filesystem"
+	"terminal-sh/models"
+	"terminal-sh/services"
 	"strings"
-	"ssh4xx-go/cmd"
-	"ssh4xx-go/filesystem"
-	"ssh4xx-go/models"
-	"ssh4xx-go/services"
 
+	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // ShellModel handles the interactive shell after login
@@ -21,10 +23,23 @@ type ShellModel struct {
 		command string
 		output  string
 	}
-	currentLine strings.Builder
-	showWelcome bool
-	width        int
-	height       int
+	textInput      textinput.Model
+	textarea       textarea.Model
+	showWelcome    bool
+	width          int
+	height         int
+	commandHistory []string        // All executed commands for navigation
+	historyIndex   int             // Current position in history (-1 = new command)
+	editMode       bool            // Whether we're in edit mode
+	editFilename   string          // File being edited
+	shellStack     []ShellContext  // Stack for nested SSH sessions
+}
+
+// ShellContext represents a shell session context
+type ShellContext struct {
+	serverPath string
+	vfs        *filesystem.VFS
+	handler    *cmd.CommandHandler
 }
 
 // NewShellModel creates a new shell model
@@ -48,16 +63,64 @@ func NewShellModelWithSize(userService *services.UserService, user interface{}, 
 	vfs := filesystem.NewVFS(username)
 	handler := cmd.NewCommandHandler(vfs, u, userService)
 
-	return &ShellModel{
+	// Sync user tools to VFS so they appear in help
+	if u != nil {
+		handler.SyncUserToolsToVFS()
+	}
+
+	// Initialize text input component
+	ti := textinput.New()
+	ti.Prompt = ""
+	ti.Placeholder = ""
+	ti.CharLimit = 0
+	ti.Width = width
+	ti.Focus()
+
+	// Initialize textarea component for edit mode
+	ta := textarea.New()
+	ta.Placeholder = "Start typing..."
+	ta.CharLimit = 0
+	ta.SetWidth(width)
+	ta.SetHeight(height - 2) // Reserve space for status line and prompt
+
+	// Set up SSH callbacks for nested session handling
+	shellModel := &ShellModel{
 		userService: userService,
 		user:        u,
 		vfs:         vfs,
 		handler:     handler,
-		history:     make([]struct{command string; output string}, 0),
-		showWelcome: true,
-		width:       width,
-		height:      height,
+		history: make([]struct {
+			command string
+			output  string
+		}, 0),
+		showWelcome:    true,
+		width:          width,
+		height:         height,
+		commandHistory: make([]string, 0),
+		historyIndex:   -1,
+		shellStack:     make([]ShellContext, 0),
+		textInput:      ti,
+		textarea:       ta,
 	}
+
+	// Set SSH callbacks
+	handler.SetSSHCallbacks(
+		func(serverPath string) error {
+			// On SSH connect: push current context to stack
+			shellModel.shellStack = append(shellModel.shellStack, ShellContext{
+				serverPath: handler.GetCurrentServerPath(),
+				vfs:        shellModel.vfs,
+				handler:    shellModel.handler,
+			})
+			return nil
+		},
+		func() error {
+			// On SSH disconnect: pop from stack (handled in exit command)
+			return nil
+		},
+	)
+
+	return shellModel
 }
 
 // Init initializes the shell
@@ -68,6 +131,7 @@ func (m *ShellModel) Init() tea.Cmd {
 			return WelcomeMsg{}
 		},
 		tea.WindowSize(),
+		m.textInput.Focus(),
 	)
 }
 
@@ -77,55 +141,151 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.textInput.Width = msg.Width
+		m.textarea.SetWidth(msg.Width)
+		m.textarea.SetHeight(msg.Height - 2) // Reserve space for status line and prompt
 		return m, nil
 	case tea.KeyMsg:
+		// Handle edit mode separately
+		if m.editMode {
+			return m.handleEditModeInput(msg)
+		}
+
 		switch msg.String() {
 		case "ctrl+c":
-			// Clear current line
-			m.currentLine.Reset()
+			// If in SSH session, exit SSH (same as exit command)
+			// Otherwise, clear current line
+			if m.handler.GetCurrentServerPath() != "" {
+				return m.handleExitSSH()
+			}
+			m.textInput.SetValue("")
+			m.historyIndex = -1
+			return m, nil
+		case "up":
+			// Navigate command history backward
+			if len(m.commandHistory) > 0 {
+				if m.historyIndex == -1 {
+					m.historyIndex = len(m.commandHistory) - 1
+				} else if m.historyIndex > 0 {
+					m.historyIndex--
+				}
+				m.textInput.SetValue(m.commandHistory[m.historyIndex])
+				m.textInput.CursorEnd()
+			}
+			return m, nil
+		case "down":
+			// Navigate command history forward
+			if m.historyIndex >= 0 {
+				m.historyIndex++
+				if m.historyIndex >= len(m.commandHistory) {
+					m.historyIndex = -1
+					m.textInput.SetValue("")
+				} else {
+					m.textInput.SetValue(m.commandHistory[m.historyIndex])
+					m.textInput.CursorEnd()
+				}
+			}
+			return m, nil
+		case "tab":
+			// Autocomplete
+			line := m.textInput.Value()
+			parts := strings.Fields(line)
+
+			if len(parts) == 0 || len(parts) == 1 {
+				// Complete command name
+				prefix := ""
+				if len(parts) == 1 {
+					prefix = parts[0]
+				}
+				matches := m.getCommandMatches(prefix)
+				if len(matches) == 1 {
+					// Single match - complete it
+					m.textInput.SetValue(matches[0])
+					m.textInput.CursorEnd()
+				} else if len(matches) > 1 {
+					// Multiple matches - complete common prefix
+					commonPrefix := m.findCommonPrefix(matches)
+					if commonPrefix != prefix {
+						m.textInput.SetValue(commonPrefix)
+						m.textInput.CursorEnd()
+					}
+				}
+			} else {
+				// Complete file/directory name
+				prefix := parts[len(parts)-1]
+				matches := m.getFileMatches(prefix)
+				if len(matches) == 1 {
+					// Single match - complete it
+					current := m.textInput.Value()
+					// Replace last part with match
+					lastSpaceIdx := strings.LastIndex(current, " ")
+					if lastSpaceIdx >= 0 {
+						m.textInput.SetValue(current[:lastSpaceIdx+1] + matches[0])
+					} else {
+						m.textInput.SetValue(matches[0])
+					}
+					m.textInput.CursorEnd()
+				} else if len(matches) > 1 {
+					// Multiple matches - complete common prefix
+					commonPrefix := m.findCommonPrefix(matches)
+					if commonPrefix != prefix {
+						current := m.textInput.Value()
+						lastSpaceIdx := strings.LastIndex(current, " ")
+						if lastSpaceIdx >= 0 {
+							m.textInput.SetValue(current[:lastSpaceIdx+1] + commonPrefix)
+						} else {
+							m.textInput.SetValue(commonPrefix)
+						}
+						m.textInput.CursorEnd()
+					}
+				}
+			}
 			return m, nil
 		case "enter":
-			line := m.currentLine.String()
-			m.currentLine.Reset()
+			line := m.textInput.Value()
+			m.textInput.SetValue("")
 			if line == "" {
 				return m, nil
 			}
 			// Add command to history immediately
-			m.history = append(m.history, struct{command string; output string}{
+			m.history = append(m.history, struct {
+				command string
+				output  string
+			}{
 				command: line,
 				output:  "",
 			})
+			// Add to command history for navigation (if not duplicate of last command)
+			if len(m.commandHistory) == 0 || m.commandHistory[len(m.commandHistory)-1] != line {
+				m.commandHistory = append(m.commandHistory, line)
+			}
+			m.historyIndex = -1
 			m.showWelcome = false
 			return m, m.executeCommand(line)
-		case "backspace":
-			if m.currentLine.Len() > 0 {
-				current := m.currentLine.String()
-				m.currentLine.Reset()
-				m.currentLine.WriteString(current[:len(current)-1])
-			}
-			return m, nil
 		default:
-			// Add character to current line
-			if len(msg.Runes) > 0 {
-				m.currentLine.WriteRune(msg.Runes[0])
-			}
-			return m, nil
+			var cmd tea.Cmd
+			m.textInput, cmd = m.textInput.Update(msg)
+			m.historyIndex = -1 // Reset history index when typing
+			return m, cmd
 		}
 	case WelcomeMsg:
 		m.showWelcome = true
 		return m, nil
 	case CommandResultMsg:
-		// Handle clear command specially - clear history instead of showing ANSI codes
+		// Handle clear command - clear history
 		if len(m.history) > 0 {
 			lastCommand := m.history[len(m.history)-1].command
 			if lastCommand == "clear" {
 				// Clear all history and reset welcome
-				m.history = make([]struct{command string; output string}, 0)
+				m.history = make([]struct {
+					command string
+					output  string
+				}, 0)
 				m.showWelcome = false
 				return m, nil
 			}
 		}
-		
+
 		// Add command and output to history
 		if len(m.history) > 0 {
 			lastIdx := len(m.history) - 1
@@ -141,15 +301,53 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if msg.Result.Error != nil {
 				output = FormatError(msg.Result.Error)
 			} else if msg.Result.Nodes != nil {
-				output = FormatDirList(msg.Result.Nodes)
+				output = FormatDirListWithOptions(msg.Result.Nodes, msg.Result.LongFormat)
 			} else if msg.Result.Output != "" {
-				if msg.Result.Output == "__ANIMATED_HELP__" {
-					output = AnimatedHelp()
+				// Handle special messages
+				if strings.HasPrefix(msg.Result.Output, "__SSH_CONNECT__") {
+					// Handle SSH connection - push to stack and update path
+					newServerPath := strings.TrimPrefix(msg.Result.Output, "__SSH_CONNECT__")
+					// Push current context to stack
+					m.shellStack = append(m.shellStack, ShellContext{
+						serverPath: m.handler.GetCurrentServerPath(),
+						vfs:        m.vfs,
+						handler:    m.handler,
+					})
+					// Update handler's server path
+					m.handler.SetCurrentServerPath(newServerPath)
+					// Add connection message to history
+					parts := strings.Split(newServerPath, ".")
+					serverIP := parts[len(parts)-1]
+					output = fmt.Sprintf("Connected to %s\n", serverIP)
+					output += fmt.Sprintf("Server path: %s\n", newServerPath)
+				} else if msg.Result.Output == "__EXIT_SSH__" {
+					// Handle exit from SSH session - return immediately
+					return m.handleExitSSH()
+				} else if msg.Result.Output == "__QUIT__" {
+					// Quit the program
+					return m, tea.Quit
+				} else if strings.HasPrefix(msg.Result.Output, "__EDIT_MODE__") {
+					filename := strings.TrimPrefix(msg.Result.Output, "__EDIT_MODE__")
+					// Enter edit mode
+					m.editMode = true
+					m.editFilename = filename
+					m.textarea.Reset()
+					// Try to load existing file content
+					if content, err := m.vfs.ReadFile(filename); err == nil {
+						m.textarea.SetValue(content)
+					}
+					m.textInput.Blur()
+					m.textarea.Focus()
+					output = fmt.Sprintf("Edit mode for %s. Press Ctrl+S to save, Esc/Ctrl+Q to exit.\n", filename)
 				} else if msg.Result.Output == "\033[2J\033[H" {
-					// Skip ANSI clear codes - they're handled specially above
+					// Handle clear command ANSI codes - return empty output
 					output = ""
 				} else {
 					output = msg.Result.Output
+					// Ensure output ends with newline if not empty
+					if !strings.HasSuffix(output, "\n") {
+						output += "\n"
+					}
 				}
 			}
 			// Always set output, even if empty (to mark command as processed)
@@ -184,152 +382,142 @@ func (m *ShellModel) View() string {
 	if m.user != nil && m.user.Username != "" {
 		username = m.user.Username
 	}
-	
-	// Reserve 1 line for the prompt at the bottom
-	// If height is 0 (not yet received), show all history
-	availableLines := m.height - 1
-	if m.height == 0 || availableLines < 1 {
-		// Show all history if height unknown or too small
-		availableLines = 1000 // Large number to show all
-	}
 
-	var historyLines strings.Builder
-	
-	// Build all history entries with line counts
-	type historyEntry struct {
-		text      string
-		lineCount int
-	}
-	
-	var entries []historyEntry
-	
-	// Add welcome message if shown (we'll handle it specially in View)
-	if m.showWelcome {
-		// Don't add to entries, we'll handle it specially in View
-	}
-	
-	// Build history entries
-	for _, entry := range m.history {
-		var entryText strings.Builder
-		prompt := RenderPrompt(username, "ssh4xx", m.vfs.GetCurrentPath())
-		entryText.WriteString(prompt)
-		entryText.WriteString(entry.command)
-		entryText.WriteString("\n")
-		if entry.output != "" {
-			entryText.WriteString(entry.output)
-			entryText.WriteString("\n")
-		}
-		text := entryText.String()
-		entries = append(entries, historyEntry{
-			text:      text,
-			lineCount: countLines(text),
-		})
-	}
-	
-	// Calculate which entries to show (from the end, fitting in available space)
-	usedLines := 0
-	startIdx := len(entries)
-	for i := len(entries) - 1; i >= 0; i-- {
-		if usedLines+entries[i].lineCount <= availableLines {
-			usedLines += entries[i].lineCount
-			startIdx = i
-		} else {
-			break
-		}
-	}
-	
-	// Build the history section
-	for i := startIdx; i < len(entries); i++ {
-		historyLines.WriteString(entries[i].text)
-	}
-	
-	historyText := historyLines.String()
-	
 	// Ensure we have a valid height (fallback to default if not set yet)
 	height := m.height
 	if height <= 0 {
 		height = 24 // Default terminal height
 	}
-	width := m.width
-	if width <= 0 {
-		width = 80 // Default terminal width
-	}
-	
-	// If showing welcome message, center only the ASCII art
+
+	// 1. Build history content (all entries with newlines)
+	var historyContent strings.Builder
+
+	// Add welcome message as first entry if shown
 	if m.showWelcome && len(m.history) == 0 {
-		asciiArt := AnimatedWelcome()
-		helpText := WelcomeHelpText()
-		
-		// Center only the ASCII art
-		centeredArt := lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, asciiArt)
-		
-		// Calculate where to place help text and prompt (at bottom, left-aligned)
-		helpTextLineCount := countLines(helpText)
-		promptLineCount := 1
-		bottomContentLines := helpTextLineCount + promptLineCount
-		bottomStartLine := height - bottomContentLines
-		
-		// Build final output line by line
-		centeredLines := strings.Split(centeredArt, "\n")
-		var result strings.Builder
-		
-		prompt := RenderPrompt(username, "ssh4xx", m.vfs.GetCurrentPath())
-		promptLine := prompt + m.currentLine.String() + "_"
-		helpLines := strings.Split(strings.TrimSuffix(helpText, "\n"), "\n")
-		
-		for i := 0; i < height; i++ {
-			if i < bottomStartLine {
-				// Show centered art lines
-				if i < len(centeredLines) {
-					result.WriteString(centeredLines[i])
-				}
-			} else {
-				// Show help text or prompt (left-aligned)
-				idx := i - bottomStartLine
-				if idx < len(helpLines) {
-					result.WriteString(helpLines[idx])
-				} else if idx == len(helpLines) {
-					result.WriteString(promptLine)
-				}
+		welcome := AnimatedWelcome() + "\n" + WelcomeHelpText()
+		historyContent.WriteString(welcome)
+		// Ensure welcome ends with newline
+		if !strings.HasSuffix(welcome, "\n") {
+			historyContent.WriteString("\n")
+		}
+	}
+
+	// Add all history entries
+	for _, entry := range m.history {
+		// Command line: prompt + command + newline
+		prompt := RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
+		historyContent.WriteString(prompt)
+		historyContent.WriteString(entry.command)
+		historyContent.WriteString("\n")
+
+		// Output: output + newline (if not empty)
+		if entry.output != "" {
+			historyContent.WriteString(entry.output)
+			// Ensure output ends with newline
+			if !strings.HasSuffix(entry.output, "\n") {
+				historyContent.WriteString("\n")
 			}
-			if i < height-1 {
-				result.WriteString("\n")
+		}
+	}
+
+	// 2. Calculate how many lines history takes
+	historyText := historyContent.String()
+	historyLines := countLines(historyText)
+
+	// 3. Calculate available space for content
+	// Reserve space for prompt/status line (1 line)
+	availableLines := height - 1
+
+	var finalOutput strings.Builder
+
+	if m.editMode {
+		// Edit mode: show history + textarea + status line
+		// Calculate how much space we have for history
+		textareaHeight := m.height - 2 // Reserve 1 for status, 1 for prompt
+		if textareaHeight < 3 {
+			textareaHeight = 3 // Minimum height
+		}
+		m.textarea.SetHeight(textareaHeight)
+		
+		// Calculate available space for history
+		historyAvailableLines := availableLines - textareaHeight - 1 // -1 for status line
+		
+		if historyLines > historyAvailableLines {
+			// Truncate history from top
+			lines := strings.Split(historyText, "\n")
+			startIdx := len(lines) - historyAvailableLines
+			if startIdx < 0 {
+				startIdx = 0
+			}
+			for i := startIdx; i < len(lines); i++ {
+				if i > startIdx {
+					finalOutput.WriteString("\n")
+				}
+				finalOutput.WriteString(lines[i])
+			}
+		} else {
+			// Pad with empty lines, then show history
+			paddingLines := historyAvailableLines - historyLines
+			for i := 0; i < paddingLines; i++ {
+				finalOutput.WriteString("\n")
+			}
+			historyTrimmed := strings.TrimSuffix(historyText, "\n")
+			if historyTrimmed != "" {
+				finalOutput.WriteString(historyTrimmed)
 			}
 		}
 		
-		return result.String()
-	}
-	
-	// For normal shell mode, put prompt at absolute bottom
-	// Count lines in history (trim trailing newline if present for accurate count)
-	historyTextTrimmed := strings.TrimSuffix(historyText, "\n")
-	historyLineCount := countLines(historyTextTrimmed)
-	
-	// Calculate padding needed to push prompt to absolute bottom
-	// Total lines in output = padding + history + prompt (1 line)
-	// We want the last line to be the prompt
-	// So: padding + historyLineCount + 1 = height
-	paddingNeeded := height - historyLineCount - 1
-	if paddingNeeded < 0 {
-		paddingNeeded = 0
-	}
-	
-	// Build the result with padding at the top to push everything to bottom
-	var result strings.Builder
-	// Add padding newlines at the top
-	for i := 0; i < paddingNeeded; i++ {
-		result.WriteString("\n")
-	}
-	// Add history content
-	result.WriteString(historyTextTrimmed)
-	
-	// Current prompt and input (always at absolute bottom)
-	prompt := RenderPrompt(username, "ssh4xx", m.vfs.GetCurrentPath())
-	result.WriteString(prompt)
-	result.WriteString(m.currentLine.String())
-	result.WriteString("_") // Cursor
+		// Add newline before textarea
+		finalOutput.WriteString("\n")
+		
+		// Render textarea (it handles its own rendering with cursor, etc.)
+		finalOutput.WriteString(m.textarea.View())
+		
+		// Add status line
+		finalOutput.WriteString("\n")
+		statusLine := fmt.Sprintf("-- Edit mode: %s | Ctrl+S to save, Esc/Ctrl+Q to exit --", m.editFilename)
+		finalOutput.WriteString(statusLine)
+	} else {
+		// Normal mode: show history + prompt
+		// Calculate how many lines we can show (height - 1 for prompt)
+		if historyLines >= availableLines {
+			// Truncate: show only last availableLines of content
+			lines := strings.Split(historyText, "\n")
+			// Remove empty last line if present
+			if len(lines) > 0 && lines[len(lines)-1] == "" {
+				lines = lines[:len(lines)-1]
+			}
+			startIdx := len(lines) - availableLines
+			if startIdx < 0 {
+				startIdx = 0
+			}
+			for i := startIdx; i < len(lines); i++ {
+				if i > startIdx {
+					finalOutput.WriteString("\n")
+				}
+				finalOutput.WriteString(lines[i])
+			}
+		} else {
+			// Pad: add empty lines, then history
+			paddingLines := availableLines - historyLines
+			for i := 0; i < paddingLines; i++ {
+				finalOutput.WriteString("\n")
+			}
+			// Add history (trim trailing newline)
+			historyTrimmed := strings.TrimSuffix(historyText, "\n")
+			if historyTrimmed != "" {
+				finalOutput.WriteString(historyTrimmed)
+			}
+		}
 
-	return result.String()
+		// Add prompt on last line
+		finalOutput.WriteString("\n")
+		m.textInput.Prompt = RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
+		m.textInput.Width = m.width
+		finalOutput.WriteString(m.textInput.View())
+	}
+
+	return finalOutput.String()
 }
 
 // countLines counts the number of lines in a string
@@ -353,3 +541,145 @@ type CommandResultMsg struct {
 	Result *cmd.CommandResult
 }
 
+// getCommandMatches returns commands that start with the given prefix
+func (m *ShellModel) getCommandMatches(prefix string) []string {
+	binCommands, usrBinCommands := m.vfs.ListCommands()
+	allCommands := append(binCommands, usrBinCommands...)
+
+	var matches []string
+	for _, cmd := range allCommands {
+		if strings.HasPrefix(cmd, prefix) {
+			matches = append(matches, cmd)
+		}
+	}
+	return matches
+}
+
+// getFileMatches returns files/directories in current directory that start with prefix
+func (m *ShellModel) getFileMatches(prefix string) []string {
+	nodes := m.vfs.ListDir()
+	var matches []string
+	for _, node := range nodes {
+		name := node.Name
+		if node.IsDir {
+			name += "/"
+		}
+		if strings.HasPrefix(name, prefix) {
+			matches = append(matches, name)
+		}
+	}
+	return matches
+}
+
+// findCommonPrefix finds the common prefix of a slice of strings
+func (m *ShellModel) findCommonPrefix(strs []string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	if len(strs) == 1 {
+		return strs[0]
+	}
+
+	prefix := strs[0]
+	for i := 1; i < len(strs); i++ {
+		for len(prefix) > 0 && !strings.HasPrefix(strs[i], prefix) {
+			prefix = prefix[:len(prefix)-1]
+		}
+		if len(prefix) == 0 {
+			return ""
+		}
+	}
+	return prefix
+}
+
+// handleExitSSH handles exiting from an SSH session
+func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
+	if len(m.shellStack) == 0 {
+		// No more shells in stack, quit program
+		return m, tea.Quit
+	}
+
+	// Pop from stack and restore context
+	lastIdx := len(m.shellStack) - 1
+	context := m.shellStack[lastIdx]
+	m.shellStack = m.shellStack[:lastIdx]
+
+	// Restore VFS and handler
+	m.vfs = context.vfs
+	m.handler = context.handler
+
+	// Update handler's server path
+	m.handler.SetCurrentServerPath(context.serverPath)
+
+	// Add exit message to history
+	m.history = append(m.history, struct {
+		command string
+		output  string
+	}{
+		command: "exit",
+		output:  "Disconnected\n",
+	})
+	m.showWelcome = false
+
+	return m, nil
+}
+
+// handleEditModeInput handles input when in edit mode
+func (m *ShellModel) handleEditModeInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	
+	// Handle special keys for edit mode
+	switch msg.String() {
+	case "ctrl+s":
+		// Save file and exit edit mode
+		filename := m.editFilename
+		content := m.textarea.Value()
+		if err := m.vfs.WriteFile(filename, content); err != nil {
+			// Add error to history
+			m.history = append(m.history, struct {
+				command string
+				output  string
+			}{
+				command: "edit " + filename,
+				output:  FormatError(err),
+			})
+		} else {
+			// Exit edit mode
+			m.editMode = false
+			m.history = append(m.history, struct {
+				command string
+				output  string
+			}{
+				command: "edit " + filename,
+				output:  fmt.Sprintf("File %s saved.\n", filename),
+			})
+			m.editFilename = ""
+			m.textarea.Reset()
+			m.textarea.Blur()
+			m.textInput.Focus()
+		}
+		m.showWelcome = false
+		return m, nil
+	case "ctrl+c", "esc", "ctrl+q":
+		// Exit edit mode without saving
+		filename := m.editFilename // Save filename before clearing
+		m.editMode = false
+		m.editFilename = ""
+		m.textarea.Reset()
+		m.textarea.Blur()
+		m.textInput.Focus()
+		m.history = append(m.history, struct {
+			command string
+			output  string
+		}{
+			command: "edit " + filename,
+			output:  "Edit mode exited without saving.\n",
+		})
+		m.showWelcome = false
+		return m, nil
+	default:
+		// Delegate all other input to textarea
+		m.textarea, cmd = m.textarea.Update(msg)
+		return m, cmd
+	}
+}

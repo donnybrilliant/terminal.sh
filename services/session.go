@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"ssh4xx-go/database"
-	"ssh4xx-go/models"
+	"terminal-sh/database"
+	"terminal-sh/models"
 
 	"github.com/google/uuid"
 )

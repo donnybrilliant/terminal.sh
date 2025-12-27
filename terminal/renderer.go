@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"ssh4xx-go/filesystem"
+	"terminal-sh/filesystem"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -36,44 +36,87 @@ func RenderPrompt(user, hostname, path string) string {
 }
 
 // FormatDirList formats a list of filesystem nodes for display
+// Returns output with trailing newline, or empty string if no nodes
 func FormatDirList(nodes []*filesystem.Node) string {
+	return FormatDirListWithOptions(nodes, false)
+}
+
+// FormatDirListWithOptions formats a list with optional long format
+func FormatDirListWithOptions(nodes []*filesystem.Node, longFormat bool) string {
 	if len(nodes) == 0 {
 		return ""
 	}
 
 	var output strings.Builder
 	for _, node := range nodes {
-		if node.IsDir {
-			output.WriteString(dirStyle.Render(node.Name + "/"))
+		if longFormat {
+			// Long format: show file details
+			// Format: permissions size name
+			perms := "-rw-r--r--"
+			if node.IsDir {
+				perms = "drwxr-xr-x"
+			}
+			size := "0"
+			if !node.IsDir {
+				size = fmt.Sprintf("%d", len(node.Content))
+			}
+			name := node.Name
+			if node.IsDir {
+				name += "/"
+			}
+			output.WriteString(fmt.Sprintf("%s %6s %s\n", perms, size, name))
 		} else {
-			output.WriteString(fileStyle.Render(node.Name))
+			// Short format: just name
+			if node.IsDir {
+				output.WriteString(dirStyle.Render(node.Name + "/"))
+			} else {
+				output.WriteString(fileStyle.Render(node.Name))
+			}
+			output.WriteString("\n")
 		}
-		output.WriteString("\n")
 	}
 
-	return strings.TrimSuffix(output.String(), "\n")
+	// Ensure trailing newline
+	result := output.String()
+	if !strings.HasSuffix(result, "\n") {
+		result += "\n"
+	}
+	return result
 }
 
 // FormatError formats an error message for display
+// Returns error message with trailing newline
 func FormatError(err error) string {
-	return errorStyle.Render("Error: " + err.Error())
+	msg := errorStyle.Render("Error: " + err.Error())
+	if !strings.HasSuffix(msg, "\n") {
+		msg += "\n"
+	}
+	return msg
 }
 
 // FormatSuccess formats a success message for display
+// Returns success message with trailing newline (or empty string if msg is empty)
 func FormatSuccess(msg string) string {
-	return successStyle.Render(msg)
+	if msg == "" {
+		return ""
+	}
+	result := successStyle.Render(msg)
+	if !strings.HasSuffix(result, "\n") {
+		result += "\n"
+	}
+	return result
 }
 
-// AnimatedWelcome returns an animated "SSH4XX" ASCII art welcome message
+// AnimatedWelcome returns an animated "TERMINAL.SH" ASCII art welcome message
 func AnimatedWelcome() string {
-	// ASCII art for SSH4XX (proper block letters)
+	// ASCII art for TERMINAL.SH (proper block letters)
 	asciiArt := `
-███████╗███████╗██╗  ██╗██╗  ██╗██╗  ██╗██╗  ██╗
-██╔════╝██╔════╝██║  ██║██║  ██║╚██╗██╔╝╚██╗██╔╝
-███████╗███████╗███████║███████║ ╚███╔╝  ╚███╔╝ 
-╚════██║╚════██║██╔══██║╚════██║ ██╔██╗  ██╔██╗ 
-███████║███████║██║  ██║     ██║██╔╝ ██╗██╔╝ ██╗
-╚══════╝╚══════╝╚═╝  ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝
+████████╗███████╗██████╗ ███╗   ███╗██╗███╗   ██╗ █████╗ ██╗         ███████╗██╗  ██╗
+╚══██╔══╝██╔════╝██╔══██╗████╗ ████║██║████╗  ██║██╔══██╗██║         ██╔════╝██║  ██║
+   ██║   █████╗  ██████╔╝██╔████╔██║██║██╔██╗ ██║███████║██║         ███████╗███████║
+   ██║   ██╔══╝  ██╔══██╗██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║         ╚════██║██╔══██║
+   ██║   ███████╗██║  ██║██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗    ███████║██║  ██║
+   ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝    ╚══════╝╚═╝  ╚═╝
 `
 	
 	var styled strings.Builder

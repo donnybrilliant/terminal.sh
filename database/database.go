@@ -3,7 +3,7 @@ package database
 import (
 	"fmt"
 
-	"ssh4xx-go/models"
+	"terminal-sh/models"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -38,6 +38,12 @@ func Migrate() error {
 		&models.User{},
 		&models.Tool{},
 		&models.UserTool{},
+		&models.UserToolState{},
+		&models.Shop{},
+		&models.ShopItem{},
+		&models.UserPurchase{},
+		&models.Patch{},
+		&models.UserPatch{},
 		&models.Server{},
 		&models.UserAchievement{},
 		&models.ExploitedServer{},

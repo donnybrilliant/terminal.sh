@@ -37,6 +37,9 @@ type User struct {
 	
 	// Relationships
 	Tools           []Tool           `gorm:"many2many:user_tools;" json:"tools,omitempty"`
+	ToolStates      []UserToolState  `gorm:"foreignKey:UserID" json:"tool_states,omitempty"`
+	Purchases       []UserPurchase   `gorm:"foreignKey:UserID" json:"purchases,omitempty"`
+	OwnedPatches    []UserPatch      `gorm:"foreignKey:UserID" json:"owned_patches,omitempty"`
 	Achievements    []UserAchievement `gorm:"foreignKey:UserID" json:"achievements,omitempty"`
 	ExploitedServers []ExploitedServer `gorm:"foreignKey:UserID" json:"exploited_servers,omitempty"`
 	ActiveMiners    []ActiveMiner     `gorm:"foreignKey:UserID" json:"active_miners,omitempty"`
