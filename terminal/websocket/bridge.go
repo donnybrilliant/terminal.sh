@@ -13,7 +13,7 @@ import (
 
 // ANSI escape sequences for terminal control
 const (
-	// Alternate screen buffer
+	// Alternate screen buffer (used for login - no scrollback)
 	enterAltScreen = "\x1b[?1049h"
 	exitAltScreen  = "\x1b[?1049l"
 	
@@ -24,6 +24,16 @@ const (
 	// Screen control
 	clearScreen = "\x1b[2J"
 	cursorHome  = "\x1b[H"
+	clearLine   = "\x1b[K"
+	clearToEnd  = "\x1b[J"
+)
+
+// RenderMode determines how content is rendered
+type RenderMode int
+
+const (
+	RenderModeFullScreen RenderMode = iota // Login: alternate screen, clear each render
+	RenderModeShell                        // Shell: normal buffer, scrollback enabled
 )
 
 // BubbleTeaBridge wraps a Bubble Tea model for WebSocket communication
@@ -37,6 +47,8 @@ type BubbleTeaBridge struct {
 	closeOnce   sync.Once
 	width       int
 	height      int
+	renderMode  RenderMode
+	lastView    string
 }
 
 // NewBubbleTeaBridge creates a new bridge between Bubble Tea and WebSocket
@@ -61,12 +73,13 @@ func NewBubbleTeaBridge(conn *websocket.Conn, db *database.Database, userService
 		msgChan:     make(chan tea.Msg, 100),
 		width:       width,
 		height:      height,
+		renderMode:  RenderModeFullScreen,
+		lastView:    "",
 	}
 	
 	// Initialize model
 	initCmd := bridge.model.Init()
 	if initCmd != nil {
-		// Execute init command
 		go func() {
 			if msg := initCmd(); msg != nil {
 				bridge.msgChan <- msg
@@ -86,31 +99,59 @@ func NewBubbleTeaBridge(conn *websocket.Conn, db *database.Database, userService
 	return bridge, nil
 }
 
-// prepareOutput converts Bubble Tea View() output for xterm.js
-// - Clears the screen completely
-// - Converts \n to \r\n for proper line breaks
-// - Pads lines to full width to prevent ghosting
-func prepareOutput(view string, width, height int) string {
+// isLoginModel checks if current model is the login screen
+func (b *BubbleTeaBridge) isLoginModel() bool {
+	_, ok := b.model.(*terminal.LoginModel)
+	return ok
+}
+
+// prepareFullScreenOutput prepares output for full-screen mode (login)
+// Clears screen completely before rendering - used for centered UI
+func prepareFullScreenOutput(view string) string {
 	var sb strings.Builder
 	
-	// Clear screen and move cursor to home position
 	sb.WriteString(clearScreen)
 	sb.WriteString(cursorHome)
 	sb.WriteString(hideCursor)
 	
-	// Process the view line by line
 	lines := strings.Split(view, "\n")
-	
 	for i, line := range lines {
-		// Write the line
 		sb.WriteString(line)
-		
-		// Clear to end of line (handles any leftover content on this line)
-		sb.WriteString("\x1b[K")
-		
-		// Add carriage return + newline (except for last line)
+		sb.WriteString(clearLine)
 		if i < len(lines)-1 {
 			sb.WriteString("\r\n")
+		}
+	}
+	
+	return sb.String()
+}
+
+// prepareShellOutput prepares output for shell mode
+// Writes content without clearing - enables natural scrolling
+// Each render overwrites from home, excess lines scroll into scrollback
+func prepareShellOutput(view string, height int) string {
+	var sb strings.Builder
+	
+	// Position at home (no clear - preserves scrollback)
+	sb.WriteString(cursorHome)
+	sb.WriteString(hideCursor)
+	
+	lines := strings.Split(view, "\n")
+	
+	// Write all lines, clearing each line as we go
+	for i, line := range lines {
+		sb.WriteString(line)
+		sb.WriteString(clearLine) // Clear rest of this line
+		if i < len(lines)-1 {
+			sb.WriteString("\r\n")
+		}
+	}
+	
+	// If content is shorter than screen, clear remaining lines
+	if len(lines) < height {
+		for i := len(lines); i < height; i++ {
+			sb.WriteString("\r\n")
+			sb.WriteString(clearLine)
 		}
 	}
 	
@@ -121,9 +162,7 @@ func prepareOutput(view string, width, height int) string {
 func (b *BubbleTeaBridge) processMessages() {
 	defer b.closeDone()
 
-	lastView := ""
-	
-	// Send initial setup: enter alternate screen + hide cursor
+	// Start in alternate screen for login (no scrollback needed)
 	initMsg := OutputMessage{
 		Type: MessageTypeOutput,
 		Data: enterAltScreen + hideCursor,
@@ -132,40 +171,30 @@ func (b *BubbleTeaBridge) processMessages() {
 		return
 	}
 
-	// Helper function to send view
-	sendView := func(view string) {
-		// Only send if view has changed
-		if view == lastView {
-			return
-		}
-		
-		// Prepare output for xterm
-		output := prepareOutput(view, b.width, b.height)
-		
-		msg := OutputMessage{
-			Type: MessageTypeOutput,
-			Data: output,
-		}
-		if err := b.conn.WriteJSON(msg); err != nil {
-			return // Connection closed
-		}
-		lastView = view
-	}
-
 	// Send initial view
 	currentView := b.model.View()
-	sendView(currentView)
+	output := prepareFullScreenOutput(currentView)
+	msg := OutputMessage{
+		Type: MessageTypeOutput,
+		Data: output,
+	}
+	if err := b.conn.WriteJSON(msg); err != nil {
+		return
+	}
+	b.lastView = currentView
+	wasLogin := true
 
 	for {
 		select {
 		case <-b.done:
-			// Send exit alternate screen on close
+			// Clean up on close
 			exitMsg := OutputMessage{
 				Type: MessageTypeOutput,
 				Data: exitAltScreen + showCursor,
 			}
 			b.conn.WriteJSON(exitMsg)
 			return
+			
 		case teaMsg := <-b.msgChan:
 			// Handle resize
 			if sizeMsg, ok := teaMsg.(tea.WindowSizeMsg); ok {
@@ -173,11 +202,11 @@ func (b *BubbleTeaBridge) processMessages() {
 				b.height = sizeMsg.Height
 			}
 			
-			// Update model with message
+			// Update model
 			var cmd tea.Cmd
 			b.model, cmd = b.model.Update(teaMsg)
 			
-			// Execute command if any (commands can return messages)
+			// Execute any returned command
 			if cmd != nil {
 				go func(c tea.Cmd) {
 					if msg := c(); msg != nil {
@@ -190,31 +219,54 @@ func (b *BubbleTeaBridge) processMessages() {
 				}(cmd)
 			}
 			
-			// Always send the current view after any update
-			// This is necessary for forms and other interactive components
+			// Check if we transitioned from login to shell
+			isLogin := b.isLoginModel()
+			if wasLogin && !isLogin {
+				// Transition: exit alternate screen to enable scrollback
+				transitionMsg := OutputMessage{
+					Type: MessageTypeOutput,
+					Data: exitAltScreen + clearScreen + cursorHome,
+				}
+				if err := b.conn.WriteJSON(transitionMsg); err != nil {
+					return
+				}
+				b.renderMode = RenderModeShell
+				b.lastView = "" // Force redraw
+			}
+			wasLogin = isLogin
+			
+			// Get current view
 			currentView := b.model.View()
 			
-			// Force send on every update (remove duplicate check for now)
-			// This ensures the UI stays in sync
-			output := prepareOutput(currentView, b.width, b.height)
+			// Skip if unchanged (optimization)
+			if currentView == b.lastView {
+				continue
+			}
+			
+			// Prepare output based on mode
+			var output string
+			if b.renderMode == RenderModeFullScreen {
+				output = prepareFullScreenOutput(currentView)
+			} else {
+				output = prepareShellOutput(currentView, b.height)
+			}
+			
 			msg := OutputMessage{
 				Type: MessageTypeOutput,
 				Data: output,
 			}
 			if err := b.conn.WriteJSON(msg); err != nil {
-				return // Connection closed
+				return
 			}
-			lastView = currentView
+			b.lastView = currentView
 		}
 	}
 }
 
 // HandleInput handles input messages from the WebSocket client
 func (b *BubbleTeaBridge) HandleInput(msg InputMessage) error {
-	// Convert WebSocket input message to Bubble Tea KeyMsg
 	keyMsg := convertToKeyMsg(msg)
 	
-	// Send to message channel
 	select {
 	case b.msgChan <- keyMsg:
 	default:
@@ -226,7 +278,6 @@ func (b *BubbleTeaBridge) HandleInput(msg InputMessage) error {
 
 // HandleResize handles resize messages from the WebSocket client
 func (b *BubbleTeaBridge) HandleResize(msg ResizeMessage) error {
-	// Send WindowSizeMsg to message channel
 	select {
 	case b.msgChan <- tea.WindowSizeMsg{
 		Width:  msg.Width,
@@ -239,14 +290,14 @@ func (b *BubbleTeaBridge) HandleResize(msg ResizeMessage) error {
 	return nil
 }
 
-// closeDone safely closes the done channel (only once)
+// closeDone safely closes the done channel
 func (b *BubbleTeaBridge) closeDone() {
 	b.closeOnce.Do(func() {
 		close(b.done)
 	})
 }
 
-// Close closes the bridge and cleans up
+// Close closes the bridge
 func (b *BubbleTeaBridge) Close() {
 	b.closeDone()
 }
@@ -256,7 +307,6 @@ func convertToKeyMsg(msg InputMessage) tea.KeyMsg {
 	var keyType tea.KeyType
 	var runes []rune
 	
-	// Handle special keys
 	switch msg.Key {
 	case "Enter":
 		keyType = tea.KeyEnter
@@ -285,18 +335,15 @@ func convertToKeyMsg(msg InputMessage) tea.KeyMsg {
 	case "Ctrl+l":
 		keyType = tea.KeyCtrlL
 	default:
-		// Regular character - use the char field
 		if msg.Char != "" {
 			runes = []rune(msg.Char)
 			keyType = tea.KeyRunes
 		} else {
-			// Fallback: treat as runes
 			runes = []rune(msg.Key)
 			keyType = tea.KeyRunes
 		}
 	}
 	
-	// Check for Alt modifier (Ctrl is encoded in key type like KeyCtrlC)
 	alt := false
 	for _, mod := range msg.Modifiers {
 		if mod == "Alt" {

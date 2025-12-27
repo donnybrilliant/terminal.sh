@@ -10,16 +10,17 @@ function getWebSocketURL() {
     return `${protocol}//${host}/ws`;
 }
 
-// Initialize terminal with settings optimized for Bubble Tea
+// Initialize terminal with scrollback enabled for shell history
 const term = new Terminal({ 
     cursorBlink: false,
     cursorStyle: 'block',
     cursorInactiveStyle: 'none',
     disableStdin: false,
-    scrollback: 0,          // Disable scrollback - Bubble Tea manages full screen
-    allowProposedApi: true, // Enable newer APIs
+    scrollback: 10000,      // Enable scrollback for command history
+    allowProposedApi: true,
     convertEol: false,      // We handle line endings from server
     windowsMode: false,
+    scrollOnUserInput: true,
     theme: {
         background: '#000000',
         foreground: '#ffffff',

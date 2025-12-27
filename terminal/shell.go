@@ -273,7 +273,7 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showWelcome = true
 		return m, nil
 	case CommandResultMsg:
-		// Handle clear command - clear history
+		// Handle clear command - clear history and terminal
 		if len(m.history) > 0 {
 			lastCommand := m.history[len(m.history)-1].command
 			if lastCommand == "clear" {
@@ -283,7 +283,8 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					output  string
 				}, 0)
 				m.showWelcome = false
-				return m, nil
+				// Return a command that will trigger a full redraw
+				return m, tea.ClearScreen
 			}
 		}
 
@@ -471,28 +472,24 @@ func (m *ShellModel) View() string {
 		output.WriteString(statusLine)
 	} else {
 		// Normal mode: content + prompt at bottom
-
-		// If content is longer than available space, truncate from top
-		if len(contentLines) >= availableLines {
-			startIdx := len(contentLines) - availableLines
-			for i := startIdx; i < len(contentLines); i++ {
-				output.WriteString(contentLines[i])
-				output.WriteString("\n")
-			}
-		} else {
-			// Pad with empty lines at the top to push content down
+		// When content is short, pad to push prompt to bottom
+		// When content is long, show it all (terminal handles scroll)
+		
+		if len(contentLines) < availableLines {
+			// Pad top to push prompt to bottom of screen
 			paddingLines := availableLines - len(contentLines)
 			for i := 0; i < paddingLines; i++ {
 				output.WriteString("\n")
 			}
-			// Add content
-			for _, line := range contentLines {
-				output.WriteString(line)
-				output.WriteString("\n")
-			}
+		}
+		
+		// Output all content
+		for _, line := range contentLines {
+			output.WriteString(line)
+			output.WriteString("\n")
 		}
 
-		// Add prompt on last line
+		// Add prompt at the end
 		output.WriteString(promptLine)
 	}
 
