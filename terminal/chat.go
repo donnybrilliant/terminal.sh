@@ -34,9 +34,7 @@ type ChatModel struct {
 	msgChan       chan models.ChatMessage
 	sessionID     uuid.UUID
 	splitMode     bool
-	// Command history
-	cmdHistory   []string
-	historyIndex int
+	inputHistory  *InputHistory // Command history for up/down navigation
 }
 
 // ChatMessageMsg is sent when a new message arrives
@@ -92,8 +90,7 @@ func NewChatModel(parent *ShellModel, chatService *services.ChatService, user *m
 		msgChan:       msgChan,
 		sessionID:     sessionID,
 		splitMode:     splitMode,
-		cmdHistory:    make([]string, 0),
-		historyIndex:  -1,
+		inputHistory:  NewInputHistory(100), // Keep last 100 commands
 	}
 
 	// Initialize viewports and load messages for each room
@@ -232,29 +229,19 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "up":
 			// Command history - previous
-			if len(m.cmdHistory) > 0 {
-				if m.historyIndex == -1 {
-					m.historyIndex = len(m.cmdHistory) - 1
-				} else if m.historyIndex > 0 {
-					m.historyIndex--
-				}
-				m.textInput.SetValue(m.cmdHistory[m.historyIndex])
+			if cmd, ok := m.inputHistory.Previous(); ok {
+				m.textInput.SetValue(cmd)
 				m.textInput.CursorEnd()
 			}
 			return m, nil
 
 		case "down":
 			// Command history - next
-			if m.historyIndex >= 0 {
-				if m.historyIndex < len(m.cmdHistory)-1 {
-					m.historyIndex++
-					m.textInput.SetValue(m.cmdHistory[m.historyIndex])
-					m.textInput.CursorEnd()
-				} else {
-					// Past end of history, clear input
-					m.historyIndex = -1
-					m.textInput.SetValue("")
-				}
+			if cmd, ok := m.inputHistory.Next(); ok {
+				m.textInput.SetValue(cmd)
+				m.textInput.CursorEnd()
+			} else {
+				m.textInput.SetValue("")
 			}
 			return m, nil
 
@@ -271,24 +258,19 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Send message or execute command
 			input := m.textInput.Value()
 			m.textInput.SetValue("")
-			m.historyIndex = -1 // Reset history navigation
+			m.inputHistory.Reset()
 
 			if input == "" {
 				return m, nil
 			}
 
-			// Check if it's a command
+			// Check if it's a command - only commands go in history
 			if strings.HasPrefix(input, "/") {
-				// Add to command history
-				m.cmdHistory = append(m.cmdHistory, input)
-				// Keep history reasonable size
-				if len(m.cmdHistory) > 100 {
-					m.cmdHistory = m.cmdHistory[1:]
-				}
+				m.inputHistory.Add(input)
 				return m, m.handleCommand(input)
 			}
 
-			// Send message to active room
+			// Send message to active room (not added to history)
 			if m.activeRoomID != uuid.Nil {
 				err := m.chatService.SendMessage(m.activeRoomID, m.user.ID, m.user.Username, input)
 				if err != nil {
@@ -636,31 +618,16 @@ func (m *ChatModel) autocompleteCommand(input string) string {
 	}
 
 	// Try to autocomplete the command itself
-	var matches []string
-	for _, cmd := range chatCommands {
-		if strings.HasPrefix(cmd, cmdPart) {
-			matches = append(matches, cmd)
-		}
-	}
-
-	if len(matches) == 1 {
-		// Single match - complete it with a space
+	if completed, ok := CompleteFromList(cmdPart, chatCommands); ok {
 		if len(parts) > 1 {
-			return matches[0] + " " + strings.Join(parts[1:], " ")
+			return completed + " " + strings.Join(parts[1:], " ")
 		}
-		return matches[0] + " "
-	} else if len(matches) > 1 {
-		// Multiple matches - find common prefix
-		common := matches[0]
-		for _, match := range matches[1:] {
-			common = commonPrefix(common, match)
+		// Add space after completed command if it was a single match
+		matches := FilterByPrefix(chatCommands, cmdPart)
+		if len(matches) == 1 {
+			return completed + " "
 		}
-		if len(common) > len(cmdPart) {
-			if len(parts) > 1 {
-				return common + " " + strings.Join(parts[1:], " ")
-			}
-			return common
-		}
+		return completed
 	}
 
 	return input
@@ -676,36 +643,15 @@ func (m *ChatModel) autocompleteArgs(input, cmd string, args []string) string {
 			if len(args) == 1 {
 				partial = args[0]
 			}
-			// Get all rooms user is in for /leave, or suggest room names for /join
+
+			// Get room names
 			var roomNames []string
-			if cmd == "/leave" {
-				for _, room := range m.rooms {
-					roomNames = append(roomNames, room.Name)
-				}
-			} else {
-				// For /join, suggest rooms user is in (they might want to switch)
-				for _, room := range m.rooms {
-					roomNames = append(roomNames, room.Name)
-				}
+			for _, room := range m.rooms {
+				roomNames = append(roomNames, room.Name)
 			}
 
-			var matches []string
-			for _, name := range roomNames {
-				if strings.HasPrefix(name, partial) {
-					matches = append(matches, name)
-				}
-			}
-
-			if len(matches) == 1 {
-				return cmd + " " + matches[0]
-			} else if len(matches) > 1 && partial != "" {
-				common := matches[0]
-				for _, match := range matches[1:] {
-					common = commonPrefix(common, match)
-				}
-				if len(common) > len(partial) {
-					return cmd + " " + common
-				}
+			if completed, ok := CompleteFromList(partial, roomNames); ok {
+				return cmd + " " + completed
 			}
 		}
 	case "/invite":
@@ -714,20 +660,6 @@ func (m *ChatModel) autocompleteArgs(input, cmd string, args []string) string {
 	}
 
 	return input
-}
-
-// commonPrefix returns the common prefix of two strings
-func commonPrefix(a, b string) string {
-	minLen := len(a)
-	if len(b) < minLen {
-		minLen = len(b)
-	}
-	for i := 0; i < minLen; i++ {
-		if a[i] != b[i] {
-			return a[:i]
-		}
-	}
-	return a[:minLen]
 }
 
 // updateViewportContent updates the viewport content for a room

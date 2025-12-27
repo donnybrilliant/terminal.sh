@@ -26,17 +26,16 @@ type ShellModel struct {
 		command string
 		output  string
 	}
-	textInput      textinput.Model
-	textarea       textarea.Model
-	showWelcome    bool
-	width          int
-	height         int
-	commandHistory []string       // All executed commands for navigation
-	historyIndex   int            // Current position in history (-1 = new command)
-	editMode       bool           // Whether we're in edit mode
-	editFilename   string         // File being edited
-	shellStack     []ShellContext // Stack for nested SSH sessions
-	sessionID      uuid.UUID      // Session ID for chat
+	textInput    textinput.Model
+	textarea     textarea.Model
+	showWelcome  bool
+	width        int
+	height       int
+	inputHistory *InputHistory  // Command history for up/down navigation
+	editMode     bool           // Whether we're in edit mode
+	editFilename string         // File being edited
+	shellStack   []ShellContext // Stack for nested SSH sessions
+	sessionID    uuid.UUID      // Session ID for chat
 
 	// Incremental rendering state
 	pendingOutput   string // New output to append (command results)
@@ -109,16 +108,15 @@ func NewShellModelWithSize(db *database.Database, userService *services.UserServ
 			command string
 			output  string
 		}, 0),
-		showWelcome:    true,
-		width:          width,
-		height:         height,
-		commandHistory: make([]string, 0),
-		historyIndex:   -1,
-		shellStack:     make([]ShellContext, 0),
-		textInput:      ti,
-		textarea:       ta,
-		initialRender:  true,
-		sessionID:      sessionID,
+		showWelcome:   true,
+		width:         width,
+		height:        height,
+		inputHistory:  NewInputHistory(100), // Keep last 100 commands
+		shellStack:    make([]ShellContext, 0),
+		textInput:     ti,
+		textarea:      ta,
+		initialRender: true,
+		sessionID:     sessionID,
 	}
 
 	// Set SSH callbacks
@@ -177,31 +175,22 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.handleExitSSH()
 			}
 			m.textInput.SetValue("")
-			m.historyIndex = -1
+			m.inputHistory.Reset()
 			return m, nil
 		case "up":
 			// Navigate command history backward
-			if len(m.commandHistory) > 0 {
-				if m.historyIndex == -1 {
-					m.historyIndex = len(m.commandHistory) - 1
-				} else if m.historyIndex > 0 {
-					m.historyIndex--
-				}
-				m.textInput.SetValue(m.commandHistory[m.historyIndex])
+			if cmd, ok := m.inputHistory.Previous(); ok {
+				m.textInput.SetValue(cmd)
 				m.textInput.CursorEnd()
 			}
 			return m, nil
 		case "down":
 			// Navigate command history forward
-			if m.historyIndex >= 0 {
-				m.historyIndex++
-				if m.historyIndex >= len(m.commandHistory) {
-					m.historyIndex = -1
-					m.textInput.SetValue("")
-				} else {
-					m.textInput.SetValue(m.commandHistory[m.historyIndex])
-					m.textInput.CursorEnd()
-				}
+			if cmd, ok := m.inputHistory.Next(); ok {
+				m.textInput.SetValue(cmd)
+				m.textInput.CursorEnd()
+			} else {
+				m.textInput.SetValue("")
 			}
 			return m, nil
 		case "tab":
@@ -215,47 +204,24 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(parts) == 1 {
 					prefix = parts[0]
 				}
-				matches := m.getCommandMatches(prefix)
-				if len(matches) == 1 {
-					// Single match - complete it
-					m.textInput.SetValue(matches[0])
+				commands := m.getCommandMatches(prefix)
+				if completed, ok := CompleteFromList(prefix, commands); ok {
+					m.textInput.SetValue(completed)
 					m.textInput.CursorEnd()
-				} else if len(matches) > 1 {
-					// Multiple matches - complete common prefix
-					commonPrefix := m.findCommonPrefix(matches)
-					if commonPrefix != prefix {
-						m.textInput.SetValue(commonPrefix)
-						m.textInput.CursorEnd()
-					}
 				}
 			} else {
 				// Complete file/directory name
 				prefix := parts[len(parts)-1]
-				matches := m.getFileMatches(prefix)
-				if len(matches) == 1 {
-					// Single match - complete it
+				files := m.getFileMatches(prefix)
+				if completed, ok := CompleteFromList(prefix, files); ok {
 					current := m.textInput.Value()
-					// Replace last part with match
 					lastSpaceIdx := strings.LastIndex(current, " ")
 					if lastSpaceIdx >= 0 {
-						m.textInput.SetValue(current[:lastSpaceIdx+1] + matches[0])
+						m.textInput.SetValue(current[:lastSpaceIdx+1] + completed)
 					} else {
-						m.textInput.SetValue(matches[0])
+						m.textInput.SetValue(completed)
 					}
 					m.textInput.CursorEnd()
-				} else if len(matches) > 1 {
-					// Multiple matches - complete common prefix
-					commonPrefix := m.findCommonPrefix(matches)
-					if commonPrefix != prefix {
-						current := m.textInput.Value()
-						lastSpaceIdx := strings.LastIndex(current, " ")
-						if lastSpaceIdx >= 0 {
-							m.textInput.SetValue(current[:lastSpaceIdx+1] + commonPrefix)
-						} else {
-							m.textInput.SetValue(commonPrefix)
-						}
-						m.textInput.CursorEnd()
-					}
 				}
 			}
 			return m, nil
@@ -276,17 +242,14 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				command: line,
 				output:  "",
 			})
-			// Add to command history for navigation (if not duplicate of last command)
-			if len(m.commandHistory) == 0 || m.commandHistory[len(m.commandHistory)-1] != line {
-				m.commandHistory = append(m.commandHistory, line)
-			}
-			m.historyIndex = -1
+			// Add to command history for navigation
+			m.inputHistory.Add(line)
 			m.showWelcome = false
 			return m, m.executeCommand(line)
 		default:
 			var cmd tea.Cmd
 			m.textInput, cmd = m.textInput.Update(msg)
-			m.historyIndex = -1 // Reset history index when typing
+			m.inputHistory.Reset() // Reset history index when typing
 			return m, cmd
 		}
 	case WelcomeMsg:
@@ -685,27 +648,6 @@ func (m *ShellModel) getFileMatches(prefix string) []string {
 		}
 	}
 	return matches
-}
-
-// findCommonPrefix finds the common prefix of a slice of strings
-func (m *ShellModel) findCommonPrefix(strs []string) string {
-	if len(strs) == 0 {
-		return ""
-	}
-	if len(strs) == 1 {
-		return strs[0]
-	}
-
-	prefix := strs[0]
-	for i := 1; i < len(strs); i++ {
-		for len(prefix) > 0 && !strings.HasPrefix(strs[i], prefix) {
-			prefix = prefix[:len(prefix)-1]
-		}
-		if len(prefix) == 0 {
-			return ""
-		}
-	}
-	return prefix
 }
 
 // handleExitSSH handles exiting from an SSH session
