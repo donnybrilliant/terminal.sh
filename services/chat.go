@@ -150,14 +150,15 @@ func (s *ChatService) CreateRoom(name, roomType, password string, creatorID uuid
 // GetRoomByName retrieves a room by name
 func (s *ChatService) GetRoomByName(name string) (*models.ChatRoom, error) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
 
 	// Check cache first
 	for _, room := range s.rooms {
 		if room.Name == name {
+			s.mu.RUnlock()
 			return room, nil
 		}
 	}
+	s.mu.RUnlock()
 
 	// Check database
 	var room models.ChatRoom
@@ -166,12 +167,10 @@ func (s *ChatService) GetRoomByName(name string) (*models.ChatRoom, error) {
 	}
 
 	// Add to cache
-	s.mu.RUnlock()
 	s.mu.Lock()
 	s.rooms[room.ID] = &room
 	s.loadRoomMembers(room.ID)
 	s.mu.Unlock()
-	s.mu.RLock()
 
 	return &room, nil
 }
@@ -432,9 +431,6 @@ func (s *ChatService) UnregisterSession(sessionID uuid.UUID) {
 
 // GetRoomsForUser returns all rooms a user is a member of
 func (s *ChatService) GetRoomsForUser(userID uuid.UUID) ([]*models.ChatRoom, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	var members []models.ChatRoomMember
 	if err := s.db.Where("user_id = ?", userID).Find(&members).Error; err != nil {
 		return nil, fmt.Errorf("failed to get user rooms: %w", err)
@@ -442,18 +438,20 @@ func (s *ChatService) GetRoomsForUser(userID uuid.UUID) ([]*models.ChatRoom, err
 
 	rooms := make([]*models.ChatRoom, 0, len(members))
 	for _, member := range members {
-		if room, ok := s.rooms[member.RoomID]; ok {
+		s.mu.RLock()
+		room, ok := s.rooms[member.RoomID]
+		s.mu.RUnlock()
+
+		if ok {
 			rooms = append(rooms, room)
 		} else {
 			// Load from database if not in cache
 			var dbRoom models.ChatRoom
 			if err := s.db.First(&dbRoom, "id = ?", member.RoomID).Error; err == nil {
-				s.mu.RUnlock()
 				s.mu.Lock()
 				s.rooms[dbRoom.ID] = &dbRoom
 				s.loadRoomMembers(dbRoom.ID)
 				s.mu.Unlock()
-				s.mu.RLock()
 				rooms = append(rooms, &dbRoom)
 			}
 		}

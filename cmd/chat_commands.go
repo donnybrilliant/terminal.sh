@@ -72,16 +72,21 @@ func (h *CommandHandler) handleChatJoin(args []string) *CommandResult {
 }
 
 // handleChatLeave handles /leave command in chat mode
-func (h *CommandHandler) handleChatLeave(args []string) *CommandResult {
+// roomName is optional - if not provided, currentRoomName should be passed
+func (h *CommandHandler) handleChatLeave(args []string, currentRoomName string) *CommandResult {
 	if h.user == nil || h.chatService == nil {
 		return &CommandResult{Error: fmt.Errorf("not authenticated")}
 	}
 
-	if len(args) < 1 {
-		return &CommandResult{Error: fmt.Errorf("usage: /leave <room>")}
+	// Use provided room name or fall back to current room
+	var roomName string
+	if len(args) >= 1 {
+		roomName = args[0]
+	} else if currentRoomName != "" {
+		roomName = currentRoomName
+	} else {
+		return &CommandResult{Error: fmt.Errorf("usage: /leave [room] (no current room)")}
 	}
-
-	roomName := args[0]
 
 	// Get room
 	room, err := h.chatService.GetRoomByName(roomName)
@@ -180,37 +185,44 @@ func (h *CommandHandler) handleChatWho(args []string) *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("room not found: %s", roomName)}
 	}
 
-	// Get members
-	memberIDs, err := h.chatService.GetRoomMembers(room.ID)
+	// Get members (returns []models.User directly)
+	members, err := h.chatService.GetRoomMembers(room.ID)
 	if err != nil {
 		return &CommandResult{Error: err}
 	}
 
-	// Get usernames
+	// Build output from returned users
 	var output strings.Builder
 	output.WriteString(fmt.Sprintf("Users in %s:\n", roomName))
-	for _, userID := range memberIDs {
-		var user models.User
-		if err := h.db.First(&user, "id = ?", userID).Error; err == nil {
-			output.WriteString(fmt.Sprintf("  - %s\n", user.Username))
-		}
+	for _, user := range members {
+		output.WriteString(fmt.Sprintf("  - %s\n", user.Username))
 	}
 
 	return &CommandResult{Output: output.String()}
 }
 
 // handleChatInvite handles /invite command in chat mode
-func (h *CommandHandler) handleChatInvite(args []string) *CommandResult {
+// currentRoomName is used if room is not specified in args
+func (h *CommandHandler) handleChatInvite(args []string, currentRoomName string) *CommandResult {
 	if h.user == nil || h.chatService == nil {
 		return &CommandResult{Error: fmt.Errorf("not authenticated")}
 	}
 
-	if len(args) < 2 {
-		return &CommandResult{Error: fmt.Errorf("usage: /invite <user> <room>")}
+	if len(args) < 1 {
+		return &CommandResult{Error: fmt.Errorf("usage: /invite <user> [room]")}
 	}
 
 	username := args[0]
-	roomName := args[1]
+
+	// Use provided room name or fall back to current room
+	var roomName string
+	if len(args) >= 2 {
+		roomName = args[1]
+	} else if currentRoomName != "" {
+		roomName = currentRoomName
+	} else {
+		return &CommandResult{Error: fmt.Errorf("usage: /invite <user> [room] (no current room)")}
+	}
 
 	// Get user
 	var targetUser models.User
@@ -264,4 +276,3 @@ func (h *CommandHandler) handleChatMessage(roomID uuid.UUID, content string) err
 
 	return h.chatService.SendMessage(roomID, h.user.ID, h.user.Username, content)
 }
-
