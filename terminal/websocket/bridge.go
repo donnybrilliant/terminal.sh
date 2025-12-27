@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"terminal-sh/database"
@@ -22,10 +23,12 @@ const (
 	showCursor = "\x1b[?25h"
 	
 	// Screen control
-	clearScreen = "\x1b[2J"
-	cursorHome  = "\x1b[H"
-	clearLine   = "\x1b[K"
-	clearToEnd  = "\x1b[J"
+	clearScreen     = "\x1b[2J"          // Clear visible screen
+	clearScrollback = "\x1b[3J"          // Clear scrollback buffer
+	clearAll        = "\x1b[2J\x1b[3J"   // Clear screen + scrollback
+	cursorHome      = "\x1b[H"
+	clearLine       = "\x1b[2K"          // Clear entire line
+	clearToEOL      = "\x1b[K"           // Clear to end of line
 )
 
 // RenderMode determines how content is rendered
@@ -33,7 +36,7 @@ type RenderMode int
 
 const (
 	RenderModeFullScreen RenderMode = iota // Login: alternate screen, clear each render
-	RenderModeShell                        // Shell: normal buffer, scrollback enabled
+	RenderModeIncremental                  // Shell: incremental output, scrollback enabled
 )
 
 // BubbleTeaBridge wraps a Bubble Tea model for WebSocket communication
@@ -49,6 +52,7 @@ type BubbleTeaBridge struct {
 	height      int
 	renderMode  RenderMode
 	lastView    string
+	promptRow   int // Track which row the prompt is on for updates
 }
 
 // NewBubbleTeaBridge creates a new bridge between Bubble Tea and WebSocket
@@ -105,6 +109,15 @@ func (b *BubbleTeaBridge) isLoginModel() bool {
 	return ok
 }
 
+// getShellModel returns the shell model if current model is shell
+func (b *BubbleTeaBridge) getShellModel() *terminal.ShellModel {
+	shell, ok := b.model.(*terminal.ShellModel)
+	if ok {
+		return shell
+	}
+	return nil
+}
+
 // prepareFullScreenOutput prepares output for full-screen mode (login)
 // Clears screen completely before rendering - used for centered UI
 func prepareFullScreenOutput(view string) string {
@@ -117,7 +130,7 @@ func prepareFullScreenOutput(view string) string {
 	lines := strings.Split(view, "\n")
 	for i, line := range lines {
 		sb.WriteString(line)
-		sb.WriteString(clearLine)
+		sb.WriteString(clearToEOL)
 		if i < len(lines)-1 {
 			sb.WriteString("\r\n")
 		}
@@ -126,32 +139,112 @@ func prepareFullScreenOutput(view string) string {
 	return sb.String()
 }
 
-// prepareShellOutput prepares output for shell mode
-// Writes content without clearing - enables natural scrolling
-// Each render overwrites from home, excess lines scroll into scrollback
-func prepareShellOutput(view string, height int) string {
+// prepareIncrementalOutput prepares output for incremental mode (shell)
+// If startRow > 0, positions cursor at that row first
+// If content starts with \n, we're appending after a command (move to next line first)
+func prepareIncrementalOutput(content string, startRow int) string {
 	var sb strings.Builder
 	
-	// Position at home (no clear - preserves scrollback)
-	sb.WriteString(cursorHome)
-	sb.WriteString(hideCursor)
+	// Position cursor at specific row if requested
+	if startRow > 0 {
+		sb.WriteString(fmt.Sprintf("\x1b[%d;1H", startRow))
+	} else if strings.HasPrefix(content, "\n") {
+		// Appending after a command - move to end of current line, then next line
+		sb.WriteString("\x1b[999C") // Move cursor far right (stops at end of content)
+		sb.WriteString("\r\n")      // Move to next line
+		content = content[1:]       // Remove the leading \n (we just handled it)
+	}
 	
-	lines := strings.Split(view, "\n")
-	
-	// Write all lines, clearing each line as we go
+	// Convert \n to \r\n for proper terminal rendering
+	lines := strings.Split(content, "\n")
 	for i, line := range lines {
 		sb.WriteString(line)
-		sb.WriteString(clearLine) // Clear rest of this line
 		if i < len(lines)-1 {
 			sb.WriteString("\r\n")
 		}
 	}
 	
-	// If content is shorter than screen, clear remaining lines
-	if len(lines) < height {
-		for i := len(lines); i < height; i++ {
+	sb.WriteString(hideCursor)
+	return sb.String()
+}
+
+// preparePromptUpdate prepares a prompt-only update at a specific row
+func preparePromptUpdate(promptLine string, row int) string {
+	var sb strings.Builder
+	// Position at the prompt row
+	sb.WriteString(fmt.Sprintf("\x1b[%d;1H", row))
+	sb.WriteString(clearLine)   // Clear the entire line
+	sb.WriteString(promptLine)  // Write new prompt
+	sb.WriteString(hideCursor)
+	return sb.String()
+}
+
+// prepareClearScreen prepares a clear screen with content
+// Positions at startRow if > 0
+func prepareClearScreen(content string, startRow int) string {
+	var sb strings.Builder
+	sb.WriteString(clearScreen)
+	
+	// Position at specific row or home
+	if startRow > 0 {
+		sb.WriteString(fmt.Sprintf("\x1b[%d;1H", startRow))
+	} else {
+		sb.WriteString(cursorHome)
+	}
+	
+	// Convert \n to \r\n
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		sb.WriteString(line)
+		if i < len(lines)-1 {
 			sb.WriteString("\r\n")
-			sb.WriteString(clearLine)
+		}
+	}
+	
+	sb.WriteString(hideCursor)
+	return sb.String()
+}
+
+// prepareShellOutput prepares shell view for full-screen redraw
+// Clears screen, positions content, handles line conversion
+func prepareShellOutput(view string, height int) string {
+	var sb strings.Builder
+	
+	// Clear screen and go home
+	sb.WriteString(clearScreen)
+	sb.WriteString(cursorHome)
+	sb.WriteString(hideCursor)
+	
+	// Convert \n to \r\n for proper terminal rendering
+	lines := strings.Split(view, "\n")
+	for i, line := range lines {
+		sb.WriteString(line)
+		sb.WriteString(clearToEOL)
+		if i < len(lines)-1 {
+			sb.WriteString("\r\n")
+		}
+	}
+	
+	return sb.String()
+}
+
+// prepareShellOutputWithClear prepares shell view and clears scrollback buffer
+// Used after 'clear' command to truly clear everything
+func prepareShellOutputWithClear(view string, height int) string {
+	var sb strings.Builder
+	
+	// Clear screen AND scrollback buffer, then go home
+	sb.WriteString(clearAll)
+	sb.WriteString(cursorHome)
+	sb.WriteString(hideCursor)
+	
+	// Convert \n to \r\n for proper terminal rendering
+	lines := strings.Split(view, "\n")
+	for i, line := range lines {
+		sb.WriteString(line)
+		sb.WriteString(clearToEOL)
+		if i < len(lines)-1 {
+			sb.WriteString("\r\n")
 		}
 	}
 	
@@ -230,35 +323,64 @@ func (b *BubbleTeaBridge) processMessages() {
 				if err := b.conn.WriteJSON(transitionMsg); err != nil {
 					return
 				}
-				b.renderMode = RenderModeShell
+				b.renderMode = RenderModeIncremental
 				b.lastView = "" // Force redraw
 			}
 			wasLogin = isLogin
 			
-			// Get current view
-			currentView := b.model.View()
-			
-			// Skip if unchanged (optimization)
-			if currentView == b.lastView {
-				continue
-			}
-			
-			// Prepare output based on mode
-			var output string
+			// Render based on mode
 			if b.renderMode == RenderModeFullScreen {
-				output = prepareFullScreenOutput(currentView)
+				// Login screen - full screen render
+				currentView := b.model.View()
+				
+				// Skip if unchanged
+				if currentView == b.lastView {
+					continue
+				}
+				
+				output := prepareFullScreenOutput(currentView)
+				msg := OutputMessage{
+					Type: MessageTypeOutput,
+					Data: output,
+				}
+				if err := b.conn.WriteJSON(msg); err != nil {
+					return
+				}
+				b.lastView = currentView
 			} else {
-				output = prepareShellOutput(currentView, b.height)
+				// Shell mode - use full screen redraw for reliability
+				shell := b.getShellModel()
+				
+				// Check if we need to clear scrollback (after clear command)
+				needsClearScrollback := false
+				if shell != nil {
+					needsClearScrollback = shell.NeedsClearScrollback()
+				}
+				
+				currentView := b.model.View()
+				
+				// Skip if unchanged (unless we need to clear scrollback)
+				if currentView == b.lastView && !needsClearScrollback {
+					continue
+				}
+				
+				var output string
+				if needsClearScrollback {
+					// Clear everything including scrollback
+					output = prepareShellOutputWithClear(currentView, b.height)
+				} else {
+					output = prepareShellOutput(currentView, b.height)
+				}
+				
+				msg := OutputMessage{
+					Type: MessageTypeOutput,
+					Data: output,
+				}
+				if err := b.conn.WriteJSON(msg); err != nil {
+					return
+				}
+				b.lastView = currentView
 			}
-			
-			msg := OutputMessage{
-				Type: MessageTypeOutput,
-				Data: output,
-			}
-			if err := b.conn.WriteJSON(msg); err != nil {
-				return
-			}
-			b.lastView = currentView
 		}
 	}
 }

@@ -34,6 +34,14 @@ type ShellModel struct {
 	editMode       bool            // Whether we're in edit mode
 	editFilename   string          // File being edited
 	shellStack     []ShellContext  // Stack for nested SSH sessions
+	
+	// Incremental rendering state
+	pendingOutput     string // New output to append (command results)
+	pendingClear      bool   // Whether to clear screen
+	lastPromptLine    string // Last rendered prompt (for detecting changes)
+	initialRender     bool   // First render after transition from login
+	commandPending    bool   // True when waiting for command result (don't update prompt)
+	commandJustDone   bool   // True when command just finished (need to move to next line)
 }
 
 // ShellContext represents a shell session context
@@ -102,6 +110,7 @@ func NewShellModelWithSize(db *database.Database, userService *services.UserServ
 		shellStack:     make([]ShellContext, 0),
 		textInput:      ti,
 		textarea:       ta,
+		initialRender:  true,
 	}
 
 	// Set SSH callbacks
@@ -244,10 +253,13 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			line := m.textInput.Value()
-			m.textInput.SetValue("")
 			if line == "" {
+				// Empty enter - just add a newline effect
 				return m, nil
 			}
+			// Don't clear textInput yet - keep command visible until result comes
+			// Set flag to prevent prompt updates while command executes
+			m.commandPending = true
 			// Add command to history immediately
 			m.history = append(m.history, struct {
 				command string
@@ -271,24 +283,29 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case WelcomeMsg:
 		m.showWelcome = true
+		// Don't set pendingOutput here - initialRender handles it
 		return m, nil
 	case CommandResultMsg:
 		// Handle clear command - clear history and terminal
 		if len(m.history) > 0 {
 			lastCommand := m.history[len(m.history)-1].command
 			if lastCommand == "clear" {
-				// Clear all history and reset welcome
+				// Clear all history
 				m.history = make([]struct {
 					command string
 					output  string
 				}, 0)
 				m.showWelcome = false
-				// Return a command that will trigger a full redraw
-				return m, tea.ClearScreen
+				m.pendingClear = true
+				// Clear input state
+				m.textInput.SetValue("")
+				m.commandPending = false
+				m.commandJustDone = false // Not needed since pendingClear handles it
+				return m, nil
 			}
 		}
 
-		// Add command and output to history
+		// Process command output
 		if len(m.history) > 0 {
 			lastIdx := len(m.history) - 1
 			// Find the last command without output
@@ -352,8 +369,17 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-			// Always set output, even if empty (to mark command as processed)
+			// Set output in history
 			m.history[lastIdx].output = output
+			
+			// Queue output as pending for incremental render
+			// Trim any trailing whitespace/newlines to avoid blank lines
+			m.pendingOutput = strings.TrimRight(output, "\n\r ")
+			
+			// Mark that command just finished (need to move to next line)
+			m.commandJustDone = true
+			m.commandPending = false
+			m.textInput.SetValue("")
 		}
 		return m, nil
 	}
@@ -377,7 +403,116 @@ func (m *ShellModel) executeCommand(command string) tea.Cmd {
 	}
 }
 
-// View renders the shell
+// GetIncrementalOutput returns content for incremental rendering
+// Returns: output to send, whether this is a clear, whether prompt changed, startRow for positioning
+func (m *ShellModel) GetIncrementalOutput() (output string, isClear bool, promptOnly bool, startRow int) {
+	username := "guest"
+	if m.user != nil && m.user.Username != "" {
+		username = m.user.Username
+	}
+	
+	// Handle clear command
+	if m.pendingClear {
+		m.pendingClear = false
+		promptLine := m.getPromptLine(username)
+		m.lastPromptLine = promptLine
+		// Clear screen, prompt at bottom (row = height)
+		return promptLine, true, false, m.height
+	}
+	
+	// Handle initial render (after login transition)
+	if m.initialRender {
+		m.initialRender = false
+		var sb strings.Builder
+		
+		promptLine := m.getPromptLine(username)
+		
+		if m.showWelcome {
+			welcome := AnimatedWelcome() + "\n" + WelcomeHelpText()
+			welcomeLinesList := strings.Split(welcome, "\n")
+			welcomeLines := len(welcomeLinesList)
+			
+			sb.WriteString(welcome)
+			sb.WriteString("\n")
+			sb.WriteString(promptLine)
+			
+			// Calculate start row to push content to bottom
+			// Total lines = welcomeLines + 1 (prompt)
+			totalLines := welcomeLines + 1
+			startRow := m.height - totalLines + 1
+			if startRow < 1 {
+				startRow = 1
+			}
+			
+			m.lastPromptLine = promptLine
+			m.pendingOutput = ""
+			return sb.String(), false, false, startRow
+		} else {
+			// No welcome - just prompt at bottom
+			m.lastPromptLine = promptLine
+			m.pendingOutput = ""
+			return promptLine, false, false, m.height
+		}
+	}
+	
+	// Handle command just finished (need to output result + new prompt on next line)
+	if m.commandJustDone {
+		m.commandJustDone = false
+		promptLine := m.getPromptLine(username)
+		m.lastPromptLine = promptLine
+		
+		// Build output: move to next line, then output (if any), then prompt
+		// Use \n prefix to signal bridge to move to next line first
+		if m.pendingOutput != "" {
+			// Output exists: \n + output + \n + prompt
+			result := "\n" + m.pendingOutput + "\n" + promptLine
+			m.pendingOutput = ""
+			return result, false, false, 0
+		} else {
+			// No output: just \n + prompt (move to next line, show prompt)
+			return "\n" + promptLine, false, false, 0
+		}
+	}
+	
+	// If command is pending (waiting for result), don't update prompt
+	if m.commandPending {
+		return "", false, false, 0
+	}
+	
+	// No pending output - check if prompt changed (user typing)
+	currentPrompt := m.getPromptLine(username)
+	if currentPrompt != m.lastPromptLine {
+		m.lastPromptLine = currentPrompt
+		// Return prompt with row=-1 to signal "update prompt in place at current scroll position"
+		return currentPrompt, false, true, -1
+	}
+	
+	// Nothing changed
+	return "", false, false, 0
+}
+
+// getPromptLine returns the current prompt line with input
+func (m *ShellModel) getPromptLine(username string) string {
+	m.textInput.Prompt = RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
+	return m.textInput.View()
+}
+
+// IsEditMode returns whether the shell is in edit mode
+func (m *ShellModel) IsEditMode() bool {
+	return m.editMode
+}
+
+// NeedsClearScrollback returns true if scrollback should be cleared (after clear command)
+// Calling this resets the flag
+func (m *ShellModel) NeedsClearScrollback() bool {
+	if m.pendingClear {
+		m.pendingClear = false
+		return true
+	}
+	return false
+}
+
+// View renders the shell (used for edit mode and fallback)
 func (m *ShellModel) View() string {
 	// Get username for prompt
 	username := "guest"
@@ -435,7 +570,7 @@ func (m *ShellModel) View() string {
 	var output strings.Builder
 
 	if m.editMode {
-		// Edit mode rendering
+		// Edit mode rendering - full screen mode
 		textareaHeight := height - 2
 		if textareaHeight < 3 {
 			textareaHeight = 3
@@ -471,12 +606,9 @@ func (m *ShellModel) View() string {
 		statusLine := fmt.Sprintf("-- Edit mode: %s | Ctrl+S to save, Esc/Ctrl+Q to exit --", m.editFilename)
 		output.WriteString(statusLine)
 	} else {
-		// Normal mode: content + prompt at bottom
+		// Normal mode - for full View() (SSH compatibility)
 		// When content is short, pad to push prompt to bottom
-		// When content is long, show it all (terminal handles scroll)
-		
 		if len(contentLines) < availableLines {
-			// Pad top to push prompt to bottom of screen
 			paddingLines := availableLines - len(contentLines)
 			for i := 0; i < paddingLines; i++ {
 				output.WriteString("\n")
@@ -573,15 +705,14 @@ func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
 	// Update handler's server path
 	m.handler.SetCurrentServerPath(context.serverPath)
 
-	// Add exit message to history
-	m.history = append(m.history, struct {
-		command string
-		output  string
-	}{
-		command: "exit",
-		output:  "Disconnected\n",
-	})
+	// Add exit message as pending output
+	m.pendingOutput = "Disconnected\n"
 	m.showWelcome = false
+	
+	// Clear input state
+	m.textInput.SetValue("")
+	m.commandPending = false
+	m.commandJustDone = true
 
 	return m, nil
 }
@@ -597,24 +728,12 @@ func (m *ShellModel) handleEditModeInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		filename := m.editFilename
 		content := m.textarea.Value()
 		if err := m.vfs.WriteFile(filename, content); err != nil {
-			// Add error to history
-			m.history = append(m.history, struct {
-				command string
-				output  string
-			}{
-				command: "edit " + filename,
-				output:  FormatError(err),
-			})
+			// Add error to pending output
+			m.pendingOutput = FormatError(err)
 		} else {
 			// Exit edit mode
 			m.editMode = false
-			m.history = append(m.history, struct {
-				command string
-				output  string
-			}{
-				command: "edit " + filename,
-				output:  fmt.Sprintf("File %s saved.\n", filename),
-			})
+			m.pendingOutput = fmt.Sprintf("File %s saved.\n", filename)
 			m.editFilename = ""
 			m.textarea.Reset()
 			m.textarea.Blur()
@@ -624,19 +743,12 @@ func (m *ShellModel) handleEditModeInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "ctrl+c", "esc", "ctrl+q":
 		// Exit edit mode without saving
-		filename := m.editFilename // Save filename before clearing
 		m.editMode = false
+		m.pendingOutput = "Edit mode exited without saving.\n"
 		m.editFilename = ""
 		m.textarea.Reset()
 		m.textarea.Blur()
 		m.textInput.Focus()
-		m.history = append(m.history, struct {
-			command string
-			output  string
-		}{
-			command: "edit " + filename,
-			output:  "Edit mode exited without saving.\n",
-		})
 		m.showWelcome = false
 		return m, nil
 	default:
