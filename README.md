@@ -14,16 +14,10 @@ This will build all binaries and start the combined server (SSH on port 2222, We
 
 See the [Building](#building) and [Running](#running) sections below for more details.
 
-## Features
+## Documentation
 
-- **Dual Interface**: SSH server and WebSocket-based browser terminal
-- **Beautiful Terminal UI**: Built with Charm libraries (Bubble Tea, Lipgloss)
-- **Virtual Filesystem**: Navigate and interact with a simulated filesystem
-- **Network Exploration**: Scan and exploit servers in a virtual network
-- **Tool System**: Download and use hacking tools to progress
-- **Tutorial System**: Built-in tutorials to guide new players
-- **Session Management**: Track user progress and achievements
-- **Chat System**: IRC-style chat with persistent rooms, public/private groups, and real-time messaging
+- **[GAMEPLAY.md](GAMEPLAY.md)** - Complete gameplay guide with commands, strategies, and tips
+- **README.md** (this file) - Technical documentation for building, running, and deploying
 
 ## Architecture
 
@@ -280,213 +274,6 @@ DATABASE_URL=postgres://user:password@db.example.com:5432/terminal_sh?sslmode=re
 ```
 
 **Note:** The `data/` directory and all `.db` files are gitignored, so your SQLite database won't be committed to the repository.
-
-## Connecting
-
-### SSH Connection
-
-Connect using SSH client:
-
-```bash
-ssh -p 2222 <username>@your-server-ip
-```
-
-**Authentication:**
-
-- The server uses password authentication
-- **Auto-registration**: Any username/password combination will automatically create a new account on first login
-- After registration, use the same credentials to log in
-- Example: `ssh -p 2222 daniel@localhost` (password can be anything on first login)
-
-### Web Connection
-
-Open your browser and navigate to:
-
-```
-http://your-server-ip:8080
-```
-
-The browser will automatically connect via WebSocket and display the same terminal interface as SSH.
-
-## Chat System
-
-The server includes a built-in IRC-style chat system that allows players to communicate in real-time. Chat works seamlessly across both SSH and WebSocket interfaces, so players can chat regardless of how they connect.
-
-### Features
-
-- **Persistent Rooms**: Chat rooms are stored in the database and survive server restarts
-- **Public Rooms**: Anyone can join public rooms (e.g., `#public`)
-- **Private Groups**: Create invite-only private rooms
-- **Password-Protected Rooms**: Create rooms that require a password to join
-- **Tab Navigation**: Switch between multiple rooms using tabs (like IRC clients)
-- **Message History**: Last 100 messages per room are persisted
-- **Real-Time Messaging**: Messages are broadcast instantly to all users in a room
-- **Cross-Platform**: Works identically on both SSH and WebSocket interfaces
-
-### Getting Started
-
-#### Entering Chat Mode
-
-To enter chat mode, simply type:
-
-```bash
-chat
-```
-
-This will enter full-screen chat mode. You can also use split-screen mode:
-
-```bash
-chat --split
-```
-
-#### Default Room
-
-When you first enter chat, you'll automatically be joined to the `#public` room (created automatically on first server startup).
-
-### Chat Commands
-
-Once in chat mode, you can use the following commands:
-
-#### Room Management
-
-- `/create <room> [--private|--password <pass>]` - Create a new room
-  - Example: `/create myroom` - Creates a public room
-  - Example: `/create secret --private` - Creates a private (invite-only) room
-  - Example: `/create locked --password secret123` - Creates a password-protected room
-- `/join <room> [password]` - Join an existing room
-  - Example: `/join #general`
-  - Example: `/join locked secret123` - Join with password
-- `/leave [room]` - Leave a room (current room if no argument)
-  - Example: `/leave #general`
-  - Example: `/leave` - Leave current room
-- `/rooms` - List all rooms you're currently in
-- `/who` - List all users in current room
-
-#### Private Rooms
-
-- `/invite <user> [room]` - Invite a user to a room (current room if no argument)
-  - Example: `/invite alice` - Invite to current room
-  - Example: `/invite alice secret` - Invite to specific room
-  - Note: You must be a member of the room to invite others
-  - The invited user receives a notification with instructions to join
-
-#### Navigation
-
-While in chat mode, you can navigate between rooms using:
-
-- **Arrow Keys** (←/→) - Switch between room tabs
-- **↑/↓ Arrow Keys** - Navigate command history (like shell)
-- **Tab Key** - Autocomplete commands and room names
-- **Esc** or **Ctrl+C** - Exit chat mode
-
-### Room Types
-
-#### Public Rooms
-
-Public rooms can be joined by anyone. Create with `/create`, join with `/join`:
-
-```bash
-/create #general           # Create a public room
-/join #general             # Join the room
-```
-
-#### Private Rooms
-
-Private rooms require an invitation. Only the creator and invited members can join:
-
-```bash
-/create secret --private   # Create private room
-/invite alice              # Invite alice to current room
-# Alice receives: "bob invited you to secret. Use /join secret to enter."
-```
-
-#### Password-Protected Rooms
-
-Password-protected rooms require a password to join:
-
-```bash
-/create locked --password mypassword   # Create with password
-/join locked mypassword                # Join with password
-```
-
-### Usage Examples
-
-#### Basic Chatting
-
-```bash
-# Enter chat mode
-chat
-
-# You're automatically in #public
-# Just type your message and press Enter
-Hello everyone!
-
-# Create and join another room
-/create #general
-Hello #general!
-
-# Switch back to #public using arrow keys or tab
-# Type another message
-How's everyone doing?
-```
-
-#### Creating and Managing Rooms
-
-```bash
-# Create a private room for your team
-/create team-alpha --private
-
-# Invite team members (they'll receive notifications)
-/invite bob
-/invite charlie
-
-# Create a password-protected room
-/create secret-meeting --password secure123
-
-# Share the password with trusted members
-# They can join with: /join secret-meeting secure123
-```
-
-#### Multi-Room Chatting
-
-```bash
-# Create or join multiple rooms
-/create #general
-/join #public
-/join team-alpha
-
-# Use arrow keys or tab to switch between rooms
-# Each room maintains its own message history and scroll position
-# Use up/down arrows to scroll through message history
-```
-
-### Message Format
-
-Messages are displayed in IRC-style format:
-
-```
-[15:04:05] <username> Hello everyone!
-[15:04:06] <alice> Hey there!
-[15:04:07] <bob> What's up?
-```
-
-### Tips
-
-- **Navigation**: Use arrow keys (←/→) or Tab to switch rooms
-- **Command History**: Use ↑/↓ to cycle through previous commands (like a regular shell)
-- **Message History**: Each room keeps the last 100 messages
-- **Cross-Interface**: Users on SSH can chat with users on WebSocket - they share the same chat system
-- **Room Names**: Room names can start with `#` (like `#public`) or be plain names (like `mygroup`)
-- **Invitations**: When invited, you'll receive a notification with the room name and join command
-- **Exiting Chat**: Press `Esc` or `Ctrl+C` to exit chat mode and return to the shell
-
-### Technical Details
-
-- **Database Storage**: Rooms and messages are stored in the database
-- **Message Persistence**: Last 100 messages per room are kept in the database
-- **Real-Time Updates**: Messages are broadcast via Go channels to all active sessions
-- **Session Management**: Each active session registers with the chat service to receive messages
-- **Thread Safety**: All chat operations are thread-safe using mutex locks
 
 ## Project Structure
 
@@ -747,21 +534,7 @@ This starts both servers. Connect via:
 
 ### Testing
 
-Both servers provide identical functionality. Test commands work the same in both interfaces:
-
-```bash
-# Basic commands
-help
-pwd
-ls
-cd
-
-# Game commands
-scan
-get <serverIP> <toolName>
-exploit <serverIP> <toolName> <service>
-ssh <serverIP>
-```
+Both servers provide identical functionality. For gameplay testing, see [GAMEPLAY.md](GAMEPLAY.md).
 
 ## License
 
