@@ -1,0 +1,66 @@
+{
+  "patches": [
+    {
+      "name": "pass_patch_v2",
+      "target_tool": "password_cracker",
+      "description": "Enhanced password cracking algorithm",
+      "upgrades": {
+        "exploits": [
+          {
+            "type": "password_cracking",
+            "level": 20
+          }
+        ],
+        "resources": {
+          "cpu": -2,
+          "bandwidth": 0,
+          "ram": -1
+        }
+      }
+    },
+    {
+      "name": "ssh_patch_v2",
+      "target_tool": "ssh_exploit",
+      "description": "Improved SSH exploitation techniques",
+      "upgrades": {
+        "exploits": [
+          {
+            "type": "remote_code_execution",
+            "level": 30
+          }
+        ],
+        "resources": {
+          "cpu": -3,
+          "bandwidth": -0.1,
+          "ram": -2
+        }
+      }
+    },
+    {
+      "name": "exploit_kit_advanced",
+      "target_tool": "exploit_kit",
+      "description": "Advanced multi-vulnerability exploitation",
+      "upgrades": {
+        "exploits": [
+          {
+            "type": "remote_code_execution",
+            "level": 20
+          },
+          {
+            "type": "sql_injection",
+            "level": 20
+          },
+          {
+            "type": "xss",
+            "level": 15
+          }
+        ],
+        "resources": {
+          "cpu": -5,
+          "bandwidth": -0.2,
+          "ram": -3
+        }
+      }
+    }
+  ]
+}

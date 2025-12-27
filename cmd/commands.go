@@ -21,6 +21,7 @@ type CommandResult struct {
 }
 
 type CommandHandler struct {
+	db              *database.Database
 	vfs            *filesystem.VFS
 	user           *models.User
 	userService    *services.UserService
@@ -41,22 +42,23 @@ type CommandHandler struct {
 	onSSHDisconnect func() error // Callback for SSH disconnection
 }
 
-func NewCommandHandler(vfs *filesystem.VFS, user *models.User, userService *services.UserService) *CommandHandler {
-	serverService := services.NewServerService()
-	toolService := services.NewToolService(serverService)
-	patchService := services.NewPatchService(toolService)
+func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.User, userService *services.UserService) *CommandHandler {
+	serverService := services.NewServerService(db)
+	toolService := services.NewToolService(db, serverService)
+	patchService := services.NewPatchService(db, toolService)
 	toolService.SetPatchService(patchService) // Link patch service to tool service
 	networkService := services.NewNetworkService(serverService)
-	shopService := services.NewShopService(serverService)
+	shopService := services.NewShopService(db, serverService)
 	networkService.SetShopService(shopService) // Link shop service to network service
 	shopDiscovery := services.NewShopDiscovery(shopService, serverService, patchService, toolService)
 	progressService := services.NewProgressService()
-	sessionService := services.NewSessionService(serverService)
-	exploitationService := services.NewExploitationService(toolService, serverService)
-	miningService := services.NewMiningService(toolService, serverService)
-	tutorialService, _ := services.NewTutorialService("tutorials.json") // Initialize tutorial service, ignore error for now
+	sessionService := services.NewSessionService(db, serverService)
+	exploitationService := services.NewExploitationService(db, toolService, serverService)
+	miningService := services.NewMiningService(db, toolService, serverService)
+	tutorialService, _ := services.NewTutorialService("") // Initialize tutorial service with default path (data/seed/tutorials.json), ignore error for now
 	
 	return &CommandHandler{
+		db:              db,
 		vfs:            vfs,
 		user:           user,
 		userService:    userService,
@@ -750,7 +752,7 @@ func (h *CommandHandler) handleTOOLS() *CommandResult {
 
 	// Get user's tool states (shows versions and patches)
 	var toolStates []models.UserToolState
-	if err := database.DB.Where("user_id = ?", h.user.ID).Preload("Tool").Find(&toolStates).Error; err != nil {
+	if err := h.db.Where("user_id = ?", h.user.ID).Preload("Tool").Find(&toolStates).Error; err != nil {
 		// Fallback to old method if no tool states
 		tools, err := h.toolService.GetUserTools(h.user.ID)
 		if err != nil {

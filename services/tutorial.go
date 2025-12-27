@@ -30,10 +30,10 @@ func NewTutorialService(dataPath string) (*TutorialService, error) {
 
 // LoadTutorials loads tutorials from the JSON file
 func (s *TutorialService) LoadTutorials() error {
-	// Default to tutorials.json in current directory if not specified
+	// Default to data/seed/tutorials.json if not specified
 	path := s.dataPath
 	if path == "" {
-		path = "tutorials.json"
+		path = "data/seed/tutorials.json"
 	}
 	
 	// Check if file exists, if not create default
@@ -82,7 +82,7 @@ func (s *TutorialService) GetTutorialPath() string {
 	if s.dataPath != "" {
 		return s.dataPath
 	}
-	return "tutorials.json"
+	return "data/seed/tutorials.json"
 }
 
 // createDefaultTutorials creates a default tutorial file

@@ -1,5 +1,8 @@
 # Binaries
+bin/
 terminal.sh
+terminal.sh-ssh
+terminal.sh-web
 *.exe
 *.exe~
 *.dll
@@ -9,6 +12,19 @@ terminal.sh
 # Database files (runtime data)
 *.db
 terminal.db
+*.sqlite
+*.sqlite3
+# Ignore database files in data/ directory, but track data/seed/ JSON files
+data/*.db
+data/terminal.db
+data/**/*.db
+data/**/*.sqlite
+data/**/*.sqlite3
+
+# Environment files
+.env
+.env.local
+.env.*.local
 
 # Log files
 *.log

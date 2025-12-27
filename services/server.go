@@ -11,12 +11,14 @@ import (
 
 // ServerService handles server-related operations
 type ServerService struct {
+	db  *database.Database
 	rng *rand.Rand
 }
 
 // NewServerService creates a new server service
-func NewServerService() *ServerService {
+func NewServerService(db *database.Database) *ServerService {
 	return &ServerService{
+		db:  db,
 		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
@@ -25,11 +27,11 @@ func NewServerService() *ServerService {
 func (s *ServerService) GetServerByIP(ip string) (*models.Server, error) {
 	var server models.Server
 	// Try IP field first (hostname)
-	if err := database.DB.Where("ip = ?", ip).First(&server).Error; err == nil {
+	if err := s.db.Where("ip = ?", ip).First(&server).Error; err == nil {
 		return &server, nil
 	}
 	// Try LocalIP field (actual IP address)
-	if err := database.DB.Where("local_ip = ?", ip).First(&server).Error; err != nil {
+	if err := s.db.Where("local_ip = ?", ip).First(&server).Error; err != nil {
 		return nil, err
 	}
 	return &server, nil
@@ -78,7 +80,7 @@ func (s *ServerService) GetServerByPath(path string) (*models.Server, error) {
 func (s *ServerService) GetAllTopLevelServers() ([]models.Server, error) {
 	var servers []models.Server
 	// For now, return all servers - we'll filter by checking if they're referenced in localNetwork later
-	if err := database.DB.Find(&servers).Error; err != nil {
+	if err := s.db.Find(&servers).Error; err != nil {
 		return nil, err
 	}
 	return servers, nil
@@ -106,7 +108,7 @@ func (s *ServerService) GetConnectedServers(serverIP string) ([]models.Server, e
 func (s *ServerService) CreateServer(ip, localIP string) (*models.Server, error) {
 	// Check if server already exists
 	var existing models.Server
-	if err := database.DB.Where("ip = ?", ip).First(&existing).Error; err == nil {
+	if err := s.db.Where("ip = ?", ip).First(&existing).Error; err == nil {
 		return nil, fmt.Errorf("server with IP %s already exists", ip)
 	}
 
@@ -131,7 +133,7 @@ func (s *ServerService) CreateServer(ip, localIP string) (*models.Server, error)
 		LocalNetwork: make(map[string]interface{}),
 	}
 
-	if err := database.DB.Create(server).Error; err != nil {
+	if err := s.db.Create(server).Error; err != nil {
 		return nil, fmt.Errorf("failed to create server: %w", err)
 	}
 
@@ -158,7 +160,7 @@ func (s *ServerService) CreateLocalServer(parentServerIP, ip, localIP string) (*
 	}
 	parentServer.LocalNetwork[ip] = server.ID.String()
 
-	if err := database.DB.Save(parentServer).Error; err != nil {
+	if err := s.db.Save(parentServer).Error; err != nil {
 		return nil, fmt.Errorf("failed to update parent server: %w", err)
 	}
 

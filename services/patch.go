@@ -3,7 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
-
+	"os"
 	"terminal-sh/database"
 	"terminal-sh/models"
 
@@ -13,12 +13,14 @@ import (
 
 // PatchService handles patch-related operations
 type PatchService struct {
+	db          *database.Database
 	toolService *ToolService
 }
 
 // NewPatchService creates a new patch service
-func NewPatchService(toolService *ToolService) *PatchService {
+func NewPatchService(db *database.Database, toolService *ToolService) *PatchService {
 	return &PatchService{
+		db:          db,
 		toolService: toolService,
 	}
 }
@@ -26,7 +28,7 @@ func NewPatchService(toolService *ToolService) *PatchService {
 // GetPatchByName retrieves a patch by name
 func (s *PatchService) GetPatchByName(name string) (*models.Patch, error) {
 	var patch models.Patch
-	if err := database.DB.Where("name = ?", name).First(&patch).Error; err != nil {
+	if err := s.db.Where("name = ?", name).First(&patch).Error; err != nil {
 		return nil, err
 	}
 	return &patch, nil
@@ -35,7 +37,7 @@ func (s *PatchService) GetPatchByName(name string) (*models.Patch, error) {
 // GetAllPatches retrieves all patches
 func (s *PatchService) GetAllPatches() ([]models.Patch, error) {
 	var patches []models.Patch
-	if err := database.DB.Find(&patches).Error; err != nil {
+	if err := s.db.Find(&patches).Error; err != nil {
 		return nil, err
 	}
 	return patches, nil
@@ -44,7 +46,7 @@ func (s *PatchService) GetAllPatches() ([]models.Patch, error) {
 // GetPatchesForTool retrieves all patches that target a specific tool
 func (s *PatchService) GetPatchesForTool(toolName string) ([]models.Patch, error) {
 	var patches []models.Patch
-	if err := database.DB.Where("target_tool = ?", toolName).Find(&patches).Error; err != nil {
+	if err := s.db.Where("target_tool = ?", toolName).Find(&patches).Error; err != nil {
 		return nil, err
 	}
 	return patches, nil
@@ -115,7 +117,7 @@ func (s *PatchService) ApplyPatch(userID uuid.UUID, toolName, patchName string) 
 	toolState.Version++
 
 	// Save updated tool state
-	if err := database.DB.Save(toolState).Error; err != nil {
+	if err := s.db.Save(toolState).Error; err != nil {
 		return fmt.Errorf("failed to save tool state: %w", err)
 	}
 
@@ -126,7 +128,7 @@ func (s *PatchService) ApplyPatch(userID uuid.UUID, toolName, patchName string) 
 func (s *PatchService) CalculateEffectiveStats(toolState *models.UserToolState) *models.Tool {
 	// Get base tool
 	var baseTool models.Tool
-	if err := database.DB.First(&baseTool, "id = ?", toolState.ToolID).Error; err != nil {
+	if err := s.db.First(&baseTool, "id = ?", toolState.ToolID).Error; err != nil {
 		return nil
 	}
 
@@ -147,7 +149,7 @@ func (s *PatchService) CalculateEffectiveStats(toolState *models.UserToolState) 
 	// Apply each patch
 	for _, patchName := range toolState.AppliedPatches {
 		var patch models.Patch
-		if err := database.DB.Where("name = ?", patchName).First(&patch).Error; err != nil {
+		if err := s.db.Where("name = ?", patchName).First(&patch).Error; err != nil {
 			continue // Skip if patch not found
 		}
 
@@ -193,12 +195,12 @@ func (s *PatchService) CalculateEffectiveStats(toolState *models.UserToolState) 
 // UserOwnsPatch checks if a user owns a patch (for shop purchases)
 func (s *PatchService) UserOwnsPatch(userID uuid.UUID, patchName string) bool {
 	var patch models.Patch
-	if err := database.DB.Where("name = ?", patchName).First(&patch).Error; err != nil {
+	if err := s.db.Where("name = ?", patchName).First(&patch).Error; err != nil {
 		return false
 	}
 
 	var userPatch models.UserPatch
-	if err := database.DB.Where("user_id = ? AND patch_id = ?", userID, patch.ID).First(&userPatch).Error; err != nil {
+	if err := s.db.Where("user_id = ? AND patch_id = ?", userID, patch.ID).First(&userPatch).Error; err != nil {
 		return false
 	}
 
@@ -208,7 +210,7 @@ func (s *PatchService) UserOwnsPatch(userID uuid.UUID, patchName string) bool {
 // AddUserPatch adds a patch to a user's inventory (for shop purchases)
 func (s *PatchService) AddUserPatch(userID uuid.UUID, patchName string) error {
 	var patch models.Patch
-	if err := database.DB.Where("name = ?", patchName).First(&patch).Error; err != nil {
+	if err := s.db.Where("name = ?", patchName).First(&patch).Error; err != nil {
 		return fmt.Errorf("patch not found: %w", err)
 	}
 
@@ -222,7 +224,7 @@ func (s *PatchService) AddUserPatch(userID uuid.UUID, patchName string) error {
 		PatchID: patch.ID,
 	}
 
-	if err := database.DB.Create(userPatch).Error; err != nil {
+	if err := s.db.Create(userPatch).Error; err != nil {
 		return fmt.Errorf("failed to add patch to user: %w", err)
 	}
 
@@ -232,7 +234,7 @@ func (s *PatchService) AddUserPatch(userID uuid.UUID, patchName string) error {
 // GetUserPatches retrieves all patches owned by a user
 func (s *PatchService) GetUserPatches(userID uuid.UUID) ([]models.Patch, error) {
 	var userPatches []models.UserPatch
-	if err := database.DB.Where("user_id = ?", userID).Preload("Patch").Find(&userPatches).Error; err != nil {
+	if err := s.db.Where("user_id = ?", userID).Preload("Patch").Find(&userPatches).Error; err != nil {
 		return nil, err
 	}
 
@@ -314,63 +316,28 @@ func (s *PatchService) getFileContent(filesystem map[string]interface{}, path st
 	return ""
 }
 
-// SeedPatches seeds the database with default patches
+// SeedPatches seeds the database with default patches from JSON file
 func (s *PatchService) SeedPatches() error {
-	patches := []models.Patch{
-		{
-			Name:        "pass_patch_v2",
-			TargetTool:  "password_cracker",
-			Description: "Enhanced password cracking algorithm",
-			Upgrades: models.PatchUpgrades{
-				Exploits: []models.Exploit{
-					{Type: "password_cracking", Level: 20},
-				},
-				Resources: models.ToolResources{
-					CPU:      -2,
-					Bandwidth: 0,
-					RAM:      -1,
-				},
-			},
-		},
-		{
-			Name:        "ssh_patch_v2",
-			TargetTool:  "ssh_exploit",
-			Description: "Improved SSH exploitation techniques",
-			Upgrades: models.PatchUpgrades{
-				Exploits: []models.Exploit{
-					{Type: "remote_code_execution", Level: 30},
-				},
-				Resources: models.ToolResources{
-					CPU:      -3,
-					Bandwidth: -0.1,
-					RAM:      -2,
-				},
-			},
-		},
-		{
-			Name:        "exploit_kit_advanced",
-			TargetTool:  "exploit_kit",
-			Description: "Advanced multi-vulnerability exploitation",
-			Upgrades: models.PatchUpgrades{
-				Exploits: []models.Exploit{
-					{Type: "remote_code_execution", Level: 20},
-					{Type: "sql_injection", Level: 20},
-					{Type: "xss", Level: 15},
-				},
-				Resources: models.ToolResources{
-					CPU:      -5,
-					Bandwidth: -0.2,
-					RAM:      -3,
-				},
-			},
-		},
+	// Load patches from JSON file
+	data, err := os.ReadFile("data/seed/patches.json")
+	if err != nil {
+		return fmt.Errorf("failed to read patches.json: %w", err)
 	}
+
+	var patchData struct {
+		Patches []models.Patch `json:"patches"`
+	}
+	if err := json.Unmarshal(data, &patchData); err != nil {
+		return fmt.Errorf("failed to parse patches.json: %w", err)
+	}
+
+	patches := patchData.Patches
 
 	for _, patch := range patches {
 		var existing models.Patch
-		err := database.DB.Where("name = ?", patch.Name).First(&existing).Error
+		err := s.db.Where("name = ?", patch.Name).First(&existing).Error
 		if err != nil && err == gorm.ErrRecordNotFound {
-			if err := database.DB.Create(&patch).Error; err != nil {
+			if err := s.db.Create(&patch).Error; err != nil {
 				return fmt.Errorf("failed to seed patch %s: %w", patch.Name, err)
 			}
 		} else if err != nil {

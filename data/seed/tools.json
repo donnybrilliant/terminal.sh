@@ -1,0 +1,220 @@
+{
+  "tools": [
+    {
+      "name": "password_cracker",
+      "function": "Basic password cracking",
+      "resources": {
+        "cpu": 20,
+        "bandwidth": 0.3,
+        "ram": 8
+      },
+      "exploits": [
+        {
+          "type": "password_cracking",
+          "level": 10
+        }
+      ],
+      "services": "ssh"
+    },
+    {
+      "name": "pass_patch",
+      "function": "Upgrade for password_cracker",
+      "resources": {
+        "cpu": 0,
+        "bandwidth": 0,
+        "ram": 0
+      },
+      "exploits": [
+        {
+          "type": "password_cracking",
+          "level": 20
+        }
+      ],
+      "is_patch": true
+    },
+    {
+      "name": "ssh_exploit",
+      "function": "Exploit SSH vulnerabilities",
+      "resources": {
+        "cpu": 25,
+        "bandwidth": 0.5,
+        "ram": 10
+      },
+      "exploits": [
+        {
+          "type": "remote_code_execution",
+          "level": 20
+        }
+      ],
+      "services": "ssh"
+    },
+    {
+      "name": "ssh_patch",
+      "function": "Upgrade for ssh_exploit",
+      "resources": {
+        "cpu": 0,
+        "bandwidth": 0,
+        "ram": 0
+      },
+      "exploits": [
+        {
+          "type": "remote_code_execution",
+          "level": 30
+        }
+      ],
+      "is_patch": true
+    },
+    {
+      "name": "crypto_miner",
+      "function": "Mine cryptocurrency (passive income)",
+      "resources": {
+        "cpu": 50,
+        "bandwidth": 1.0,
+        "ram": 16
+      },
+      "special": "Generates passive income over time."
+    },
+    {
+      "name": "user_enum",
+      "function": "Enumerate users and roles",
+      "resources": {
+        "cpu": 15,
+        "bandwidth": 0.2,
+        "ram": 4
+      }
+    },
+    {
+      "name": "lan_sniffer",
+      "function": "Discover local network connections",
+      "resources": {
+        "cpu": 18,
+        "bandwidth": 0.4,
+        "ram": 6
+      }
+    },
+    {
+      "name": "rootkit",
+      "function": "Install hidden backdoor access",
+      "resources": {
+        "cpu": 30,
+        "bandwidth": 0.6,
+        "ram": 12
+      }
+    },
+    {
+      "name": "exploit_kit",
+      "function": "Multi-vulnerability exploitation",
+      "resources": {
+        "cpu": 40,
+        "bandwidth": 0.8,
+        "ram": 14
+      },
+      "exploits": [
+        {
+          "type": "remote_code_execution",
+          "level": 15
+        },
+        {
+          "type": "sql_injection",
+          "level": 15
+        },
+        {
+          "type": "xss",
+          "level": 10
+        }
+      ]
+    },
+    {
+      "name": "password_sniffer",
+      "function": "Sniff and crack passwords from user roles",
+      "resources": {
+        "cpu": 22,
+        "bandwidth": 0.4,
+        "ram": 9
+      },
+      "exploits": [
+        {
+          "type": "password_cracking",
+          "level": 15
+        }
+      ]
+    },
+    {
+      "name": "advanced_exploit_kit",
+      "function": "Advanced multi-vulnerability exploitation",
+      "resources": {
+        "cpu": 60,
+        "bandwidth": 1.2,
+        "ram": 20
+      },
+      "exploits": [
+        {
+          "type": "remote_code_execution",
+          "level": 25
+        },
+        {
+          "type": "sql_injection",
+          "level": 25
+        },
+        {
+          "type": "xss",
+          "level": 20
+        },
+        {
+          "type": "buffer_overflow",
+          "level": 20
+        }
+      ]
+    },
+    {
+      "name": "sql_injector",
+      "function": "Perform SQL injection attacks",
+      "resources": {
+        "cpu": 28,
+        "bandwidth": 0.5,
+        "ram": 11
+      },
+      "exploits": [
+        {
+          "type": "sql_injection",
+          "level": 20
+        }
+      ],
+      "services": "http"
+    },
+    {
+      "name": "xss_exploit",
+      "function": "Exploit XSS vulnerabilities",
+      "resources": {
+        "cpu": 20,
+        "bandwidth": 0.3,
+        "ram": 7
+      },
+      "exploits": [
+        {
+          "type": "xss",
+          "level": 15
+        }
+      ],
+      "services": "http"
+    },
+    {
+      "name": "packet_capture",
+      "function": "Capture network packets",
+      "resources": {
+        "cpu": 16,
+        "bandwidth": 0.3,
+        "ram": 5
+      }
+    },
+    {
+      "name": "packet_decoder",
+      "function": "Decode captured packets",
+      "resources": {
+        "cpu": 12,
+        "bandwidth": 0.1,
+        "ram": 3
+      }
+    }
+  ]
+}

@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"fmt"
+	"strings"
 	"terminal-sh/models"
 	"terminal-sh/services"
 
@@ -14,18 +15,15 @@ import (
 var (
 	titleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("205")).
-			Bold(true).
-			Align(lipgloss.Center).
-			MarginBottom(1)
+			Bold(true)
 
 	welcomeStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Align(lipgloss.Center).
-			MarginBottom(2)
+			Foreground(lipgloss.Color("39"))
 )
 
 // LoginModel handles the login/registration form
 type LoginModel struct {
+	db            *database.Database
 	form          *huh.Form
 	userService   *services.UserService
 	username      string
@@ -41,16 +39,26 @@ type LoginModel struct {
 }
 
 // NewLoginModel creates a new login model
-func NewLoginModel(userService *services.UserService, prefillUsername, prefillPassword string) *LoginModel {
-	username := prefillUsername
-	password := prefillPassword
+func NewLoginModel(db *database.Database, userService *services.UserService, prefillUsername, prefillPassword string) *LoginModel {
+	model := &LoginModel{
+		db:          db,
+		userService: userService,
+		username:    prefillUsername,
+		password:    prefillPassword,
+		prefillUser: prefillUsername,
+		prefillPass: prefillPassword,
+		width:       80,  // Default
+		height:      24,  // Default
+		formWidth:   50,  // Default form width
+	}
 
 	// Form will be resized based on window size
+	// Use model fields directly so form updates them
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Username").
-				Value(&username).
+				Value(&model.username).
 				Placeholder("Enter your username").
 				Validate(func(s string) error {
 					if s == "" {
@@ -60,7 +68,7 @@ func NewLoginModel(userService *services.UserService, prefillUsername, prefillPa
 				}),
 			huh.NewInput().
 				Title("Password").
-				Value(&password).
+				Value(&model.password).
 				Placeholder("Enter your password").
 				EchoMode(huh.EchoModePassword).
 				Validate(func(s string) error {
@@ -74,17 +82,8 @@ func NewLoginModel(userService *services.UserService, prefillUsername, prefillPa
 		WithTheme(huh.ThemeCatppuccin()).
 		WithWidth(50) // Default width, will be updated on window resize
 
-	return &LoginModel{
-		form:        form,
-		userService: userService,
-		username:    username,
-		password:    password,
-		prefillUser: prefillUsername,
-		prefillPass: prefillPassword,
-		width:       80,  // Default
-		height:      24,  // Default
-		formWidth:   50,  // Default form width
-	}
+	model.form = form
+	return model
 }
 
 // Init initializes the model
@@ -134,8 +133,10 @@ func (m *LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
-			return m, tea.Quit
+		case "ctrl+c":
+			// Don't allow quitting from login in web version
+			// Ctrl+C should be handled by the browser/terminal
+			return m, nil
 		}
 
 	case LoginSuccessMsg:
@@ -144,7 +145,7 @@ func (m *LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = nil // Clear any previous errors
 		// Store user in context for shell to use
 		// Transition to shell model with current window size
-		shellModel := NewShellModelWithSize(m.userService, msg.User, m.width, m.height)
+		shellModel := NewShellModelWithSize(m.db, m.userService, msg.User, m.width, m.height)
 		return shellModel, shellModel.Init()
 
 	case LoginErrorMsg:
@@ -154,14 +155,12 @@ func (m *LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.form.State = huh.StateNormal
 		// Clear password field for security
 		m.password = ""
-		// Recreate form to reset it
-		username := m.username
-		password := ""
+		// Recreate form to reset it - use model fields directly
 		m.form = huh.NewForm(
 			huh.NewGroup(
 				huh.NewInput().
 					Title("Username").
-					Value(&username).
+					Value(&m.username).
 					Placeholder("Enter your username").
 					Validate(func(s string) error {
 						if s == "" {
@@ -171,7 +170,7 @@ func (m *LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}),
 				huh.NewInput().
 					Title("Password").
-					Value(&password).
+					Value(&m.password).
 					Placeholder("Enter your password").
 					EchoMode(huh.EchoModePassword).
 					Validate(func(s string) error {
@@ -184,8 +183,6 @@ func (m *LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		).
 			WithTheme(huh.ThemeCatppuccin()).
 			WithWidth(m.formWidth)
-		m.username = username
-		m.password = password
 		return m, m.form.Init()
 	}
 
@@ -220,7 +217,7 @@ func (m *LoginModel) handleSubmit() tea.Cmd {
 			// Check if it's a password error (user exists but wrong password)
 			// vs user doesn't exist (auto-register)
 			var existingUser models.User
-			err := database.DB.Where("username = ?", m.username).First(&existingUser).Error
+			err := m.db.Where("username = ?", m.username).First(&existingUser).Error
 			userExists := err == nil
 				
 				if userExists {
@@ -246,31 +243,42 @@ func (m *LoginModel) View() string {
 		return ""
 	}
 
-	var s string
-	s += titleStyle.Render("╔═══════════════════════════════════════╗\n║   terminal.sh Server - Welcome!       ║\n╚═══════════════════════════════════════╝")
-	s += "\n\n"
-	s += welcomeStyle.Render("Enter your credentials to continue")
-	s += "\n\n"
-
-	if m.err != nil {
-		s += lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196")).
-			Render(fmt.Sprintf("Error: %v\n\n", m.err))
+	// Ensure minimum dimensions
+	width := m.width
+	height := m.height
+	if width < 40 {
+		width = 80
+	}
+	if height < 10 {
+		height = 24
 	}
 
-	s += m.form.View()
-	s += "\n\n"
-	s += lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
-		Render("Press Ctrl+C or 'q' to quit")
+	// Build content
+	var content strings.Builder
+	
+	// Title box
+	title := `╔═══════════════════════════════════════╗
+║   terminal.sh Server - Welcome!       ║
+╚═══════════════════════════════════════╝`
+	content.WriteString(titleStyle.Render(title))
+	content.WriteString("\n\n")
+	content.WriteString(welcomeStyle.Render("Enter your credentials to continue"))
+	content.WriteString("\n\n")
 
-	// Center the content based on actual window size
+	if m.err != nil {
+		errorStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196"))
+		content.WriteString(errorStyle.Render(fmt.Sprintf("Error: %v", m.err)))
+		content.WriteString("\n\n")
+	}
+
+	content.WriteString(m.form.View())
+
+	// Use lipgloss.Place() to center content in full terminal frame
 	return lipgloss.Place(
-		m.width,
-		m.height,
-		lipgloss.Center,
-		lipgloss.Center,
-		s,
+		width, height,
+		lipgloss.Center, lipgloss.Center,
+		content.String(),
 	)
 }
 
@@ -282,4 +290,3 @@ type LoginSuccessMsg struct {
 type LoginErrorMsg struct {
 	Error error
 }
-

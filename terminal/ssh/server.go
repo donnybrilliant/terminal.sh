@@ -1,18 +1,28 @@
-package terminal
+package ssh
 
 import (
 	"context"
 	"fmt"
-	"log"
 	"terminal-sh/config"
+	"terminal-sh/database"
 	"terminal-sh/services"
+	"terminal-sh/terminal"
 	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	wishbubbletea "github.com/charmbracelet/wish/bubbletea"
 	"github.com/charmbracelet/wish/logging"
+)
+
+var (
+	successLogStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("46")).
+			Bold(true)
+	infoLogStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39"))
 )
 
 var (
@@ -22,8 +32,8 @@ var (
 
 // StartServer starts the SSH server using Wish framework
 // No SSH authentication - everyone connects and sees the Bubble Tea login form
-func StartServer(cfg *config.Config) error {
-	userService := services.NewUserService(cfg.JWTSecret)
+func StartServer(cfg *config.Config, db *database.Database) error {
+	userService := services.NewUserService(db, cfg.JWTSecret)
 
 	// Use default host key path if not provided
 	hostKeyPath := cfg.HostKeyPath
@@ -54,7 +64,7 @@ func StartServer(cfg *config.Config) error {
 				
 				// Create login model with prefilled username (no password from SSH)
 				// Everyone sees the login form - no SSH auth required
-				model := NewLoginModel(userService, username, "")
+				model := terminal.NewLoginModel(db, userService, username, "")
 				
 				// After login, transition to shell
 				return model, []tea.ProgramOption{tea.WithAltScreen()}
@@ -73,11 +83,11 @@ func StartServer(cfg *config.Config) error {
 	sshServer = s
 	serverMu.Unlock()
 
-	log.Printf("SSH server listening on %s:%d", cfg.Host, cfg.Port)
-	log.Printf("✓ No SSH authentication required")
-	log.Printf("✓ All connections go directly to login form")
-	log.Printf("✓ Users can connect with: ssh user@host -p %d", cfg.Port)
-	log.Printf("✓ Press Ctrl+C to shutdown gracefully")
+	fmt.Println(infoLogStyle.Render(fmt.Sprintf("SSH server listening on %s:%d", cfg.Host, cfg.Port)))
+	fmt.Println(successLogStyle.Render("✓") + " No SSH authentication required")
+	fmt.Println(successLogStyle.Render("✓") + " All connections go directly to login form")
+	fmt.Println(successLogStyle.Render("✓") + " " + infoLogStyle.Render(fmt.Sprintf("Users can connect with: ssh user@host -p %d", cfg.Port)))
+	fmt.Println(successLogStyle.Render("✓") + " Press Ctrl+C to shutdown gracefully")
 	
 	return s.ListenAndServe()
 }
@@ -92,7 +102,7 @@ func ShutdownServer(ctx context.Context) error {
 		return nil // Server not started
 	}
 
-	log.Printf("Shutting down SSH server...")
+	fmt.Println(infoLogStyle.Render("Shutting down SSH server..."))
 	return s.Shutdown(ctx)
 }
 

@@ -266,12 +266,13 @@ func AnimatedHelp() string {
 		for _, cmd := range section.commands {
 			cmdStyle := lipgloss.NewStyle().
 				Foreground(lipgloss.Color(cmd.color))
-			// Format: "  command - description"
-			// Pad command to 20 chars for alignment
+			// Format: "  command - description" with proper left alignment
+			// Use tabs or fixed spacing for alignment (xterm.js handles tabs better)
 			cmdPadded := cmd.cmd
 			if len(cmdPadded) < 20 {
 				cmdPadded += strings.Repeat(" ", 20-len(cmdPadded))
 			}
+			// Left-align everything - no floating
 			styled.WriteString("  " + cmdStyle.Render(cmdPadded) + " - " + cmd.desc + "\n")
 		}
 		styled.WriteString("\n")

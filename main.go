@@ -12,7 +12,7 @@ import (
 	"terminal-sh/config"
 	"terminal-sh/database"
 	"terminal-sh/services"
-	"terminal-sh/terminal"
+	"terminal-sh/terminal/ssh"
 )
 
 func main() {
@@ -25,12 +25,13 @@ func main() {
 
 	// Initialize database
 	fmt.Print("Initializing database... ")
-	if err := database.Init(cfg.DatabasePath); err != nil {
+	db, err := database.NewDB(cfg.DatabasePath, cfg.DatabaseURL)
+	if err != nil {
 		log.Fatalf("\n✗ Failed to initialize database: %v", err)
 	}
 	defer func() {
 		fmt.Println("\nClosing database connection...")
-		if err := database.Close(); err != nil {
+		if err := db.Close(); err != nil {
 			log.Printf("Error closing database: %v", err)
 		} else {
 			fmt.Println("✓ Database closed")
@@ -40,8 +41,8 @@ func main() {
 
 	// Seed tools
 	fmt.Print("Seeding tools... ")
-	serverService := services.NewServerService()
-	toolService := services.NewToolService(serverService)
+	serverService := services.NewServerService(db)
+	toolService := services.NewToolService(db, serverService)
 	if err := toolService.SeedTools(); err != nil {
 		log.Printf("\n✗ Failed to seed tools: %v", err)
 	} else {
@@ -50,7 +51,7 @@ func main() {
 	
 	// Seed initial game data (servers, etc.)
 	fmt.Print("Seeding game data... ")
-	if err := services.SeedInitialData(); err != nil {
+	if err := services.SeedInitialData(db); err != nil {
 		log.Printf("\n✗ Failed to seed initial data: %v", err)
 	} else {
 		fmt.Println("✓")
@@ -69,7 +70,7 @@ func main() {
 	// Start server in a goroutine
 	serverErr := make(chan error, 1)
 	go func() {
-		if err := terminal.StartServer(cfg); err != nil {
+		if err := ssh.StartServer(cfg, db); err != nil {
 			serverErr <- err
 		}
 	}()
@@ -85,7 +86,7 @@ func main() {
 		defer cancel()
 		
 		// Shutdown the server
-		if err := terminal.ShutdownServer(ctx); err != nil {
+		if err := ssh.ShutdownServer(ctx); err != nil {
 			log.Printf("Error during shutdown: %v", err)
 		} else {
 			fmt.Println("✓ Server shut down gracefully")

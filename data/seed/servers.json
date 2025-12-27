@@ -1,0 +1,85 @@
+{
+  "servers": [
+    {
+      "ip": "repo",
+      "local_ip": "10.0.0.1",
+      "security_level": 200,
+      "resources": {
+        "cpu": 50000,
+        "bandwidth": 100000,
+        "ram": 2048
+      },
+      "wallet": {
+        "crypto": 0,
+        "data": 0
+      },
+      "tools": [],
+      "connected_ips": [],
+      "services": [
+        {
+          "name": "ssh",
+          "description": "Secure Shell",
+          "port": 22,
+          "vulnerable": false,
+          "level": 200,
+          "vulnerabilities": []
+        }
+      ],
+      "roles": [
+        {
+          "role": "admin",
+          "level": 200
+        }
+      ],
+      "file_system": {},
+      "local_network": {}
+    },
+    {
+      "ip": "test",
+      "local_ip": "192.168.1.100",
+      "security_level": 15,
+      "resources": {
+        "cpu": 5000,
+        "bandwidth": 10000,
+        "ram": 512
+      },
+      "wallet": {
+        "crypto": 100,
+        "data": 1000
+      },
+      "tools": ["password_cracker", "ssh_exploit"],
+      "connected_ips": [],
+      "services": [
+        {
+          "name": "ssh",
+          "description": "Secure Shell",
+          "port": 22,
+          "vulnerable": true,
+          "level": 10,
+          "vulnerabilities": [
+            {
+              "type": "weak_password",
+              "level": 5
+            },
+            {
+              "type": "ssh_vulnerability",
+              "level": 10
+            }
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "role": "user",
+          "level": 5
+        },
+        {
+          "role": "admin",
+          "level": 10
+        }
+      ],
+      "file_system": {},
+      "local_network": {}
+    }
+  ]
+}

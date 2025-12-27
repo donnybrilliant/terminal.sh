@@ -1,0 +1,173 @@
+{
+  "shops": [
+    {
+      "server_ip": "1.1.1.1",
+      "server": {
+        "ip": "1.1.1.1",
+        "local_ip": "10.0.0.10",
+        "security_level": 50,
+        "resources": {
+          "cpu": 10000,
+          "bandwidth": 20000,
+          "ram": 1024
+        },
+        "wallet": {
+          "crypto": 5000,
+          "data": 50000
+        },
+        "tools": [],
+        "connected_ips": [],
+        "services": [
+          {
+            "name": "ssh",
+            "description": "Secure Shell",
+            "port": 22,
+            "vulnerable": true,
+            "level": 20,
+            "vulnerabilities": [
+              {
+                "type": "remote_code_execution",
+                "level": 15
+              }
+            ]
+          }
+        ],
+        "roles": [
+          {
+            "role": "admin",
+            "level": 20
+          }
+        ],
+        "file_system": {},
+        "local_network": {}
+      },
+      "shop_type": "tools",
+      "shop_name": "Elite Tools Shop",
+      "shop_description": "Premium tools for professional hackers",
+      "items": [
+        {
+          "item_type": "tool",
+          "item_id": "advanced_exploit_kit",
+          "name": "advanced_exploit_kit",
+          "description": "Advanced multi-vulnerability exploitation tool",
+          "crypto_price": 1000,
+          "data_price": 0,
+          "stock": -1
+        },
+        {
+          "item_type": "patch",
+          "item_id": "pass_patch_v2",
+          "name": "pass_patch_v2",
+          "description": "Enhanced password cracking algorithm",
+          "crypto_price": 0,
+          "data_price": 500,
+          "stock": -1
+        },
+        {
+          "item_type": "patch",
+          "item_id": "ssh_patch_v2",
+          "name": "ssh_patch_v2",
+          "description": "Improved SSH exploitation techniques",
+          "crypto_price": 0,
+          "data_price": 750,
+          "stock": -1
+        },
+        {
+          "item_type": "resource",
+          "item_id": "cpu_boost",
+          "name": "cpu_boost",
+          "description": "Increase CPU by 50",
+          "crypto_price": 500,
+          "data_price": 0,
+          "stock": -1
+        }
+      ]
+    },
+    {
+      "server_ip": "2.2.2.2",
+      "server": {
+        "ip": "2.2.2.2",
+        "local_ip": "10.0.0.20",
+        "security_level": 30,
+        "resources": {
+          "cpu": 8000,
+          "bandwidth": 15000,
+          "ram": 512
+        },
+        "wallet": {
+          "crypto": 2000,
+          "data": 20000
+        },
+        "tools": [],
+        "connected_ips": [],
+        "services": [
+          {
+            "name": "ssh",
+            "description": "Secure Shell",
+            "port": 22,
+            "vulnerable": true,
+            "level": 15,
+            "vulnerabilities": [
+              {
+                "type": "password_cracking",
+                "level": 10
+              }
+            ]
+          }
+        ],
+        "roles": [
+          {
+            "role": "admin",
+            "level": 15
+          }
+        ],
+        "file_system": {},
+        "local_network": {}
+      },
+      "shop_type": "resources",
+      "shop_name": "Resource Boost Shop",
+      "shop_description": "Upgrade your computational resources",
+      "items": [
+        {
+          "item_type": "resource",
+          "item_id": "bandwidth_boost",
+          "name": "bandwidth_boost",
+          "description": "Increase Bandwidth by 50",
+          "crypto_price": 300,
+          "data_price": 0,
+          "stock": -1
+        },
+        {
+          "item_type": "resource",
+          "item_id": "ram_boost",
+          "name": "ram_boost",
+          "description": "Increase RAM by 8",
+          "crypto_price": 400,
+          "data_price": 0,
+          "stock": -1
+        },
+        {
+          "item_type": "resource",
+          "item_id": "full_boost",
+          "name": "full_boost",
+          "description": "Increase all resources significantly",
+          "crypto_price": 2000,
+          "data_price": 1000,
+          "stock": -1
+        }
+      ]
+    }
+  ],
+  "patch_files": [
+    {
+      "server_ip": "test",
+      "file_path": "patches/ssh_patch_v2.json",
+      "content": "{\n  \"name\": \"ssh_patch_v2\",\n  \"target_tool\": \"ssh_exploit\",\n  \"description\": \"Improved SSH exploitation techniques found on this server\",\n  \"upgrades\": {\n    \"exploits\": [{\"type\": \"remote_code_execution\", \"level\": 30}],\n    \"resources\": {\"cpu\": -3, \"bandwidth\": -0.1, \"ram\": -2}\n  }\n}"
+    },
+    {
+      "server_ip": "1.1.1.1",
+      "file_path": "patches/exploit_kit_advanced.json",
+      "content": "{\n  \"name\": \"exploit_kit_advanced\",\n  \"target_tool\": \"exploit_kit\",\n  \"description\": \"Advanced multi-vulnerability exploitation patch\",\n  \"upgrades\": {\n    \"exploits\": [\n      {\"type\": \"remote_code_execution\", \"level\": 20},\n      {\"type\": \"sql_injection\", \"level\": 20},\n      {\"type\": \"xss\", \"level\": 15}\n    ],\n    \"resources\": {\"cpu\": -5, \"bandwidth\": -0.2, \"ram\": -3}\n  }\n}"
+    }
+  ]
+}

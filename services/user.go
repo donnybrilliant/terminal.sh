@@ -15,12 +15,14 @@ import (
 
 // UserService handles user-related operations
 type UserService struct {
+	db           *database.Database
 	tokenManager *auth.TokenManager
 }
 
 // NewUserService creates a new user service
-func NewUserService(jwtSecret string) *UserService {
+func NewUserService(db *database.Database, jwtSecret string) *UserService {
 	return &UserService{
+		db:           db,
 		tokenManager: auth.NewTokenManager(jwtSecret),
 	}
 }
@@ -34,7 +36,7 @@ func (s *UserService) Register(username, password string) (*models.User, error) 
 
 	// Check if user already exists
 	var existingUser models.User
-	if err := database.DB.Where("username = ?", username).First(&existingUser).Error; err == nil {
+	if err := s.db.Where("username = ?", username).First(&existingUser).Error; err == nil {
 		return nil, fmt.Errorf("username already exists")
 	}
 
@@ -69,7 +71,7 @@ func (s *UserService) Register(username, password string) (*models.User, error) 
 		},
 	}
 
-	if err := database.DB.Create(user).Error; err != nil {
+	if err := s.db.Create(user).Error; err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
@@ -79,7 +81,7 @@ func (s *UserService) Register(username, password string) (*models.User, error) 
 // Login authenticates a user and returns a JWT token
 func (s *UserService) Login(username, password string) (*models.User, string, error) {
 	var user models.User
-	if err := database.DB.Where("username = ?", username).First(&user).Error; err != nil {
+	if err := s.db.Where("username = ?", username).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Auto-register on first login attempt
 			user, err := s.Register(username, password)
@@ -112,7 +114,7 @@ func (s *UserService) Login(username, password string) (*models.User, string, er
 // GetUserByID retrieves a user by ID
 func (s *UserService) GetUserByID(userID uuid.UUID) (*models.User, error) {
 	var user models.User
-	if err := database.DB.Preload("Tools").Preload("Achievements").First(&user, "id = ?", userID).Error; err != nil {
+	if err := s.db.Preload("Tools").Preload("Achievements").First(&user, "id = ?", userID).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -121,7 +123,7 @@ func (s *UserService) GetUserByID(userID uuid.UUID) (*models.User, error) {
 // GetUserByUsername retrieves a user by username
 func (s *UserService) GetUserByUsername(username string) (*models.User, error) {
 	var user models.User
-	if err := database.DB.Preload("Tools").Preload("Achievements").First(&user, "username = ?", username).Error; err != nil {
+	if err := s.db.Preload("Tools").Preload("Achievements").First(&user, "username = ?", username).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -135,11 +137,11 @@ func (s *UserService) UpdateUsername(userID uuid.UUID, newUsername string) error
 
 	// Check if username is already taken
 	var existingUser models.User
-	if err := database.DB.Where("username = ? AND id != ?", newUsername, userID).First(&existingUser).Error; err == nil {
+	if err := s.db.Where("username = ? AND id != ?", newUsername, userID).First(&existingUser).Error; err == nil {
 		return fmt.Errorf("username already taken")
 	}
 
-	return database.DB.Model(&models.User{}).Where("id = ?", userID).Update("username", newUsername).Error
+	return s.db.Model(&models.User{}).Where("id = ?", userID).Update("username", newUsername).Error
 }
 
 // AddExperience adds experience to a user and levels them up if needed
@@ -157,7 +159,7 @@ func (s *UserService) AddExperience(userID uuid.UUID, amount int) error {
 		user.Level = newLevel
 	}
 
-	return database.DB.Model(user).Updates(map[string]interface{}{
+	return s.db.Model(user).Updates(map[string]interface{}{
 		"experience": user.Experience,
 		"level":      user.Level,
 	}).Error

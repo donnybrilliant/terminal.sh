@@ -3,6 +3,7 @@ package terminal
 import (
 	"fmt"
 	"terminal-sh/cmd"
+	"terminal-sh/database"
 	"terminal-sh/filesystem"
 	"terminal-sh/models"
 	"terminal-sh/services"
@@ -43,12 +44,12 @@ type ShellContext struct {
 }
 
 // NewShellModel creates a new shell model
-func NewShellModel(userService *services.UserService, user interface{}) *ShellModel {
-	return NewShellModelWithSize(userService, user, 80, 24)
+func NewShellModel(db *database.Database, userService *services.UserService, user interface{}) *ShellModel {
+	return NewShellModelWithSize(db, userService, user, 80, 24)
 }
 
 // NewShellModelWithSize creates a new shell model with specified window dimensions
-func NewShellModelWithSize(userService *services.UserService, user interface{}, width, height int) *ShellModel {
+func NewShellModelWithSize(db *database.Database, userService *services.UserService, user interface{}, width, height int) *ShellModel {
 	u, ok := user.(*models.User)
 	if !ok {
 		// Handle if user is not the right type
@@ -61,7 +62,7 @@ func NewShellModelWithSize(userService *services.UserService, user interface{}, 
 	}
 
 	vfs := filesystem.NewVFS(username)
-	handler := cmd.NewCommandHandler(vfs, u, userService)
+	handler := cmd.NewCommandHandler(db, vfs, u, userService)
 
 	// Sync user tools to VFS so they appear in help
 	if u != nil {
@@ -383,155 +384,119 @@ func (m *ShellModel) View() string {
 		username = m.user.Username
 	}
 
-	// Ensure we have a valid height (fallback to default if not set yet)
+	// Ensure we have valid dimensions
+	width := m.width
 	height := m.height
+	if width <= 0 {
+		width = 80
+	}
 	if height <= 0 {
-		height = 24 // Default terminal height
+		height = 24
 	}
 
-	// 1. Build history content (all entries with newlines)
-	var historyContent strings.Builder
+	// Build all content lines
+	var contentLines []string
 
 	// Add welcome message as first entry if shown
 	if m.showWelcome && len(m.history) == 0 {
 		welcome := AnimatedWelcome() + "\n" + WelcomeHelpText()
-		historyContent.WriteString(welcome)
-		// Ensure welcome ends with newline
-		if !strings.HasSuffix(welcome, "\n") {
-			historyContent.WriteString("\n")
-		}
+		welcomeLines := strings.Split(welcome, "\n")
+		contentLines = append(contentLines, welcomeLines...)
 	}
 
 	// Add all history entries
 	for _, entry := range m.history {
-		// Command line: prompt + command + newline
+		// Command line: prompt + command
 		prompt := RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
-		historyContent.WriteString(prompt)
-		historyContent.WriteString(entry.command)
-		historyContent.WriteString("\n")
+		commandLine := prompt + entry.command
+		contentLines = append(contentLines, commandLine)
 
-		// Output: output + newline (if not empty)
+		// Output lines (if any)
 		if entry.output != "" {
-			historyContent.WriteString(entry.output)
-			// Ensure output ends with newline
-			if !strings.HasSuffix(entry.output, "\n") {
-				historyContent.WriteString("\n")
-			}
+			outputText := strings.TrimSuffix(entry.output, "\n")
+			outputLines := strings.Split(outputText, "\n")
+			contentLines = append(contentLines, outputLines...)
 		}
 	}
 
-	// 2. Calculate how many lines history takes
-	historyText := historyContent.String()
-	historyLines := countLines(historyText)
+	// Build the current prompt line
+	m.textInput.Prompt = RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
+	m.textInput.Width = width
+	promptLine := m.textInput.View()
 
-	// 3. Calculate available space for content
-	// Reserve space for prompt/status line (1 line)
+	// Calculate available lines for content (minus 1 for prompt)
 	availableLines := height - 1
+	if availableLines < 1 {
+		availableLines = 1
+	}
 
-	var finalOutput strings.Builder
+	// Build output
+	var output strings.Builder
 
 	if m.editMode {
-		// Edit mode: show history + textarea + status line
-		// Calculate how much space we have for history
-		textareaHeight := m.height - 2 // Reserve 1 for status, 1 for prompt
+		// Edit mode rendering
+		textareaHeight := height - 2
 		if textareaHeight < 3 {
-			textareaHeight = 3 // Minimum height
+			textareaHeight = 3
 		}
 		m.textarea.SetHeight(textareaHeight)
-		
-		// Calculate available space for history
-		historyAvailableLines := availableLines - textareaHeight - 1 // -1 for status line
-		
-		if historyLines > historyAvailableLines {
-			// Truncate history from top
-			lines := strings.Split(historyText, "\n")
-			startIdx := len(lines) - historyAvailableLines
-			if startIdx < 0 {
-				startIdx = 0
-			}
-			for i := startIdx; i < len(lines); i++ {
-				if i > startIdx {
-					finalOutput.WriteString("\n")
-				}
-				finalOutput.WriteString(lines[i])
+
+		historyAvailableLines := availableLines - textareaHeight - 1
+
+		// Show history (truncated from top if needed)
+		if len(contentLines) > historyAvailableLines {
+			startIdx := len(contentLines) - historyAvailableLines
+			for i := startIdx; i < len(contentLines); i++ {
+				output.WriteString(contentLines[i])
+				output.WriteString("\n")
 			}
 		} else {
-			// Pad with empty lines, then show history
-			paddingLines := historyAvailableLines - historyLines
+			// Pad with empty lines first
+			paddingLines := historyAvailableLines - len(contentLines)
 			for i := 0; i < paddingLines; i++ {
-				finalOutput.WriteString("\n")
+				output.WriteString("\n")
 			}
-			historyTrimmed := strings.TrimSuffix(historyText, "\n")
-			if historyTrimmed != "" {
-				finalOutput.WriteString(historyTrimmed)
+			for _, line := range contentLines {
+				output.WriteString(line)
+				output.WriteString("\n")
 			}
 		}
-		
-		// Add newline before textarea
-		finalOutput.WriteString("\n")
-		
-		// Render textarea (it handles its own rendering with cursor, etc.)
-		finalOutput.WriteString(m.textarea.View())
-		
+
+		// Add textarea
+		output.WriteString(m.textarea.View())
+		output.WriteString("\n")
+
 		// Add status line
-		finalOutput.WriteString("\n")
 		statusLine := fmt.Sprintf("-- Edit mode: %s | Ctrl+S to save, Esc/Ctrl+Q to exit --", m.editFilename)
-		finalOutput.WriteString(statusLine)
+		output.WriteString(statusLine)
 	} else {
-		// Normal mode: show history + prompt
-		// Calculate how many lines we can show (height - 1 for prompt)
-		if historyLines >= availableLines {
-			// Truncate: show only last availableLines of content
-			lines := strings.Split(historyText, "\n")
-			// Remove empty last line if present
-			if len(lines) > 0 && lines[len(lines)-1] == "" {
-				lines = lines[:len(lines)-1]
-			}
-			startIdx := len(lines) - availableLines
-			if startIdx < 0 {
-				startIdx = 0
-			}
-			for i := startIdx; i < len(lines); i++ {
-				if i > startIdx {
-					finalOutput.WriteString("\n")
-				}
-				finalOutput.WriteString(lines[i])
+		// Normal mode: content + prompt at bottom
+
+		// If content is longer than available space, truncate from top
+		if len(contentLines) >= availableLines {
+			startIdx := len(contentLines) - availableLines
+			for i := startIdx; i < len(contentLines); i++ {
+				output.WriteString(contentLines[i])
+				output.WriteString("\n")
 			}
 		} else {
-			// Pad: add empty lines, then history
-			paddingLines := availableLines - historyLines
+			// Pad with empty lines at the top to push content down
+			paddingLines := availableLines - len(contentLines)
 			for i := 0; i < paddingLines; i++ {
-				finalOutput.WriteString("\n")
+				output.WriteString("\n")
 			}
-			// Add history (trim trailing newline)
-			historyTrimmed := strings.TrimSuffix(historyText, "\n")
-			if historyTrimmed != "" {
-				finalOutput.WriteString(historyTrimmed)
+			// Add content
+			for _, line := range contentLines {
+				output.WriteString(line)
+				output.WriteString("\n")
 			}
 		}
 
 		// Add prompt on last line
-		finalOutput.WriteString("\n")
-		m.textInput.Prompt = RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
-		m.textInput.Width = m.width
-		finalOutput.WriteString(m.textInput.View())
+		output.WriteString(promptLine)
 	}
 
-	return finalOutput.String()
-}
-
-// countLines counts the number of lines in a string
-func countLines(s string) int {
-	if s == "" {
-		return 0
-	}
-	count := 1
-	for _, r := range s {
-		if r == '\n' {
-			count++
-		}
-	}
-	return count
+	return output.String()
 }
 
 // Messages

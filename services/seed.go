@@ -1,50 +1,86 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"terminal-sh/database"
 	"terminal-sh/models"
+
 	"gorm.io/gorm"
 )
 
-// SeedInitialData seeds the database with initial game data
-func SeedInitialData() error {
-	// Seed tools (already done in main.go, but we can add server seeding here)
-	
-	// Create "repo" server with all tools
-	repoServer, err := createRepoServer()
-	if err != nil {
-		return fmt.Errorf("failed to create repo server: %w", err)
+// SeedInitialData seeds the database with initial game data from JSON files
+func SeedInitialData(db *database.Database) error {
+	// Seed servers from JSON
+	if err := seedServersFromJSON(db); err != nil {
+		return fmt.Errorf("failed to seed servers: %w", err)
 	}
-	// Note: repoServer will be nil if it already exists, which is fine
-	_ = repoServer
-	
-	// Create test server for easy connection testing
-	testServer, err := createTestServer()
-	if err != nil {
-		return fmt.Errorf("failed to create test server: %w", err)
-	}
-	// Note: testServer will be nil if it already exists, which is fine
-	_ = testServer
 	
 	// Seed patches
-	patchService := NewPatchService(NewToolService(NewServerService()))
+	serverService := NewServerService(db)
+	toolService := NewToolService(db, serverService)
+	patchService := NewPatchService(db, toolService)
 	if err := patchService.SeedPatches(); err != nil {
 		return fmt.Errorf("failed to seed patches: %w", err)
 	}
 	
-	// Seed shops
-	if err := seedShops(); err != nil {
+	// Seed shops from JSON
+	if err := seedShopsFromJSON(db); err != nil {
 		return fmt.Errorf("failed to seed shops: %w", err)
 	}
 	
 	return nil
 }
 
-func createRepoServer() (*models.Server, error) {
+// seedServersFromJSON loads and seeds servers from JSON file
+func seedServersFromJSON(db *database.Database) error {
+	data, err := os.ReadFile("data/seed/servers.json")
+	if err != nil {
+		return fmt.Errorf("failed to read servers.json: %w", err)
+	}
+
+	var serverData struct {
+		Servers []models.Server `json:"servers"`
+	}
+	if err := json.Unmarshal(data, &serverData); err != nil {
+		return fmt.Errorf("failed to parse servers.json: %w", err)
+	}
+
+	for _, server := range serverData.Servers {
+		// Check if server already exists
+		var existing models.Server
+		err := db.Where("ip = ?", server.IP).First(&existing).Error
+		if err != nil && err == gorm.ErrRecordNotFound {
+			// For repo server, populate tools list with all available tools
+			if server.IP == "repo" {
+				var tools []models.Tool
+				if err := db.Find(&tools).Error; err == nil {
+					toolNames := make([]string, len(tools))
+					for i, tool := range tools {
+						toolNames[i] = tool.Name
+					}
+					server.Tools = toolNames
+				}
+			}
+			
+			if err := db.Create(&server).Error; err != nil {
+				return fmt.Errorf("failed to seed server %s: %w", server.IP, err)
+			}
+		} else if err != nil {
+			return fmt.Errorf("failed to check server %s: %w", server.IP, err)
+		}
+		// If server exists, skip it
+	}
+
+	return nil
+}
+
+// Deprecated: Use seedServersFromJSON instead
+func createRepoServer(db *database.Database) (*models.Server, error) {
 	// Check if repo server already exists
 	var existing models.Server
-	err := database.DB.Where("ip = ?", "repo").First(&existing).Error
+	err := db.Where("ip = ?", "repo").First(&existing).Error
 	if err == nil {
 		return &existing, nil
 	}
@@ -54,7 +90,7 @@ func createRepoServer() (*models.Server, error) {
 	
 	// Get all tools
 	var tools []models.Tool
-	if err := database.DB.Find(&tools).Error; err != nil {
+	if err := db.Find(&tools).Error; err != nil {
 		return nil, err
 	}
 	
@@ -97,17 +133,17 @@ func createRepoServer() (*models.Server, error) {
 		LocalNetwork: make(map[string]interface{}),
 	}
 	
-	if err := database.DB.Create(repoServer).Error; err != nil {
+	if err := db.Create(repoServer).Error; err != nil {
 		return nil, fmt.Errorf("failed to create repo server: %w", err)
 	}
 	
 	return repoServer, nil
 }
 
-func createTestServer() (*models.Server, error) {
+func createTestServer(db *database.Database) (*models.Server, error) {
 	// Check if test server already exists
 	var existing models.Server
-	err := database.DB.Where("ip = ?", "test").First(&existing).Error
+	err := db.Where("ip = ?", "test").First(&existing).Error
 	if err == nil {
 		return &existing, nil
 	}
@@ -152,30 +188,177 @@ func createTestServer() (*models.Server, error) {
 		LocalNetwork: make(map[string]interface{}),
 	}
 	
-	if err := database.DB.Create(testServer).Error; err != nil {
+	if err := db.Create(testServer).Error; err != nil {
 		return nil, fmt.Errorf("failed to create test server: %w", err)
 	}
 	
 	return testServer, nil
 }
 
-// seedShops seeds initial shops
-func seedShops() error {
-	serverService := NewServerService()
-	shopService := NewShopService(serverService)
+// seedShopsFromJSON loads and seeds shops from JSON file
+func seedShopsFromJSON(db *database.Database) error {
+	// Load shops from JSON file
+	data, err := os.ReadFile("data/seed/shops.json")
+	if err != nil {
+		return fmt.Errorf("failed to read shops.json: %w", err)
+	}
+
+	var shopData struct {
+		Shops      []struct {
+			ServerIP        string `json:"server_ip"`
+			Server          models.Server `json:"server"`
+			ShopType        string `json:"shop_type"`
+			ShopName        string `json:"shop_name"`
+			ShopDescription string `json:"shop_description"`
+			Items           []struct {
+				ItemType    string `json:"item_type"`
+				ItemID      string `json:"item_id"`
+				Name        string `json:"name"`
+				Description string `json:"description"`
+				CryptoPrice  float64 `json:"crypto_price"`
+				DataPrice    float64 `json:"data_price"`
+				Stock        int     `json:"stock"`
+			} `json:"items"`
+		} `json:"shops"`
+		PatchFiles []struct {
+			ServerIP string `json:"server_ip"`
+			FilePath string `json:"file_path"`
+			Content  string `json:"content"`
+		} `json:"patch_files"`
+	}
+	if err := json.Unmarshal(data, &shopData); err != nil {
+		return fmt.Errorf("failed to parse shops.json: %w", err)
+	}
+
+	serverService := NewServerService(db)
+	shopService := NewShopService(db, serverService)
+
+	// Seed shops
+	for _, shopDef := range shopData.Shops {
+		// Check if shop already exists
+		var existingShop models.Shop
+		if err := db.Where("server_ip = ?", shopDef.ServerIP).First(&existingShop).Error; err == nil {
+			continue // Shop already exists
+		}
+
+		// Create shop server if it doesn't exist
+		var shopServer models.Server
+		if err := db.Where("ip = ?", shopDef.ServerIP).First(&shopServer).Error; err != nil {
+			// Create shop server from JSON
+			shopServer = shopDef.Server
+			if err := db.Create(&shopServer).Error; err != nil {
+				return fmt.Errorf("failed to create shop server %s: %w", shopDef.ServerIP, err)
+			}
+		}
+
+		// Determine shop type
+		var shopType models.ShopType
+		switch shopDef.ShopType {
+		case "tools":
+			shopType = models.ShopTypeTools
+		case "resources":
+			shopType = models.ShopTypeResources
+		default:
+			shopType = models.ShopTypeTools
+		}
+
+		// Create shop
+		shop, err := shopService.CreateShop(shopDef.ServerIP, shopType, shopDef.ShopName, shopDef.ShopDescription)
+		if err != nil {
+			return fmt.Errorf("failed to create shop: %w", err)
+		}
+
+		// Add shop items
+		for _, item := range shopDef.Items {
+			var itemType models.ItemType
+			switch item.ItemType {
+			case "tool":
+				itemType = models.ItemTypeTool
+			case "patch":
+				itemType = models.ItemTypePatch
+			case "resource":
+				itemType = models.ItemTypeResource
+			default:
+				itemType = models.ItemTypeTool
+			}
+
+			_, err = shopService.AddShopItem(shop.ID, itemType, item.Name, item.Description, item.CryptoPrice, item.DataPrice, item.Stock)
+			if err != nil {
+				return fmt.Errorf("failed to add shop item %s: %w", item.Name, err)
+			}
+		}
+	}
+
+	// Seed patch files on servers
+	for _, patchFile := range shopData.PatchFiles {
+		var server models.Server
+		if err := db.Where("ip = ?", patchFile.ServerIP).First(&server).Error; err != nil {
+			continue // Server doesn't exist, skip
+		}
+
+		if server.FileSystem == nil {
+			server.FileSystem = make(map[string]interface{})
+		}
+
+		// Parse file path to create directory structure
+		parts := []string{}
+		current := ""
+		for _, char := range patchFile.FilePath {
+			if char == '/' {
+				if current != "" {
+					parts = append(parts, current)
+					current = ""
+				}
+			} else {
+				current += string(char)
+			}
+		}
+		if current != "" {
+			parts = append(parts, current)
+		}
+
+		// Create directory structure
+		currentLevel := server.FileSystem
+		for i, part := range parts {
+			if i == len(parts)-1 {
+				// Last part is the file
+				currentLevel[part] = map[string]interface{}{
+					"content": patchFile.Content,
+				}
+			} else {
+				// Directory
+				if _, ok := currentLevel[part].(map[string]interface{}); !ok {
+					currentLevel[part] = make(map[string]interface{})
+				}
+				currentLevel = currentLevel[part].(map[string]interface{})
+			}
+		}
+
+		if err := db.Save(&server).Error; err != nil {
+			return fmt.Errorf("failed to save patch file on server %s: %w", patchFile.ServerIP, err)
+		}
+	}
+
+	return nil
+}
+
+// Deprecated: Use seedShopsFromJSON instead
+func seedShops(db *database.Database) error {
+	serverService := NewServerService(db)
+	shopService := NewShopService(db, serverService)
 	
 	// Create tool shop on a new server
 	toolShopServerIP := "1.1.1.1"
 	
 	// Check if shop already exists
 	var existingShop models.Shop
-	if err := database.DB.Where("server_ip = ?", toolShopServerIP).First(&existingShop).Error; err == nil {
+	if err := db.Where("server_ip = ?", toolShopServerIP).First(&existingShop).Error; err == nil {
 		return nil // Shop already exists
 	}
 	
 	// Create shop server if it doesn't exist
 	var shopServer models.Server
-	if err := database.DB.Where("ip = ?", toolShopServerIP).First(&shopServer).Error; err != nil {
+	if err := db.Where("ip = ?", toolShopServerIP).First(&shopServer).Error; err != nil {
 		// Create shop server
 		shopServer = models.Server{
 			IP:            toolShopServerIP,
@@ -210,7 +393,7 @@ func seedShops() error {
 			FileSystem:   make(map[string]interface{}),
 			LocalNetwork: make(map[string]interface{}),
 		}
-		if err := database.DB.Create(&shopServer).Error; err != nil {
+		if err := db.Create(&shopServer).Error; err != nil {
 			return fmt.Errorf("failed to create shop server: %w", err)
 		}
 	}
@@ -246,7 +429,7 @@ func seedShops() error {
 	resourceShopServerIP := "2.2.2.2"
 	
 	var resourceShopServer models.Server
-	if err := database.DB.Where("ip = ?", resourceShopServerIP).First(&resourceShopServer).Error; err != nil {
+	if err := db.Where("ip = ?", resourceShopServerIP).First(&resourceShopServer).Error; err != nil {
 		resourceShopServer = models.Server{
 			IP:            resourceShopServerIP,
 			LocalIP:       "10.0.0.20",
@@ -280,7 +463,7 @@ func seedShops() error {
 			FileSystem:   make(map[string]interface{}),
 			LocalNetwork: make(map[string]interface{}),
 		}
-		if err := database.DB.Create(&resourceShopServer).Error; err != nil {
+		if err := db.Create(&resourceShopServer).Error; err != nil {
 			return fmt.Errorf("failed to create resource shop server: %w", err)
 		}
 	}
@@ -306,7 +489,7 @@ func seedShops() error {
 	}
 	
 	// Seed patch files on servers
-	if err := seedPatchFiles(); err != nil {
+	if err := seedPatchFiles(db); err != nil {
 		return fmt.Errorf("failed to seed patch files: %w", err)
 	}
 	
@@ -314,10 +497,10 @@ func seedShops() error {
 }
 
 // seedPatchFiles creates patch metadata files on various servers
-func seedPatchFiles() error {
+func seedPatchFiles(db *database.Database) error {
 	// Create a patch file on test server
 	var testServer models.Server
-	if err := database.DB.Where("ip = ?", "test").First(&testServer).Error; err == nil {
+	if err := db.Where("ip = ?", "test").First(&testServer).Error; err == nil {
 		// Create patches directory in filesystem
 		if testServer.FileSystem == nil {
 			testServer.FileSystem = make(map[string]interface{})
@@ -338,14 +521,14 @@ func seedPatchFiles() error {
 		}
 		
 		testServer.FileSystem["patches"] = patchesDir
-		if err := database.DB.Save(&testServer).Error; err != nil {
+		if err := db.Save(&testServer).Error; err != nil {
 			return fmt.Errorf("failed to save patch file: %w", err)
 		}
 	}
 	
 	// Create patch file on shop server
 	var shopServer models.Server
-	if err := database.DB.Where("ip = ?", "1.1.1.1").First(&shopServer).Error; err == nil {
+	if err := db.Where("ip = ?", "1.1.1.1").First(&shopServer).Error; err == nil {
 		if shopServer.FileSystem == nil {
 			shopServer.FileSystem = make(map[string]interface{})
 		}
@@ -369,7 +552,7 @@ func seedPatchFiles() error {
 		}
 		
 		shopServer.FileSystem["patches"] = patchesDir
-		if err := database.DB.Save(&shopServer).Error; err != nil {
+		if err := db.Save(&shopServer).Error; err != nil {
 			return fmt.Errorf("failed to save patch file: %w", err)
 		}
 	}

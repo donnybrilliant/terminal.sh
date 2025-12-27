@@ -1,5 +1,82 @@
 # Implementation Summary
 
+## Seed Data Refactoring (Consistent JSON-Based Seeding)
+
+All game seed data has been refactored to use JSON files for consistency and maintainability:
+
+### Structure
+
+All seed data is now stored in `data/seed/` directory:
+- `data/seed/tools.json` - Tool definitions
+- `data/seed/servers.json` - Initial servers (repo, test)
+- `data/seed/shops.json` - Shop definitions and items
+- `data/seed/patches.json` - Patch/upgrade definitions
+- `data/seed/tutorials.json` - Tutorial content
+
+### Benefits
+
+- **Consistent**: All seed data uses the same JSON-based pattern
+- **Maintainable**: Easy to edit JSON files without code changes
+- **Production-friendly**: Update JSON files and restart server to apply changes
+- **Version controlled**: All seed data is tracked in git
+- **Database-backed**: Data is seeded to database on startup (idempotent)
+
+### Seeding Process
+
+All seed functions:
+1. Load data from JSON files in `data/seed/`
+2. Parse JSON into Go models
+3. Seed to database (idempotent - checks if exists, skips if already present)
+
+### Editing Seed Data
+
+To modify game data:
+1. Edit the appropriate JSON file in `data/seed/`
+2. Restart the server
+3. Seeding logic will update the database
+
+## Architecture Refactoring
+
+### Dual Server Architecture
+
+The project has been refactored to support separate SSH and WebSocket servers that can be deployed independently:
+
+#### Key Changes:
+
+1. **Database Refactoring**
+   - Removed global database variable
+   - Implemented dependency injection with `database.Database` struct
+   - All services now accept `*database.Database` in constructors
+   - Enables separate deployment with shared or separate databases
+
+2. **Separate Binaries**
+   - `cmd/ssh/main.go` - SSH server entry point
+   - `cmd/web/main.go` - WebSocket/HTTP server entry point
+   - Both can be built and deployed independently
+
+3. **Terminal Code Organization**
+   - `terminal/ssh/` - SSH-specific server code
+   - `terminal/websocket/` - WebSocket bridge and HTTP server
+   - `terminal/` - Shared Bubble Tea models (login, shell)
+
+4. **WebSocket Implementation**
+   - Full Bubble Tea over WebSocket
+   - Browser-based terminal using xterm.js
+   - Identical functionality to SSH interface
+   - Real-time bidirectional communication
+
+#### Deployment Options:
+
+- **Monolithic**: Run both servers on same machine/container
+- **Separate Containers**: Deploy SSH and Web servers in different containers
+- **Shared Database**: Both servers can use same SQLite file or PostgreSQL instance
+- **Separate Databases**: Each server can use its own database
+
+#### Configuration:
+
+- SSH Server: `HOST`, `PORT`, `HOSTKEY_PATH`, `DATABASE_PATH`, `JWT_SECRET`
+- Web Server: `WEB_HOST`, `WEB_PORT`, `DATABASE_PATH`, `DATABASE_URL`, `JWT_SECRET`
+
 ## Completed Improvements
 
 ### 1. Missing Tools Implementation
@@ -137,16 +214,24 @@ Then users can access it with: `tutorial my_new_tutorial`
 
 To test the implementation:
 
-1. **Build the server**:
+1. **Build the servers**:
 
    ```bash
-   go build -o terminal.sh .
+   # Build SSH server
+   go build -o bin/terminal.sh-ssh ./cmd/ssh
+   
+   # Build Web server
+   go build -o bin/terminal.sh-web ./cmd/web
    ```
 
-2. **Run the server**:
+2. **Run the servers**:
 
    ```bash
-   ./terminal.sh
+   # Terminal 1 - SSH server
+   ./bin/terminal.sh-ssh
+   
+   # Terminal 2 - Web server
+   ./bin/terminal.sh-web
    ```
 
 3. **Connect via SSH**:
@@ -154,6 +239,10 @@ To test the implementation:
    ```bash
    ssh -p 2222 username@localhost
    ```
+
+4. **Connect via Web**:
+
+   Open `http://localhost:8080` in your browser
 
 4. **Test tutorials**:
 

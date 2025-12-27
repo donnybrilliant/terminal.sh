@@ -12,12 +12,14 @@ import (
 
 // SessionService handles SSH session management
 type SessionService struct {
+	db            *database.Database
 	serverService *ServerService
 }
 
 // NewSessionService creates a new session service
-func NewSessionService(serverService *ServerService) *SessionService {
+func NewSessionService(db *database.Database, serverService *ServerService) *SessionService {
 	return &SessionService{
+		db:            db,
 		serverService: serverService,
 	}
 }
@@ -32,7 +34,7 @@ func (s *SessionService) CreateSession(userID uuid.UUID, sshConnID string, curre
 		CreatedAt:       time.Now(),
 	}
 
-	if err := database.DB.Create(session).Error; err != nil {
+	if err := s.db.Create(session).Error; err != nil {
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
@@ -42,7 +44,7 @@ func (s *SessionService) CreateSession(userID uuid.UUID, sshConnID string, curre
 // GetSessionByConnID retrieves a session by SSH connection ID
 func (s *SessionService) GetSessionByConnID(sshConnID string) (*models.Session, error) {
 	var session models.Session
-	if err := database.DB.Where("ssh_conn_id = ?", sshConnID).First(&session).Error; err != nil {
+	if err := s.db.Where("ssh_conn_id = ?", sshConnID).First(&session).Error; err != nil {
 		return nil, err
 	}
 	return &session, nil
@@ -50,7 +52,7 @@ func (s *SessionService) GetSessionByConnID(sshConnID string) (*models.Session, 
 
 // UpdateSessionServerPath updates the current server path for a session
 func (s *SessionService) UpdateSessionServerPath(sessionID uuid.UUID, serverPath string) error {
-	return database.DB.Model(&models.Session{}).Where("id = ?", sessionID).Update("current_server_path", serverPath).Error
+	return s.db.Model(&models.Session{}).Where("id = ?", sessionID).Update("current_server_path", serverPath).Error
 }
 
 // GetSessionHierarchy returns the full session hierarchy (parent sessions)
@@ -60,7 +62,7 @@ func (s *SessionService) GetSessionHierarchy(sessionID uuid.UUID) ([]*models.Ses
 
 	for currentSessionID != uuid.Nil {
 		var session models.Session
-		if err := database.DB.Where("id = ?", currentSessionID).First(&session).Error; err != nil {
+		if err := s.db.Where("id = ?", currentSessionID).First(&session).Error; err != nil {
 			break
 		}
 		sessions = append([]*models.Session{&session}, sessions...)

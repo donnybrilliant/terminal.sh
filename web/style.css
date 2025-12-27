@@ -1,0 +1,68 @@
+/* 
+ * Terminal.sh - xterm.js styling
+ * Optimized for Bubble Tea full-screen rendering
+ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #000000;
+}
+
+#terminal-container {
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
+}
+
+/* xterm.js container */
+.xterm {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* The viewport is where the terminal content lives */
+.xterm-viewport {
+    background-color: #000000 !important;
+    /* Disable xterm scrolling - Bubble Tea handles its own scrolling */
+    overflow: hidden !important;
+}
+
+/* Hide the scrollbar completely */
+.xterm-viewport::-webkit-scrollbar {
+    display: none;
+}
+
+.xterm-screen {
+    /* Ensure screen takes full size */
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Hide xterm.js cursor - Bubble Tea manages its own cursor */
+.xterm-cursor-layer {
+    display: none !important;
+}
+
+.xterm-cursor {
+    display: none !important;
+}
+
+/* Remove any default textarea styling for the helper input */
+.xterm-helper-textarea {
+    opacity: 0 !important;
+}

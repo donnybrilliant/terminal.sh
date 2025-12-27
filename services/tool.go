@@ -1,8 +1,9 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
-
+	"os"
 	"terminal-sh/database"
 	"terminal-sh/models"
 
@@ -12,13 +13,15 @@ import (
 
 // ToolService handles tool-related operations
 type ToolService struct {
+	db            *database.Database
 	serverService *ServerService
 	patchService  *PatchService // Will be set after patch service is created
 }
 
 // NewToolService creates a new tool service
-func NewToolService(serverService *ServerService) *ToolService {
+func NewToolService(db *database.Database, serverService *ServerService) *ToolService {
 	return &ToolService{
+		db:            db,
 		serverService: serverService,
 	}
 }
@@ -31,7 +34,7 @@ func (s *ToolService) SetPatchService(patchService *PatchService) {
 // GetToolByName retrieves a tool by name
 func (s *ToolService) GetToolByName(name string) (*models.Tool, error) {
 	var tool models.Tool
-	if err := database.DB.Where("name = ?", name).First(&tool).Error; err != nil {
+	if err := s.db.Where("name = ?", name).First(&tool).Error; err != nil {
 		return nil, err
 	}
 	return &tool, nil
@@ -40,7 +43,7 @@ func (s *ToolService) GetToolByName(name string) (*models.Tool, error) {
 // GetAllTools retrieves all tools
 func (s *ToolService) GetAllTools() ([]models.Tool, error) {
 	var tools []models.Tool
-	if err := database.DB.Find(&tools).Error; err != nil {
+	if err := s.db.Find(&tools).Error; err != nil {
 		return nil, err
 	}
 	return tools, nil
@@ -49,7 +52,7 @@ func (s *ToolService) GetAllTools() ([]models.Tool, error) {
 // GetUserTools retrieves all tools owned by a user (base tool definitions)
 func (s *ToolService) GetUserTools(userID uuid.UUID) ([]models.Tool, error) {
 	var user models.User
-	if err := database.DB.Preload("Tools").First(&user, "id = ?", userID).Error; err != nil {
+	if err := s.db.Preload("Tools").First(&user, "id = ?", userID).Error; err != nil {
 		return nil, err
 	}
 	return user.Tools, nil
@@ -65,7 +68,7 @@ func (s *ToolService) GetUserToolState(userID uuid.UUID, toolName string) (*mode
 
 	// Get user's tool state
 	var toolState models.UserToolState
-	if err := database.DB.Where("user_id = ? AND tool_id = ?", userID, tool.ID).First(&toolState).Error; err != nil {
+	if err := s.db.Where("user_id = ? AND tool_id = ?", userID, tool.ID).First(&toolState).Error; err != nil {
 		return nil, fmt.Errorf("tool state not found: %w", err)
 	}
 
@@ -89,7 +92,7 @@ func (s *ToolService) GetEffectiveTool(userID uuid.UUID, toolName string) (*mode
 
 	// Fallback to base tool if no patches applied
 	var baseTool models.Tool
-	if err := database.DB.First(&baseTool, "id = ?", toolState.ToolID).Error; err != nil {
+	if err := s.db.First(&baseTool, "id = ?", toolState.ToolID).Error; err != nil {
 		return nil, err
 	}
 
@@ -100,13 +103,13 @@ func (s *ToolService) GetEffectiveTool(userID uuid.UUID, toolName string) (*mode
 func (s *ToolService) CreateUserToolState(userID uuid.UUID, toolID uuid.UUID) (*models.UserToolState, error) {
 	// Check if tool state already exists
 	var existing models.UserToolState
-	if err := database.DB.Where("user_id = ? AND tool_id = ?", userID, toolID).First(&existing).Error; err == nil {
+	if err := s.db.Where("user_id = ? AND tool_id = ?", userID, toolID).First(&existing).Error; err == nil {
 		return &existing, nil
 	}
 
 	// Get base tool
 	var baseTool models.Tool
-	if err := database.DB.First(&baseTool, "id = ?", toolID).Error; err != nil {
+	if err := s.db.First(&baseTool, "id = ?", toolID).Error; err != nil {
 		return nil, fmt.Errorf("tool not found: %w", err)
 	}
 
@@ -120,7 +123,7 @@ func (s *ToolService) CreateUserToolState(userID uuid.UUID, toolID uuid.UUID) (*
 		Version:           1,
 	}
 
-	if err := database.DB.Create(toolState).Error; err != nil {
+	if err := s.db.Create(toolState).Error; err != nil {
 		return nil, fmt.Errorf("failed to create tool state: %w", err)
 	}
 
@@ -160,14 +163,14 @@ func (s *ToolService) DownloadTool(userID uuid.UUID, serverIP, toolName string) 
 		return fmt.Errorf("tool already owned")
 	}
 
-	// Add tool to user (many-to-many relationship for backward compatibility)
+	// Add tool to user (many-to-many relationship)
 	var user models.User
-	if err := database.DB.First(&user, "id = ?", userID).Error; err != nil {
+	if err := s.db.First(&user, "id = ?", userID).Error; err != nil {
 		return fmt.Errorf("user not found: %w", err)
 	}
 
 	// Add tool to user's tools list
-	if err := database.DB.Model(&user).Association("Tools").Append(tool); err != nil {
+	if err := s.db.Model(&user).Association("Tools").Append(tool); err != nil {
 		return fmt.Errorf("failed to add tool: %w", err)
 	}
 
@@ -180,206 +183,36 @@ func (s *ToolService) DownloadTool(userID uuid.UUID, serverIP, toolName string) 
 	return nil
 }
 
-// applyPatch is deprecated - use PatchService.ApplyPatch instead
-// This method is kept for backward compatibility but should not be used
-func (s *ToolService) applyPatch(user *models.User, patch *models.Tool) error {
-	// This old method is deprecated - patches should be applied via PatchService
-	// which properly updates UserToolState
-	return fmt.Errorf("deprecated: use PatchService.ApplyPatch instead")
-}
-
 // UserHasTool checks if a user has a specific tool (checks UserToolState)
 func (s *ToolService) UserHasTool(userID uuid.UUID, toolName string) bool {
 	_, err := s.GetUserToolState(userID, toolName)
 	return err == nil
 }
 
-// SeedTools seeds the database with default tools
+// SeedTools seeds the database with default tools from JSON file
 func (s *ToolService) SeedTools() error {
-	tools := []models.Tool{
-		{
-			Name:     "password_cracker",
-			Function: "Basic password cracking",
-			Resources: models.ToolResources{
-				CPU:      20,
-				Bandwidth: 0.3,
-				RAM:      8,
-			},
-			Exploits: []models.Exploit{
-				{Type: "password_cracking", Level: 10},
-			},
-			Services: "ssh",
-		},
-		{
-			Name:     "pass_patch",
-			Function: "Upgrade for password_cracker",
-			Resources: models.ToolResources{
-				CPU:      0,
-				Bandwidth: 0,
-				RAM:      0,
-			},
-			Exploits: []models.Exploit{
-				{Type: "password_cracking", Level: 20},
-			},
-			IsPatch: true,
-		},
-		{
-			Name:     "ssh_exploit",
-			Function: "Exploit SSH vulnerabilities",
-			Resources: models.ToolResources{
-				CPU:      25,
-				Bandwidth: 0.5,
-				RAM:      10,
-			},
-			Exploits: []models.Exploit{
-				{Type: "remote_code_execution", Level: 20},
-			},
-			Services: "ssh",
-		},
-		{
-			Name:     "ssh_patch",
-			Function: "Upgrade for ssh_exploit",
-			Resources: models.ToolResources{
-				CPU:      0,
-				Bandwidth: 0,
-				RAM:      0,
-			},
-			Exploits: []models.Exploit{
-				{Type: "remote_code_execution", Level: 30},
-			},
-			IsPatch: true,
-		},
-		{
-			Name:     "crypto_miner",
-			Function: "Mine cryptocurrency (passive income)",
-			Resources: models.ToolResources{
-				CPU:      50,
-				Bandwidth: 1.0,
-				RAM:      16,
-			},
-			Special: "Generates passive income over time.",
-		},
-		{
-			Name:     "user_enum",
-			Function: "Enumerate users and roles",
-			Resources: models.ToolResources{
-				CPU:      15,
-				Bandwidth: 0.2,
-				RAM:      4,
-			},
-		},
-		{
-			Name:     "lan_sniffer",
-			Function: "Discover local network connections",
-			Resources: models.ToolResources{
-				CPU:      18,
-				Bandwidth: 0.4,
-				RAM:      6,
-			},
-		},
-		{
-			Name:     "rootkit",
-			Function: "Install hidden backdoor access",
-			Resources: models.ToolResources{
-				CPU:      30,
-				Bandwidth: 0.6,
-				RAM:      12,
-			},
-		},
-		{
-			Name:     "exploit_kit",
-			Function: "Multi-vulnerability exploitation",
-			Resources: models.ToolResources{
-				CPU:      40,
-				Bandwidth: 0.8,
-				RAM:      14,
-			},
-			Exploits: []models.Exploit{
-				{Type: "remote_code_execution", Level: 15},
-				{Type: "sql_injection", Level: 15},
-				{Type: "xss", Level: 10},
-			},
-		},
-		{
-			Name:     "password_sniffer",
-			Function: "Sniff and crack passwords from user roles",
-			Resources: models.ToolResources{
-				CPU:      22,
-				Bandwidth: 0.4,
-				RAM:      9,
-			},
-			Exploits: []models.Exploit{
-				{Type: "password_cracking", Level: 15},
-			},
-		},
-		{
-			Name:     "advanced_exploit_kit",
-			Function: "Advanced multi-vulnerability exploitation",
-			Resources: models.ToolResources{
-				CPU:      60,
-				Bandwidth: 1.2,
-				RAM:      20,
-			},
-			Exploits: []models.Exploit{
-				{Type: "remote_code_execution", Level: 25},
-				{Type: "sql_injection", Level: 25},
-				{Type: "xss", Level: 20},
-				{Type: "buffer_overflow", Level: 20},
-			},
-		},
-		{
-			Name:     "sql_injector",
-			Function: "Perform SQL injection attacks",
-			Resources: models.ToolResources{
-				CPU:      28,
-				Bandwidth: 0.5,
-				RAM:      11,
-			},
-			Exploits: []models.Exploit{
-				{Type: "sql_injection", Level: 20},
-			},
-			Services: "http",
-		},
-		{
-			Name:     "xss_exploit",
-			Function: "Exploit XSS vulnerabilities",
-			Resources: models.ToolResources{
-				CPU:      20,
-				Bandwidth: 0.3,
-				RAM:      7,
-			},
-			Exploits: []models.Exploit{
-				{Type: "xss", Level: 15},
-			},
-			Services: "http",
-		},
-		{
-			Name:     "packet_capture",
-			Function: "Capture network packets",
-			Resources: models.ToolResources{
-				CPU:      16,
-				Bandwidth: 0.3,
-				RAM:      5,
-			},
-		},
-		{
-			Name:     "packet_decoder",
-			Function: "Decode captured packets",
-			Resources: models.ToolResources{
-				CPU:      12,
-				Bandwidth: 0.1,
-				RAM:      3,
-			},
-		},
+	// Load tools from JSON file
+	data, err := os.ReadFile("data/seed/tools.json")
+	if err != nil {
+		return fmt.Errorf("failed to read tools.json: %w", err)
 	}
+
+	var toolData struct {
+		Tools []models.Tool `json:"tools"`
+	}
+	if err := json.Unmarshal(data, &toolData); err != nil {
+		return fmt.Errorf("failed to parse tools.json: %w", err)
+	}
+
+	tools := toolData.Tools
 
 	for _, tool := range tools {
 		// Check if tool already exists
 		var existing models.Tool
-		err := database.DB.Where("name = ?", tool.Name).First(&existing).Error
+		err := s.db.Where("name = ?", tool.Name).First(&existing).Error
 		if err != nil && err == gorm.ErrRecordNotFound {
 			// Tool doesn't exist, create it
-			if err := database.DB.Create(&tool).Error; err != nil {
+			if err := s.db.Create(&tool).Error; err != nil {
 				return fmt.Errorf("failed to seed tool %s: %w", tool.Name, err)
 			}
 		} else if err != nil {

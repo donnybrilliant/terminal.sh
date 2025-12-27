@@ -12,12 +12,14 @@ import (
 
 // ShopService handles shop-related operations
 type ShopService struct {
+	db            *database.Database
 	serverService *ServerService
 }
 
 // NewShopService creates a new shop service
-func NewShopService(serverService *ServerService) *ShopService {
+func NewShopService(db *database.Database, serverService *ServerService) *ShopService {
 	return &ShopService{
+		db:            db,
 		serverService: serverService,
 	}
 }
@@ -25,7 +27,7 @@ func NewShopService(serverService *ServerService) *ShopService {
 // GetShopByServerIP retrieves a shop by server IP
 func (s *ShopService) GetShopByServerIP(serverIP string) (*models.Shop, error) {
 	var shop models.Shop
-	if err := database.DB.Where("server_ip = ?", serverIP).Preload("Items").First(&shop).Error; err != nil {
+	if err := s.db.Where("server_ip = ?", serverIP).Preload("Items").First(&shop).Error; err != nil {
 		return nil, err
 	}
 	return &shop, nil
@@ -34,7 +36,7 @@ func (s *ShopService) GetShopByServerIP(serverIP string) (*models.Shop, error) {
 // GetAllShops retrieves all shops
 func (s *ShopService) GetAllShops() ([]models.Shop, error) {
 	var shops []models.Shop
-	if err := database.DB.Preload("Items").Find(&shops).Error; err != nil {
+	if err := s.db.Preload("Items").Find(&shops).Error; err != nil {
 		return nil, err
 	}
 	return shops, nil
@@ -43,7 +45,7 @@ func (s *ShopService) GetAllShops() ([]models.Shop, error) {
 // GetShopItems retrieves all items for a shop
 func (s *ShopService) GetShopItems(shopID uuid.UUID) ([]models.ShopItem, error) {
 	var items []models.ShopItem
-	if err := database.DB.Where("shop_id = ?", shopID).Find(&items).Error; err != nil {
+	if err := s.db.Where("shop_id = ?", shopID).Find(&items).Error; err != nil {
 		return nil, err
 	}
 	return items, nil
@@ -53,7 +55,7 @@ func (s *ShopService) GetShopItems(shopID uuid.UUID) ([]models.ShopItem, error) 
 func (s *ShopService) PurchaseItem(userID uuid.UUID, shopID uuid.UUID, itemID uuid.UUID) error {
 	// Get shop item
 	var item models.ShopItem
-	if err := database.DB.Where("id = ? AND shop_id = ?", itemID, shopID).First(&item).Error; err != nil {
+	if err := s.db.Where("id = ? AND shop_id = ?", itemID, shopID).First(&item).Error; err != nil {
 		return fmt.Errorf("item not found in shop")
 	}
 
@@ -64,7 +66,7 @@ func (s *ShopService) PurchaseItem(userID uuid.UUID, shopID uuid.UUID, itemID uu
 
 	// Get user
 	var user models.User
-	if err := database.DB.First(&user, "id = ?", userID).Error; err != nil {
+	if err := s.db.First(&user, "id = ?", userID).Error; err != nil {
 		return fmt.Errorf("user not found")
 	}
 
@@ -79,14 +81,14 @@ func (s *ShopService) PurchaseItem(userID uuid.UUID, shopID uuid.UUID, itemID uu
 	// Deduct currency
 	user.Wallet.Crypto -= item.PriceCrypto
 	user.Wallet.Data -= item.PriceData
-	if err := database.DB.Save(&user).Error; err != nil {
+	if err := s.db.Save(&user).Error; err != nil {
 		return fmt.Errorf("failed to update wallet: %w", err)
 	}
 
 	// Reduce stock if not unlimited
 	if item.Stock > 0 {
 		item.Stock--
-		if err := database.DB.Save(&item).Error; err != nil {
+		if err := s.db.Save(&item).Error; err != nil {
 			return fmt.Errorf("failed to update stock: %w", err)
 		}
 	}
@@ -101,7 +103,7 @@ func (s *ShopService) PurchaseItem(userID uuid.UUID, shopID uuid.UUID, itemID uu
 		PriceCrypto: item.PriceCrypto,
 		PriceData:   item.PriceData,
 	}
-	if err := database.DB.Create(purchase).Error; err != nil {
+	if err := s.db.Create(purchase).Error; err != nil {
 		return fmt.Errorf("failed to record purchase: %w", err)
 	}
 
@@ -140,7 +142,7 @@ func (s *ShopService) applyResourceUpgrade(user *models.User, upgradeName string
 	user.Resources.Bandwidth += upgrade.Bandwidth
 	user.Resources.RAM += upgrade.RAM
 
-	if err := database.DB.Save(user).Error; err != nil {
+	if err := s.db.Save(user).Error; err != nil {
 		return fmt.Errorf("failed to apply resource upgrade: %w", err)
 	}
 
@@ -151,7 +153,7 @@ func (s *ShopService) applyResourceUpgrade(user *models.User, upgradeName string
 func (s *ShopService) CreateShop(serverIP string, shopType models.ShopType, name, description string) (*models.Shop, error) {
 	// Check if shop already exists
 	var existing models.Shop
-	if err := database.DB.Where("server_ip = ?", serverIP).First(&existing).Error; err == nil {
+	if err := s.db.Where("server_ip = ?", serverIP).First(&existing).Error; err == nil {
 		return &existing, nil
 	} else if err != gorm.ErrRecordNotFound {
 		return nil, err
@@ -164,7 +166,7 @@ func (s *ShopService) CreateShop(serverIP string, shopType models.ShopType, name
 		Description: description,
 	}
 
-	if err := database.DB.Create(shop).Error; err != nil {
+	if err := s.db.Create(shop).Error; err != nil {
 		return nil, fmt.Errorf("failed to create shop: %w", err)
 	}
 
@@ -183,7 +185,7 @@ func (s *ShopService) AddShopItem(shopID uuid.UUID, itemType models.ItemType, na
 		Stock:        stock,
 	}
 
-	if err := database.DB.Create(item).Error; err != nil {
+	if err := s.db.Create(item).Error; err != nil {
 		return nil, fmt.Errorf("failed to create shop item: %w", err)
 	}
 

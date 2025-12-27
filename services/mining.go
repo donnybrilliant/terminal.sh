@@ -12,13 +12,15 @@ import (
 
 // MiningService handles mining operations
 type MiningService struct {
+	db            *database.Database
 	toolService   *ToolService
 	serverService *ServerService
 }
 
 // NewMiningService creates a new mining service
-func NewMiningService(toolService *ToolService, serverService *ServerService) *MiningService {
+func NewMiningService(db *database.Database, toolService *ToolService, serverService *ServerService) *MiningService {
 	return &MiningService{
+		db:            db,
 		toolService:   toolService,
 		serverService: serverService,
 	}
@@ -44,7 +46,7 @@ func (s *MiningService) StartMining(userID uuid.UUID, serverIP string) error {
 
 	// Check if already mining on this server
 	var existing models.ActiveMiner
-	if err := database.DB.Where("user_id = ? AND server_ip = ?", userID, serverIP).First(&existing).Error; err == nil {
+	if err := s.db.Where("user_id = ? AND server_ip = ?", userID, serverIP).First(&existing).Error; err == nil {
 		return fmt.Errorf("already mining on server %s", serverIP)
 	}
 
@@ -66,7 +68,7 @@ func (s *MiningService) StartMining(userID uuid.UUID, serverIP string) error {
 		ResourceUsage: resourceUsage,
 	}
 
-	if err := database.DB.Create(miner).Error; err != nil {
+	if err := s.db.Create(miner).Error; err != nil {
 		return fmt.Errorf("failed to start mining: %w", err)
 	}
 
@@ -75,7 +77,7 @@ func (s *MiningService) StartMining(userID uuid.UUID, serverIP string) error {
 
 // StopMining stops a mining operation
 func (s *MiningService) StopMining(userID uuid.UUID, serverIP string) error {
-	result := database.DB.Where("user_id = ? AND server_ip = ?", userID, serverIP).Delete(&models.ActiveMiner{})
+	result := s.db.Where("user_id = ? AND server_ip = ?", userID, serverIP).Delete(&models.ActiveMiner{})
 	if result.Error != nil {
 		return fmt.Errorf("failed to stop mining: %w", result.Error)
 	}
@@ -88,7 +90,7 @@ func (s *MiningService) StopMining(userID uuid.UUID, serverIP string) error {
 // GetActiveMiners retrieves all active miners for a user
 func (s *MiningService) GetActiveMiners(userID uuid.UUID) ([]models.ActiveMiner, error) {
 	var miners []models.ActiveMiner
-	if err := database.DB.Where("user_id = ?", userID).Find(&miners).Error; err != nil {
+	if err := s.db.Where("user_id = ?", userID).Find(&miners).Error; err != nil {
 		return nil, err
 	}
 	return miners, nil
@@ -109,7 +111,7 @@ func (s *MiningService) CalculateMiningReward(miner *models.ActiveMiner) float64
 // ProcessMiningRewards processes rewards for all active miners (called periodically)
 func (s *MiningService) ProcessMiningRewards() error {
 	var miners []models.ActiveMiner
-	if err := database.DB.Find(&miners).Error; err != nil {
+	if err := s.db.Find(&miners).Error; err != nil {
 		return err
 	}
 
@@ -118,18 +120,18 @@ func (s *MiningService) ProcessMiningRewards() error {
 		
 		// Update user's wallet
 		var user models.User
-		if err := database.DB.First(&user, "id = ?", miner.UserID).Error; err != nil {
+		if err := s.db.First(&user, "id = ?", miner.UserID).Error; err != nil {
 			continue
 		}
 
 		user.Wallet.Crypto += reward
-		if err := database.DB.Save(&user).Error; err != nil {
+		if err := s.db.Save(&user).Error; err != nil {
 			continue
 		}
 
 		// Reset start time for next period
 		miner.StartTime = time.Now()
-		if err := database.DB.Save(&miner).Error; err != nil {
+		if err := s.db.Save(&miner).Error; err != nil {
 			continue
 		}
 	}
