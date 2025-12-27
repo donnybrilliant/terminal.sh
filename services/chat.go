@@ -17,7 +17,7 @@ type ChatService struct {
 	db             *database.Database
 	rooms          map[uuid.UUID]*models.ChatRoom
 	activeSessions map[uuid.UUID]chan models.ChatMessage
-	sessionUsers   map[uuid.UUID]uuid.UUID // sessionID -> userID
+	sessionUsers   map[uuid.UUID]uuid.UUID          // sessionID -> userID
 	roomMembers    map[uuid.UUID]map[uuid.UUID]bool // roomID -> userID -> bool
 	mu             sync.RWMutex
 }
@@ -410,8 +410,8 @@ func (s *ChatService) GetRecentMessages(roomID uuid.UUID, limit int) ([]models.C
 	return messages, nil
 }
 
-// GetRoomMembers returns all user IDs in a room
-func (s *ChatService) GetRoomMembers(roomID uuid.UUID) ([]uuid.UUID, error) {
+// GetRoomMembers returns all users in a room with their usernames
+func (s *ChatService) GetRoomMembers(roomID uuid.UUID) ([]models.User, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -425,6 +425,13 @@ func (s *ChatService) GetRoomMembers(roomID uuid.UUID) ([]uuid.UUID, error) {
 		userIDs = append(userIDs, member.UserID)
 	}
 
-	return userIDs, nil
-}
+	// Look up usernames
+	var users []models.User
+	if len(userIDs) > 0 {
+		if err := s.db.Where("id IN ?", userIDs).Find(&users).Error; err != nil {
+			return nil, fmt.Errorf("failed to get users: %w", err)
+		}
+	}
 
+	return users, nil
+}

@@ -362,6 +362,85 @@ func (m *ChatModel) handleCommand(input string) tea.Cmd {
 		return func() tea.Msg {
 			return chatExitMsg{}
 		}
+
+	case "/help":
+		// Show help - add as a system message to current room
+		helpText := `Chat Commands:
+  /join <room> [password] - Join or create a room
+  /leave <room>           - Leave a room
+  /rooms                  - List your current rooms
+  /who                    - List users in current room
+  /exit or /quit          - Exit chat mode
+  
+Navigation:
+  ←/→ or Tab              - Switch between rooms
+  ↑/↓                     - Scroll message history
+  1-9                     - Jump to room by number
+  Esc or Ctrl+C           - Exit chat mode`
+
+		// Add help as a fake message in current room
+		if m.activeRoomID != uuid.Nil {
+			helpMsg := models.ChatMessage{
+				ID:        uuid.New(),
+				RoomID:    m.activeRoomID,
+				Username:  "system",
+				Content:   helpText,
+				CreatedAt: time.Now(),
+			}
+			m.roomMessages[m.activeRoomID] = append(m.roomMessages[m.activeRoomID], helpMsg)
+			m.updateViewportContent(m.activeRoomID)
+		}
+
+	case "/rooms":
+		// List rooms user is in
+		var roomList strings.Builder
+		roomList.WriteString("Your rooms: ")
+		for i, room := range m.rooms {
+			if i > 0 {
+				roomList.WriteString(", ")
+			}
+			roomList.WriteString(room.Name)
+		}
+
+		if m.activeRoomID != uuid.Nil {
+			sysMsg := models.ChatMessage{
+				ID:        uuid.New(),
+				RoomID:    m.activeRoomID,
+				Username:  "system",
+				Content:   roomList.String(),
+				CreatedAt: time.Now(),
+			}
+			m.roomMessages[m.activeRoomID] = append(m.roomMessages[m.activeRoomID], sysMsg)
+			m.updateViewportContent(m.activeRoomID)
+		}
+
+	case "/who":
+		// List users in current room
+		if m.activeRoomID != uuid.Nil {
+			members, err := m.chatService.GetRoomMembers(m.activeRoomID)
+			var content string
+			if err != nil {
+				content = "Error getting room members"
+			} else if len(members) == 0 {
+				content = "No users in this room"
+			} else {
+				var names []string
+				for _, member := range members {
+					names = append(names, member.Username)
+				}
+				content = "Users in room: " + strings.Join(names, ", ")
+			}
+
+			sysMsg := models.ChatMessage{
+				ID:        uuid.New(),
+				RoomID:    m.activeRoomID,
+				Username:  "system",
+				Content:   content,
+				CreatedAt: time.Now(),
+			}
+			m.roomMessages[m.activeRoomID] = append(m.roomMessages[m.activeRoomID], sysMsg)
+			m.updateViewportContent(m.activeRoomID)
+		}
 	}
 
 	return nil
@@ -431,4 +510,24 @@ func (m *ChatModel) View() string {
 // Close cleans up the chat model
 func (m *ChatModel) Close() {
 	m.chatService.UnregisterSession(m.sessionID)
+}
+
+// StartMessageLoop starts the message listener and forwards messages to the given channel
+// This is used by the WebSocket bridge since it can't run Init() commands properly
+func (m *ChatModel) StartMessageLoop(bridgeChan chan tea.Msg) {
+	go func() {
+		for {
+			msg, ok := <-m.msgChan
+			if !ok {
+				return // Channel closed
+			}
+			// Forward to bridge channel as ChatMessageMsg
+			select {
+			case bridgeChan <- ChatMessageMsg{Message: msg}:
+			default:
+				// Bridge channel full or closed, stop listening
+				return
+			}
+		}
+	}()
 }

@@ -312,6 +312,7 @@ func (b *BubbleTeaBridge) processMessages() {
 	}
 	b.lastView = currentView
 	wasLogin := true
+	wasChat := false
 
 	for {
 		select {
@@ -369,9 +370,18 @@ func (b *BubbleTeaBridge) processMessages() {
 			if isChat {
 				b.renderMode = RenderModeFullScreen // Chat uses full screen rendering
 				b.lastView = ""                     // Force full redraw to avoid appended output
+
+				// If just entered chat mode, start the message loop
+				if !wasChat {
+					chatModel := b.getChatModel()
+					if chatModel != nil {
+						chatModel.StartMessageLoop(b.msgChan)
+					}
+				}
 			}
 
 			wasLogin = isLogin
+			wasChat = isChat
 
 			// Render based on mode
 			if b.renderMode == RenderModeFullScreen {
