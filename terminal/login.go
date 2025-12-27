@@ -26,6 +26,7 @@ type LoginModel struct {
 	db            *database.Database
 	form          *huh.Form
 	userService   *services.UserService
+	chatService   *services.ChatService
 	username      string
 	password      string
 	prefillUser   string // Username from SSH connection
@@ -39,10 +40,11 @@ type LoginModel struct {
 }
 
 // NewLoginModel creates a new login model
-func NewLoginModel(db *database.Database, userService *services.UserService, prefillUsername, prefillPassword string) *LoginModel {
+func NewLoginModel(db *database.Database, userService *services.UserService, chatService *services.ChatService, prefillUsername, prefillPassword string) *LoginModel {
 	model := &LoginModel{
 		db:          db,
 		userService: userService,
+		chatService: chatService,
 		username:    prefillUsername,
 		password:    prefillPassword,
 		prefillUser: prefillUsername,
@@ -145,7 +147,7 @@ func (m *LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = nil // Clear any previous errors
 		// Store user in context for shell to use
 		// Transition to shell model with current window size
-		shellModel := NewShellModelWithSize(m.db, m.userService, msg.User, m.width, m.height)
+		shellModel := NewShellModelWithSize(m.db, m.userService, msg.User, m.width, m.height, m.chatService)
 		return shellModel, shellModel.Init()
 
 	case LoginErrorMsg:

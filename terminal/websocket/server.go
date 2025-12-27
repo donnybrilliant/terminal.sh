@@ -30,7 +30,7 @@ type WebSocketSession struct {
 }
 
 // HandleWebSocket handles WebSocket upgrade and manages the session
-func HandleWebSocket(w http.ResponseWriter, r *http.Request, db *database.Database, userService *services.UserService) error {
+func HandleWebSocket(w http.ResponseWriter, r *http.Request, db *database.Database, userService *services.UserService, chatService *services.ChatService) error {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return err
@@ -42,7 +42,7 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request, db *database.Databa
 	height := 24
 
 	// Create Bubble Tea bridge
-	bridge, err := NewBubbleTeaBridge(conn, db, userService, width, height)
+	bridge, err := NewBubbleTeaBridge(conn, db, userService, chatService, width, height)
 	if err != nil {
 		return err
 	}

@@ -36,13 +36,14 @@ type CommandHandler struct {
 	shopDiscovery  *services.ShopDiscovery
 	patchService   *services.PatchService
 	progressService *services.ProgressService
+	chatService    *services.ChatService
 	currentServerPath string // Current server path if in SSH mode
 	sessionID       *uuid.UUID // Current session ID
 	onSSHConnect    func(serverPath string) error // Callback for SSH connection
 	onSSHDisconnect func() error // Callback for SSH disconnection
 }
 
-func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.User, userService *services.UserService) *CommandHandler {
+func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.User, userService *services.UserService, chatService *services.ChatService) *CommandHandler {
 	serverService := services.NewServerService(db)
 	toolService := services.NewToolService(db, serverService)
 	patchService := services.NewPatchService(db, toolService)
@@ -73,6 +74,7 @@ func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.
 		shopDiscovery: shopDiscovery,
 		patchService:  patchService,
 		progressService: progressService,
+		chatService:   chatService,
 	}
 }
 
@@ -146,6 +148,8 @@ func (h *CommandHandler) Execute(command string) *CommandResult {
 		return h.handleCLEAR()
 	case "help":
 		return h.handleHELP()
+	case "chat":
+		return h.handleChat(args)
 	case "tutorial":
 		return h.handleTUTORIAL(args)
 	case "login":

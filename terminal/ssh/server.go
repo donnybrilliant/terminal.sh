@@ -32,7 +32,7 @@ var (
 
 // StartServer starts the SSH server using Wish framework
 // No SSH authentication - everyone connects and sees the Bubble Tea login form
-func StartServer(cfg *config.Config, db *database.Database) error {
+func StartServer(cfg *config.Config, db *database.Database, chatService *services.ChatService) error {
 	userService := services.NewUserService(db, cfg.JWTSecret)
 
 	// Use default host key path if not provided
@@ -64,7 +64,7 @@ func StartServer(cfg *config.Config, db *database.Database) error {
 				
 				// Create login model with prefilled username (no password from SSH)
 				// Everyone sees the login form - no SSH auth required
-				model := terminal.NewLoginModel(db, userService, username, "")
+				model := terminal.NewLoginModel(db, userService, chatService, username, "")
 				
 				// After login, transition to shell
 				return model, []tea.ProgramOption{tea.WithAltScreen()}

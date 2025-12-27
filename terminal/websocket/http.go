@@ -22,7 +22,7 @@ var (
 )
 
 // StartHTTPServer starts the HTTP server for serving static files and WebSocket connections
-func StartHTTPServer(cfg *config.Config, db *database.Database) error {
+func StartHTTPServer(cfg *config.Config, db *database.Database, chatService *services.ChatService) error {
 	userService := services.NewUserService(db, cfg.JWTSecret)
 
 	// Determine web directory path (relative to working directory)
@@ -45,7 +45,7 @@ func StartHTTPServer(cfg *config.Config, db *database.Database) error {
 
 	// WebSocket endpoint
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		if err := HandleWebSocket(w, r, db, userService); err != nil {
+		if err := HandleWebSocket(w, r, db, userService, chatService); err != nil {
 			log.Printf("WebSocket error: %v", err)
 		}
 	})

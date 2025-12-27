@@ -121,12 +121,39 @@ function connectWebSocket() {
 }
 
 // Handle keyboard input
+// Send printable characters via onData; keep onKey for control/navigation
+term.onData((data) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!data) return;
+    // Only send printable ASCII characters (avoid control sequences)
+    // This prevents double-sending special keys handled in onKey
+    if (data.length === 1) {
+        const code = data.charCodeAt(0);
+        if (code >= 32 && code <= 126) {
+            ws.send(JSON.stringify({
+                type: 'input',
+                key: data,
+                char: data,
+                modifiers: []
+            }));
+        }
+    }
+});
+
 term.onKey((event) => {
     const { key, domEvent } = event;
     
     // Prevent browser default for special keys
     if (domEvent.key === 'Tab') {
         domEvent.preventDefault();
+    }
+
+    // If this is a plain printable character without modifiers, let onData handle it
+    if (!domEvent.ctrlKey && !domEvent.altKey && !domEvent.metaKey && domEvent.key.length === 1) {
+        const code = domEvent.key.charCodeAt(0);
+        if (code >= 32 && code <= 126) {
+            return;
+        }
     }
     
     // Build modifiers array

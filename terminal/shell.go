@@ -2,16 +2,17 @@ package terminal
 
 import (
 	"fmt"
+	"strings"
 	"terminal-sh/cmd"
 	"terminal-sh/database"
 	"terminal-sh/filesystem"
 	"terminal-sh/models"
 	"terminal-sh/services"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbletea"
+	"github.com/google/uuid"
 )
 
 // ShellModel handles the interactive shell after login
@@ -20,6 +21,7 @@ type ShellModel struct {
 	user        *models.User
 	vfs         *filesystem.VFS
 	handler     *cmd.CommandHandler
+	chatService *services.ChatService
 	history     []struct {
 		command string
 		output  string
@@ -29,19 +31,20 @@ type ShellModel struct {
 	showWelcome    bool
 	width          int
 	height         int
-	commandHistory []string        // All executed commands for navigation
-	historyIndex   int             // Current position in history (-1 = new command)
-	editMode       bool            // Whether we're in edit mode
-	editFilename   string          // File being edited
-	shellStack     []ShellContext  // Stack for nested SSH sessions
-	
+	commandHistory []string       // All executed commands for navigation
+	historyIndex   int            // Current position in history (-1 = new command)
+	editMode       bool           // Whether we're in edit mode
+	editFilename   string         // File being edited
+	shellStack     []ShellContext // Stack for nested SSH sessions
+	sessionID      uuid.UUID      // Session ID for chat
+
 	// Incremental rendering state
-	pendingOutput     string // New output to append (command results)
-	pendingClear      bool   // Whether to clear screen
-	lastPromptLine    string // Last rendered prompt (for detecting changes)
-	initialRender     bool   // First render after transition from login
-	commandPending    bool   // True when waiting for command result (don't update prompt)
-	commandJustDone   bool   // True when command just finished (need to move to next line)
+	pendingOutput   string // New output to append (command results)
+	pendingClear    bool   // Whether to clear screen
+	lastPromptLine  string // Last rendered prompt (for detecting changes)
+	initialRender   bool   // First render after transition from login
+	commandPending  bool   // True when waiting for command result (don't update prompt)
+	commandJustDone bool   // True when command just finished (need to move to next line)
 }
 
 // ShellContext represents a shell session context
@@ -52,12 +55,12 @@ type ShellContext struct {
 }
 
 // NewShellModel creates a new shell model
-func NewShellModel(db *database.Database, userService *services.UserService, user interface{}) *ShellModel {
-	return NewShellModelWithSize(db, userService, user, 80, 24)
+func NewShellModel(db *database.Database, userService *services.UserService, user interface{}, chatService *services.ChatService) *ShellModel {
+	return NewShellModelWithSize(db, userService, user, 80, 24, chatService)
 }
 
 // NewShellModelWithSize creates a new shell model with specified window dimensions
-func NewShellModelWithSize(db *database.Database, userService *services.UserService, user interface{}, width, height int) *ShellModel {
+func NewShellModelWithSize(db *database.Database, userService *services.UserService, user interface{}, width, height int, chatService *services.ChatService) *ShellModel {
 	u, ok := user.(*models.User)
 	if !ok {
 		// Handle if user is not the right type
@@ -70,7 +73,7 @@ func NewShellModelWithSize(db *database.Database, userService *services.UserServ
 	}
 
 	vfs := filesystem.NewVFS(username)
-	handler := cmd.NewCommandHandler(db, vfs, u, userService)
+	handler := cmd.NewCommandHandler(db, vfs, u, userService, chatService)
 
 	// Sync user tools to VFS so they appear in help
 	if u != nil {
@@ -92,12 +95,16 @@ func NewShellModelWithSize(db *database.Database, userService *services.UserServ
 	ta.SetWidth(width)
 	ta.SetHeight(height - 2) // Reserve space for status line and prompt
 
+	// Generate session ID for chat
+	sessionID := uuid.New()
+
 	// Set up SSH callbacks for nested session handling
 	shellModel := &ShellModel{
 		userService: userService,
 		user:        u,
 		vfs:         vfs,
 		handler:     handler,
+		chatService: chatService,
 		history: make([]struct {
 			command string
 			output  string
@@ -111,6 +118,7 @@ func NewShellModelWithSize(db *database.Database, userService *services.UserServ
 		textInput:      ti,
 		textarea:       ta,
 		initialRender:  true,
+		sessionID:      sessionID,
 	}
 
 	// Set SSH callbacks
@@ -345,6 +353,20 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else if msg.Result.Output == "__QUIT__" {
 					// Quit the program
 					return m, tea.Quit
+				} else if msg.Result.Output == "__CHAT_MODE__" {
+					// Enter full-screen chat mode
+					if m.chatService != nil && m.user != nil {
+						chatModel := NewChatModel(m, m.chatService, m.user, m.sessionID, m.width, m.height, false)
+						return chatModel, chatModel.Init()
+					}
+					output = "Chat service not available\n"
+				} else if msg.Result.Output == "__CHAT_MODE_SPLIT__" {
+					// Enter split-screen chat mode
+					if m.chatService != nil && m.user != nil {
+						chatModel := NewChatModel(m, m.chatService, m.user, m.sessionID, m.width, m.height, true)
+						return chatModel, chatModel.Init()
+					}
+					output = "Chat service not available\n"
 				} else if strings.HasPrefix(msg.Result.Output, "__EDIT_MODE__") {
 					filename := strings.TrimPrefix(msg.Result.Output, "__EDIT_MODE__")
 					// Enter edit mode
@@ -371,11 +393,11 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			// Set output in history
 			m.history[lastIdx].output = output
-			
+
 			// Queue output as pending for incremental render
 			// Trim any trailing whitespace/newlines to avoid blank lines
 			m.pendingOutput = strings.TrimRight(output, "\n\r ")
-			
+
 			// Mark that command just finished (need to move to next line)
 			m.commandJustDone = true
 			m.commandPending = false
@@ -410,7 +432,7 @@ func (m *ShellModel) GetIncrementalOutput() (output string, isClear bool, prompt
 	if m.user != nil && m.user.Username != "" {
 		username = m.user.Username
 	}
-	
+
 	// Handle clear command
 	if m.pendingClear {
 		m.pendingClear = false
@@ -419,23 +441,23 @@ func (m *ShellModel) GetIncrementalOutput() (output string, isClear bool, prompt
 		// Clear screen, prompt at bottom (row = height)
 		return promptLine, true, false, m.height
 	}
-	
+
 	// Handle initial render (after login transition)
 	if m.initialRender {
 		m.initialRender = false
 		var sb strings.Builder
-		
+
 		promptLine := m.getPromptLine(username)
-		
+
 		if m.showWelcome {
 			welcome := AnimatedWelcome() + "\n" + WelcomeHelpText()
 			welcomeLinesList := strings.Split(welcome, "\n")
 			welcomeLines := len(welcomeLinesList)
-			
+
 			sb.WriteString(welcome)
 			sb.WriteString("\n")
 			sb.WriteString(promptLine)
-			
+
 			// Calculate start row to push content to bottom
 			// Total lines = welcomeLines + 1 (prompt)
 			totalLines := welcomeLines + 1
@@ -443,7 +465,7 @@ func (m *ShellModel) GetIncrementalOutput() (output string, isClear bool, prompt
 			if startRow < 1 {
 				startRow = 1
 			}
-			
+
 			m.lastPromptLine = promptLine
 			m.pendingOutput = ""
 			return sb.String(), false, false, startRow
@@ -454,13 +476,13 @@ func (m *ShellModel) GetIncrementalOutput() (output string, isClear bool, prompt
 			return promptLine, false, false, m.height
 		}
 	}
-	
+
 	// Handle command just finished (need to output result + new prompt on next line)
 	if m.commandJustDone {
 		m.commandJustDone = false
 		promptLine := m.getPromptLine(username)
 		m.lastPromptLine = promptLine
-		
+
 		// Build output: move to next line, then output (if any), then prompt
 		// Use \n prefix to signal bridge to move to next line first
 		if m.pendingOutput != "" {
@@ -473,12 +495,12 @@ func (m *ShellModel) GetIncrementalOutput() (output string, isClear bool, prompt
 			return "\n" + promptLine, false, false, 0
 		}
 	}
-	
+
 	// If command is pending (waiting for result), don't update prompt
 	if m.commandPending {
 		return "", false, false, 0
 	}
-	
+
 	// No pending output - check if prompt changed (user typing)
 	currentPrompt := m.getPromptLine(username)
 	if currentPrompt != m.lastPromptLine {
@@ -486,7 +508,7 @@ func (m *ShellModel) GetIncrementalOutput() (output string, isClear bool, prompt
 		// Return prompt with row=-1 to signal "update prompt in place at current scroll position"
 		return currentPrompt, false, true, -1
 	}
-	
+
 	// Nothing changed
 	return "", false, false, 0
 }
@@ -614,7 +636,7 @@ func (m *ShellModel) View() string {
 				output.WriteString("\n")
 			}
 		}
-		
+
 		// Output all content
 		for _, line := range contentLines {
 			output.WriteString(line)
@@ -708,7 +730,7 @@ func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
 	// Add exit message as pending output
 	m.pendingOutput = "Disconnected\n"
 	m.showWelcome = false
-	
+
 	// Clear input state
 	m.textInput.SetValue("")
 	m.commandPending = false
@@ -720,7 +742,7 @@ func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
 // handleEditModeInput handles input when in edit mode
 func (m *ShellModel) handleEditModeInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	
+
 	// Handle special keys for edit mode
 	switch msg.String() {
 	case "ctrl+s":

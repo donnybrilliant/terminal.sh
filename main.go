@@ -57,6 +57,15 @@ func main() {
 		fmt.Println("✓")
 	}
 
+	// Initialize chat service
+	fmt.Print("Initializing chat service... ")
+	chatService := services.NewChatService(db)
+	if err := chatService.InitializeDefaultRoom(); err != nil {
+		log.Printf("\n✗ Failed to initialize default room: %v", err)
+	} else {
+		fmt.Println("✓")
+	}
+
 	fmt.Println()
 	fmt.Printf("╔═══════════════════════════════════════╗\n")
 	fmt.Printf("║   Server ready on %s:%d        ║\n", cfg.Host, cfg.Port)
@@ -70,7 +79,7 @@ func main() {
 	// Start server in a goroutine
 	serverErr := make(chan error, 1)
 	go func() {
-		if err := ssh.StartServer(cfg, db); err != nil {
+		if err := ssh.StartServer(cfg, db, chatService); err != nil {
 			serverErr <- err
 		}
 	}()

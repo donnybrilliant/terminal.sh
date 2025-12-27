@@ -77,6 +77,16 @@ func main() {
 		fmt.Println()
 	}
 
+	// Initialize chat service
+	fmt.Print(successStyle.Render("✓") + " Initializing chat service...")
+	chatService := services.NewChatService(db)
+	if err := chatService.InitializeDefaultRoom(); err != nil {
+		fmt.Println(" " + errorStyle.Render("✗"))
+		log.Printf(errorStyle.Render("Failed to initialize default room: %v"), err)
+	} else {
+		fmt.Println()
+	}
+
 	fmt.Println()
 	readyBox := fmt.Sprintf("╔═══════════════════════════════════════╗\n║   Web Server ready on %s:%d        ║\n╚═══════════════════════════════════════╝", cfg.WebHost, cfg.WebPort)
 	fmt.Println(infoStyle.Render(readyBox))
@@ -89,7 +99,7 @@ func main() {
 	// Start server in a goroutine
 	serverErr := make(chan error, 1)
 	go func() {
-		if err := websocket.StartHTTPServer(cfg, db); err != nil {
+		if err := websocket.StartHTTPServer(cfg, db, chatService); err != nil {
 			serverErr <- err
 		}
 	}()
