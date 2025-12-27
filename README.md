@@ -349,42 +349,45 @@ Once in chat mode, you can use the following commands:
 
 #### Room Management
 
-- `/join <room>` - Join a room (creates it if it doesn't exist)
-  - Example: `/join #general`
-  - Example: `/join mygroup`
-- `/leave <room>` - Leave a room
-  - Example: `/leave #general`
 - `/create <room> [--private|--password <pass>]` - Create a new room
   - Example: `/create myroom` - Creates a public room
   - Example: `/create secret --private` - Creates a private (invite-only) room
   - Example: `/create locked --password secret123` - Creates a password-protected room
+- `/join <room> [password]` - Join an existing room
+  - Example: `/join #general`
+  - Example: `/join locked secret123` - Join with password
+- `/leave [room]` - Leave a room (current room if no argument)
+  - Example: `/leave #general`
+  - Example: `/leave` - Leave current room
 - `/rooms` - List all rooms you're currently in
-- `/who <room>` - List all users in a specific room
+- `/who` - List all users in current room
 
 #### Private Rooms
 
-- `/invite <user> <room>` - Invite a user to a private room
-  - Example: `/invite alice secret`
+- `/invite <user> [room]` - Invite a user to a room (current room if no argument)
+  - Example: `/invite alice` - Invite to current room
+  - Example: `/invite alice secret` - Invite to specific room
   - Note: You must be a member of the room to invite others
+  - The invited user receives a notification with instructions to join
 
 #### Navigation
 
 While in chat mode, you can navigate between rooms using:
 
 - **Arrow Keys** (←/→) - Switch between room tabs
-- **Tab Key** - Cycle through rooms
-- **Number Keys** (1-9) - Jump directly to a room by number
+- **↑/↓ Arrow Keys** - Navigate command history (like shell)
+- **Tab Key** - Autocomplete commands and room names
 - **Esc** or **Ctrl+C** - Exit chat mode
 
 ### Room Types
 
 #### Public Rooms
 
-Public rooms can be joined by anyone without restrictions:
+Public rooms can be joined by anyone. Create with `/create`, join with `/join`:
 
 ```bash
-/join #public
-/join #general
+/create #general           # Create a public room
+/join #general             # Join the room
 ```
 
 #### Private Rooms
@@ -392,8 +395,9 @@ Public rooms can be joined by anyone without restrictions:
 Private rooms require an invitation. Only the creator and invited members can join:
 
 ```bash
-/create secret --private
-/invite alice secret
+/create secret --private   # Create private room
+/invite alice              # Invite alice to current room
+# Alice receives: "bob invited you to secret. Use /join secret to enter."
 ```
 
 #### Password-Protected Rooms
@@ -401,8 +405,8 @@ Private rooms require an invitation. Only the creator and invited members can jo
 Password-protected rooms require a password to join:
 
 ```bash
-/create locked --password mypassword
-/join locked mypassword
+/create locked --password mypassword   # Create with password
+/join locked mypassword                # Join with password
 ```
 
 ### Usage Examples
@@ -417,8 +421,8 @@ chat
 # Just type your message and press Enter
 Hello everyone!
 
-# Join another room
-/join #general
+# Create and join another room
+/create #general
 Hello #general!
 
 # Switch back to #public using arrow keys or tab
@@ -432,9 +436,9 @@ How's everyone doing?
 # Create a private room for your team
 /create team-alpha --private
 
-# Invite team members
-/invite bob team-alpha
-/invite charlie team-alpha
+# Invite team members (they'll receive notifications)
+/invite bob
+/invite charlie
 
 # Create a password-protected room
 /create secret-meeting --password secure123
@@ -446,13 +450,14 @@ How's everyone doing?
 #### Multi-Room Chatting
 
 ```bash
-# Join multiple rooms
+# Create or join multiple rooms
+/create #general
 /join #public
-/join #general
 /join team-alpha
 
 # Use arrow keys or tab to switch between rooms
 # Each room maintains its own message history and scroll position
+# Use up/down arrows to scroll through message history
 ```
 
 ### Message Format
@@ -467,10 +472,12 @@ Messages are displayed in IRC-style format:
 
 ### Tips
 
-- **Tab Navigation**: Use tabs to quickly switch between rooms you're active in
-- **Message History**: Each room keeps the last 100 messages, so you can scroll up to see recent conversation
+- **Navigation**: Use arrow keys (←/→) or Tab to switch rooms
+- **Command History**: Use ↑/↓ to cycle through previous commands (like a regular shell)
+- **Message History**: Each room keeps the last 100 messages
 - **Cross-Interface**: Users on SSH can chat with users on WebSocket - they share the same chat system
 - **Room Names**: Room names can start with `#` (like `#public`) or be plain names (like `mygroup`)
+- **Invitations**: When invited, you'll receive a notification with the room name and join command
 - **Exiting Chat**: Press `Esc` or `Ctrl+C` to exit chat mode and return to the shell
 
 ### Technical Details

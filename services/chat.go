@@ -249,6 +249,80 @@ func (s *ChatService) LeaveRoom(roomID, userID uuid.UUID) error {
 	return nil
 }
 
+// InviteUser invites a user to a private room (bypasses password/private checks)
+func (s *ChatService) InviteUser(roomID, inviterID, inviteeID uuid.UUID, inviterUsername string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Get room
+	room, ok := s.rooms[roomID]
+	if !ok {
+		var dbRoom models.ChatRoom
+		if err := s.db.First(&dbRoom, "id = ?", roomID).Error; err != nil {
+			return fmt.Errorf("room not found")
+		}
+		room = &dbRoom
+		s.rooms[roomID] = room
+	}
+
+	// Check if inviter is a member
+	if s.roomMembers[roomID] == nil || !s.roomMembers[roomID][inviterID] {
+		return fmt.Errorf("you must be a member to invite others")
+	}
+
+	// Check if invitee is already a member
+	if s.roomMembers[roomID][inviteeID] {
+		return fmt.Errorf("user is already a member")
+	}
+
+	// Add membership
+	member := &models.ChatRoomMember{
+		RoomID:   roomID,
+		UserID:   inviteeID,
+		JoinedAt: time.Now(),
+	}
+
+	if err := s.db.Create(member).Error; err != nil {
+		return fmt.Errorf("failed to invite user: %w", err)
+	}
+
+	s.roomMembers[roomID][inviteeID] = true
+
+	// Send invitation notification to invitee's active sessions
+	inviteMsg := models.ChatMessage{
+		ID:        uuid.New(),
+		RoomID:    roomID,
+		UserID:    uuid.Nil, // System message
+		Username:  "system",
+		Content:   fmt.Sprintf("%s invited you to %s. Use /join %s to enter.", inviterUsername, room.Name, room.Name),
+		CreatedAt: time.Now(),
+	}
+
+	// Find invitee's sessions and send notification
+	for sessionID, userID := range s.sessionUsers {
+		if userID == inviteeID {
+			if ch, ok := s.activeSessions[sessionID]; ok {
+				select {
+				case ch <- inviteMsg:
+				default:
+					// Channel full, skip
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// GetUserByUsername looks up a user by username
+func (s *ChatService) GetUserByUsername(username string) (*models.User, error) {
+	var user models.User
+	if err := s.db.Where("username = ?", username).First(&user).Error; err != nil {
+		return nil, fmt.Errorf("user not found: %s", username)
+	}
+	return &user, nil
+}
+
 // SendMessage sends a message to a room
 func (s *ChatService) SendMessage(roomID, userID uuid.UUID, username, content string) error {
 	s.mu.RLock()

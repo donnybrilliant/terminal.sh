@@ -34,6 +34,9 @@ type ChatModel struct {
 	msgChan       chan models.ChatMessage
 	sessionID     uuid.UUID
 	splitMode     bool
+	// Command history
+	cmdHistory   []string
+	historyIndex int
 }
 
 // ChatMessageMsg is sent when a new message arrives
@@ -89,11 +92,13 @@ func NewChatModel(parent *ShellModel, chatService *services.ChatService, user *m
 		msgChan:       msgChan,
 		sessionID:     sessionID,
 		splitMode:     splitMode,
+		cmdHistory:    make([]string, 0),
+		historyIndex:  -1,
 	}
 
 	// Initialize viewports and load messages for each room
 	for _, room := range rooms {
-		vp := viewport.New(width, height-3) // Reserve space for tabs and input
+		vp := viewport.New(width, height-5) // Reserve space for top padding (1) + tabs (2) + input (1) + buffer (1)
 		model.roomViewports[room.ID] = &vp
 
 		// Load recent messages
@@ -139,7 +144,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for roomID := range m.roomViewports {
 			vp := m.roomViewports[roomID]
 			vp.Width = msg.Width
-			vp.Height = msg.Height - 3 // Reserve space for tabs and input
+			vp.Height = msg.Height - 5 // Reserve space for top padding (1) + tabs (2) + input (1) + buffer (1)
 			m.updateViewportContent(roomID)
 		}
 
@@ -206,7 +211,18 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "tab":
-			// Cycle through tabs
+			// Check if we should autocomplete a command
+			input := m.textInput.Value()
+			if strings.HasPrefix(input, "/") {
+				// Autocomplete command
+				completed := m.autocompleteCommand(input)
+				if completed != input {
+					m.textInput.SetValue(completed)
+					m.textInput.CursorEnd()
+					return m, nil
+				}
+			}
+			// Otherwise cycle through tabs
 			if len(m.rooms) > 0 {
 				m.tabIndex = (m.tabIndex + 1) % len(m.rooms)
 				m.activeRoomID = m.rooms[m.tabIndex].ID
@@ -214,18 +230,36 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
-			// Switch to tab by number
-			tabNum := int(msg.String()[0] - '1')
-			if tabNum >= 0 && tabNum < len(m.rooms) {
-				m.tabIndex = tabNum
-				m.activeRoomID = m.rooms[m.tabIndex].ID
-				m.updateViewportContent(m.activeRoomID)
+		case "up":
+			// Command history - previous
+			if len(m.cmdHistory) > 0 {
+				if m.historyIndex == -1 {
+					m.historyIndex = len(m.cmdHistory) - 1
+				} else if m.historyIndex > 0 {
+					m.historyIndex--
+				}
+				m.textInput.SetValue(m.cmdHistory[m.historyIndex])
+				m.textInput.CursorEnd()
 			}
 			return m, nil
 
-		case "up", "down":
-			// Scroll viewport
+		case "down":
+			// Command history - next
+			if m.historyIndex >= 0 {
+				if m.historyIndex < len(m.cmdHistory)-1 {
+					m.historyIndex++
+					m.textInput.SetValue(m.cmdHistory[m.historyIndex])
+					m.textInput.CursorEnd()
+				} else {
+					// Past end of history, clear input
+					m.historyIndex = -1
+					m.textInput.SetValue("")
+				}
+			}
+			return m, nil
+
+		case "pgup", "pgdown":
+			// Scroll viewport with page up/down
 			if vp, ok := m.roomViewports[m.activeRoomID]; ok {
 				var cmd tea.Cmd
 				*vp, cmd = vp.Update(msg)
@@ -237,6 +271,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Send message or execute command
 			input := m.textInput.Value()
 			m.textInput.SetValue("")
+			m.historyIndex = -1 // Reset history navigation
 
 			if input == "" {
 				return m, nil
@@ -244,6 +279,12 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// Check if it's a command
 			if strings.HasPrefix(input, "/") {
+				// Add to command history
+				m.cmdHistory = append(m.cmdHistory, input)
+				// Keep history reasonable size
+				if len(m.cmdHistory) > 100 {
+					m.cmdHistory = m.cmdHistory[1:]
+				}
 				return m, m.handleCommand(input)
 			}
 
@@ -283,6 +324,7 @@ func (m *ChatModel) handleCommand(input string) tea.Cmd {
 	switch cmd {
 	case "/join":
 		if len(args) < 1 {
+			m.addSystemMessage("Usage: /join <room> [password]")
 			return nil
 		}
 		roomName := args[0]
@@ -291,39 +333,57 @@ func (m *ChatModel) handleCommand(input string) tea.Cmd {
 			password = args[1]
 		}
 
-		// Get or create room
-		room, err := m.chatService.GetRoomByName(roomName)
-		if err != nil {
-			room, err = m.chatService.CreateRoom(roomName, "public", "", m.user.ID)
-			if err != nil {
+		// Check if already in this room
+		for _, r := range m.rooms {
+			if r.Name == roomName {
+				m.addSystemMessage("Already in room " + roomName)
 				return nil
 			}
 		}
 
-		// Join room
-		err = m.chatService.JoinRoom(room.ID, m.user.ID, password)
-		if err == nil {
-			// Add to rooms list
-			m.rooms = append(m.rooms, room)
-			m.roomMessages[room.ID] = make([]models.ChatMessage, 0)
-			vp := viewport.New(m.width, m.height-3)
-			m.roomViewports[room.ID] = &vp
-
-			// Load messages
-			messages, _ := m.chatService.GetRecentMessages(room.ID, 100)
-			m.roomMessages[room.ID] = messages
-			m.updateViewportContent(room.ID)
-
-			// Switch to new room
-			m.tabIndex = len(m.rooms) - 1
-			m.activeRoomID = room.ID
-		}
-
-	case "/leave":
-		if len(args) < 1 {
+		// Get existing room (use /create for new rooms)
+		room, err := m.chatService.GetRoomByName(roomName)
+		if err != nil {
+			m.addSystemMessage("Room not found: " + roomName + " (use /create to make a new room)")
 			return nil
 		}
-		roomName := args[0]
+
+		// Join room
+		err = m.chatService.JoinRoom(room.ID, m.user.ID, password)
+		if err != nil {
+			m.addSystemMessage("Cannot join: " + err.Error())
+			return nil
+		}
+
+		// Add to rooms list
+		m.rooms = append(m.rooms, room)
+		m.roomMessages[room.ID] = make([]models.ChatMessage, 0)
+		vp := viewport.New(m.width, m.height-5)
+		m.roomViewports[room.ID] = &vp
+
+		// Load messages
+		messages, _ := m.chatService.GetRecentMessages(room.ID, 100)
+		m.roomMessages[room.ID] = messages
+		m.updateViewportContent(room.ID)
+
+		// Switch to new room
+		m.tabIndex = len(m.rooms) - 1
+		m.activeRoomID = room.ID
+		m.addSystemMessage("Joined " + roomName)
+
+	case "/leave":
+		// Use current room if no args
+		var roomName string
+		if len(args) < 1 {
+			if m.tabIndex >= 0 && m.tabIndex < len(m.rooms) {
+				roomName = m.rooms[m.tabIndex].Name
+			} else {
+				m.addSystemMessage("No room to leave")
+				return nil
+			}
+		} else {
+			roomName = args[0]
+		}
 
 		// Find room
 		var roomIndex int = -1
@@ -336,25 +396,133 @@ func (m *ChatModel) handleCommand(input string) tea.Cmd {
 			}
 		}
 
-		if roomIndex >= 0 {
-			// Leave room
-			m.chatService.LeaveRoom(roomID, m.user.ID)
+		if roomIndex < 0 {
+			m.addSystemMessage("Not in room " + roomName)
+			return nil
+		}
 
-			// Remove from lists
-			m.rooms = append(m.rooms[:roomIndex], m.rooms[roomIndex+1:]...)
-			delete(m.roomMessages, roomID)
-			delete(m.roomViewports, roomID)
+		// Leave room
+		m.chatService.LeaveRoom(roomID, m.user.ID)
 
-			// Switch to another room if needed
-			if len(m.rooms) > 0 {
-				if m.tabIndex >= len(m.rooms) {
-					m.tabIndex = len(m.rooms) - 1
-				}
-				m.activeRoomID = m.rooms[m.tabIndex].ID
-			} else {
-				m.activeRoomID = uuid.Nil
+		// Remove from lists
+		leftRoomName := m.rooms[roomIndex].Name
+		m.rooms = append(m.rooms[:roomIndex], m.rooms[roomIndex+1:]...)
+		delete(m.roomMessages, roomID)
+		delete(m.roomViewports, roomID)
+
+		// Switch to another room if needed
+		if len(m.rooms) > 0 {
+			if m.tabIndex >= len(m.rooms) {
+				m.tabIndex = len(m.rooms) - 1
+			}
+			m.activeRoomID = m.rooms[m.tabIndex].ID
+			m.addSystemMessage("Left " + leftRoomName)
+		} else {
+			m.activeRoomID = uuid.Nil
+		}
+
+	case "/create":
+		if len(args) < 1 {
+			m.addSystemMessage("Usage: /create <room> [--private|--password <pass>]")
+			return nil
+		}
+		roomName := args[0]
+		roomType := "public"
+		password := ""
+
+		// Parse flags
+		for i := 1; i < len(args); i++ {
+			if args[i] == "--private" {
+				roomType = "private"
+			} else if args[i] == "--password" && i+1 < len(args) {
+				roomType = "password"
+				password = args[i+1]
+				i++ // skip the password value
 			}
 		}
+
+		// Check if room already exists
+		existingRoom, _ := m.chatService.GetRoomByName(roomName)
+		if existingRoom != nil {
+			m.addSystemMessage("Room " + roomName + " already exists")
+			return nil
+		}
+
+		// Create room
+		room, err := m.chatService.CreateRoom(roomName, roomType, password, m.user.ID)
+		if err != nil {
+			m.addSystemMessage("Error creating room: " + err.Error())
+			return nil
+		}
+
+		// Auto-join the room we created
+		m.chatService.JoinRoom(room.ID, m.user.ID, password)
+
+		// Add to rooms list
+		m.rooms = append(m.rooms, room)
+		m.roomMessages[room.ID] = make([]models.ChatMessage, 0)
+		vp := viewport.New(m.width, m.height-5)
+		m.roomViewports[room.ID] = &vp
+		m.updateViewportContent(room.ID)
+
+		// Switch to new room
+		m.tabIndex = len(m.rooms) - 1
+		m.activeRoomID = room.ID
+
+		typeStr := roomType
+		if roomType == "password" {
+			typeStr = "password-protected"
+		}
+		m.addSystemMessage("Created " + typeStr + " room: " + roomName)
+
+	case "/invite":
+		if len(args) < 1 {
+			m.addSystemMessage("Usage: /invite <username> [room]")
+			return nil
+		}
+		username := args[0]
+
+		// Use current room or specified room
+		var targetRoom *models.ChatRoom
+		if len(args) >= 2 {
+			roomName := args[1]
+			for _, r := range m.rooms {
+				if r.Name == roomName {
+					targetRoom = r
+					break
+				}
+			}
+			if targetRoom == nil {
+				m.addSystemMessage("You're not in room: " + roomName)
+				return nil
+			}
+		} else {
+			// Use current room
+			if m.tabIndex >= 0 && m.tabIndex < len(m.rooms) {
+				targetRoom = m.rooms[m.tabIndex]
+			}
+		}
+
+		if targetRoom == nil {
+			m.addSystemMessage("No room selected")
+			return nil
+		}
+
+		// Look up user
+		invitee, err := m.chatService.GetUserByUsername(username)
+		if err != nil {
+			m.addSystemMessage("User not found: " + username)
+			return nil
+		}
+
+		// Invite user
+		err = m.chatService.InviteUser(targetRoom.ID, m.user.ID, invitee.ID, m.user.Username)
+		if err != nil {
+			m.addSystemMessage("Cannot invite: " + err.Error())
+			return nil
+		}
+
+		m.addSystemMessage("Invited " + username + " to " + targetRoom.Name)
 
 	case "/exit", "/quit":
 		// Exit chat mode
@@ -366,30 +534,17 @@ func (m *ChatModel) handleCommand(input string) tea.Cmd {
 	case "/help":
 		// Show help - add as a system message to current room
 		helpText := `Chat Commands:
-  /join <room> [password] - Join or create a room
-  /leave <room>           - Leave a room
-  /rooms                  - List your current rooms
-  /who                    - List users in current room
-  /exit or /quit          - Exit chat mode
+  /join <room> [password]    - Join an existing room
+  /create <room> [options]   - Create room (--private or --password <pass>)
+  /invite <user> [room]      - Invite user to room
+  /leave [room]              - Leave room (current if no arg)
+  /rooms                     - List your rooms
+  /who                       - List users in current room
+  /exit                      - Exit chat mode
   
-Navigation:
-  ←/→ or Tab              - Switch between rooms
-  ↑/↓                     - Scroll message history
-  1-9                     - Jump to room by number
-  Esc or Ctrl+C           - Exit chat mode`
+Navigation: ←/→ to switch rooms, ↑/↓ for command history, Tab to autocomplete, Esc to exit`
 
-		// Add help as a fake message in current room
-		if m.activeRoomID != uuid.Nil {
-			helpMsg := models.ChatMessage{
-				ID:        uuid.New(),
-				RoomID:    m.activeRoomID,
-				Username:  "system",
-				Content:   helpText,
-				CreatedAt: time.Now(),
-			}
-			m.roomMessages[m.activeRoomID] = append(m.roomMessages[m.activeRoomID], helpMsg)
-			m.updateViewportContent(m.activeRoomID)
-		}
+		m.addSystemMessage(helpText)
 
 	case "/rooms":
 		// List rooms user is in
@@ -401,49 +556,178 @@ Navigation:
 			}
 			roomList.WriteString(room.Name)
 		}
-
-		if m.activeRoomID != uuid.Nil {
-			sysMsg := models.ChatMessage{
-				ID:        uuid.New(),
-				RoomID:    m.activeRoomID,
-				Username:  "system",
-				Content:   roomList.String(),
-				CreatedAt: time.Now(),
-			}
-			m.roomMessages[m.activeRoomID] = append(m.roomMessages[m.activeRoomID], sysMsg)
-			m.updateViewportContent(m.activeRoomID)
-		}
+		m.addSystemMessage(roomList.String())
 
 	case "/who":
 		// List users in current room
-		if m.activeRoomID != uuid.Nil {
-			members, err := m.chatService.GetRoomMembers(m.activeRoomID)
-			var content string
-			if err != nil {
-				content = "Error getting room members"
-			} else if len(members) == 0 {
-				content = "No users in this room"
-			} else {
-				var names []string
-				for _, member := range members {
-					names = append(names, member.Username)
-				}
-				content = "Users in room: " + strings.Join(names, ", ")
-			}
-
-			sysMsg := models.ChatMessage{
-				ID:        uuid.New(),
-				RoomID:    m.activeRoomID,
-				Username:  "system",
-				Content:   content,
-				CreatedAt: time.Now(),
-			}
-			m.roomMessages[m.activeRoomID] = append(m.roomMessages[m.activeRoomID], sysMsg)
-			m.updateViewportContent(m.activeRoomID)
+		if m.activeRoomID == uuid.Nil {
+			return nil
 		}
+		members, err := m.chatService.GetRoomMembers(m.activeRoomID)
+		var content string
+		if err != nil {
+			content = "Error getting room members"
+		} else if len(members) == 0 {
+			content = "No users in this room"
+		} else {
+			var names []string
+			for _, member := range members {
+				names = append(names, member.Username)
+			}
+			content = "Users in room: " + strings.Join(names, ", ")
+		}
+		m.addSystemMessage(content)
+
+	default:
+		// Unknown command
+		m.addSystemMessage("Unknown command: " + cmd + " (type /help for available commands)")
 	}
 
 	return nil
+}
+
+// addSystemMessage adds a system message to the current room
+func (m *ChatModel) addSystemMessage(content string) {
+	if m.activeRoomID == uuid.Nil {
+		return
+	}
+	sysMsg := models.ChatMessage{
+		ID:        uuid.New(),
+		RoomID:    m.activeRoomID,
+		Username:  "system",
+		Content:   content,
+		CreatedAt: time.Now(),
+	}
+	m.roomMessages[m.activeRoomID] = append(m.roomMessages[m.activeRoomID], sysMsg)
+	m.updateViewportContent(m.activeRoomID)
+}
+
+// chatCommands lists all available chat commands for autocomplete
+var chatCommands = []string{
+	"/create",
+	"/exit",
+	"/help",
+	"/invite",
+	"/join",
+	"/leave",
+	"/quit",
+	"/rooms",
+	"/who",
+}
+
+// autocompleteCommand attempts to autocomplete a command
+func (m *ChatModel) autocompleteCommand(input string) string {
+	// Split input to get the command part
+	parts := strings.Fields(input)
+	if len(parts) == 0 {
+		return input
+	}
+
+	cmdPart := parts[0]
+
+	// If it's a complete command, try to autocomplete room names for certain commands
+	if len(parts) >= 1 {
+		for _, cmd := range chatCommands {
+			if cmd == cmdPart {
+				// Command is complete, try to autocomplete arguments
+				return m.autocompleteArgs(input, cmdPart, parts[1:])
+			}
+		}
+	}
+
+	// Try to autocomplete the command itself
+	var matches []string
+	for _, cmd := range chatCommands {
+		if strings.HasPrefix(cmd, cmdPart) {
+			matches = append(matches, cmd)
+		}
+	}
+
+	if len(matches) == 1 {
+		// Single match - complete it with a space
+		if len(parts) > 1 {
+			return matches[0] + " " + strings.Join(parts[1:], " ")
+		}
+		return matches[0] + " "
+	} else if len(matches) > 1 {
+		// Multiple matches - find common prefix
+		common := matches[0]
+		for _, match := range matches[1:] {
+			common = commonPrefix(common, match)
+		}
+		if len(common) > len(cmdPart) {
+			if len(parts) > 1 {
+				return common + " " + strings.Join(parts[1:], " ")
+			}
+			return common
+		}
+	}
+
+	return input
+}
+
+// autocompleteArgs attempts to autocomplete command arguments (room names, usernames)
+func (m *ChatModel) autocompleteArgs(input, cmd string, args []string) string {
+	switch cmd {
+	case "/join", "/leave":
+		// Autocomplete room names
+		if len(args) == 0 || (len(args) == 1 && !strings.HasSuffix(input, " ")) {
+			partial := ""
+			if len(args) == 1 {
+				partial = args[0]
+			}
+			// Get all rooms user is in for /leave, or suggest room names for /join
+			var roomNames []string
+			if cmd == "/leave" {
+				for _, room := range m.rooms {
+					roomNames = append(roomNames, room.Name)
+				}
+			} else {
+				// For /join, suggest rooms user is in (they might want to switch)
+				for _, room := range m.rooms {
+					roomNames = append(roomNames, room.Name)
+				}
+			}
+
+			var matches []string
+			for _, name := range roomNames {
+				if strings.HasPrefix(name, partial) {
+					matches = append(matches, name)
+				}
+			}
+
+			if len(matches) == 1 {
+				return cmd + " " + matches[0]
+			} else if len(matches) > 1 && partial != "" {
+				common := matches[0]
+				for _, match := range matches[1:] {
+					common = commonPrefix(common, match)
+				}
+				if len(common) > len(partial) {
+					return cmd + " " + common
+				}
+			}
+		}
+	case "/invite":
+		// Could autocomplete usernames if we had a list, for now just return as-is
+		// Future: add GetOnlineUsers() method to ChatService
+	}
+
+	return input
+}
+
+// commonPrefix returns the common prefix of two strings
+func commonPrefix(a, b string) string {
+	minLen := len(a)
+	if len(b) < minLen {
+		minLen = len(b)
+	}
+	for i := 0; i < minLen; i++ {
+		if a[i] != b[i] {
+			return a[:i]
+		}
+	}
+	return a[:minLen]
 }
 
 // updateViewportContent updates the viewport content for a room
@@ -475,6 +759,9 @@ func (m *ChatModel) View() string {
 
 	var sb strings.Builder
 
+	// Add top padding for web
+	sb.WriteString("\n")
+
 	// Render tabs
 	if len(m.rooms) > 0 {
 		tabStyle := lipgloss.NewStyle().Padding(0, 1).MarginRight(1)
@@ -491,16 +778,25 @@ func (m *ChatModel) View() string {
 		sb.WriteString("\n")
 		sb.WriteString(strings.Repeat("─", m.width))
 		sb.WriteString("\n")
-	}
 
-	// Render viewport
-	if vp, ok := m.roomViewports[m.activeRoomID]; ok {
-		sb.WriteString(vp.View())
+		// Render viewport
+		if vp, ok := m.roomViewports[m.activeRoomID]; ok {
+			sb.WriteString(vp.View())
+		}
 	} else {
-		sb.WriteString("No room selected. Use /join <room> to join a room.\n")
+		// No rooms - pad to push content to bottom
+		// Calculate lines needed: height - top padding (1) - message line (1) - input line (1) - buffer (1)
+		emptyLines := m.height - 4
+		if emptyLines < 0 {
+			emptyLines = 0
+		}
+		for i := 0; i < emptyLines; i++ {
+			sb.WriteString("\n")
+		}
+		sb.WriteString("No rooms. Use /create <room> to create one, or /join <room> to join.")
 	}
 
-	// Render input
+	// Input on separate line
 	sb.WriteString("\n")
 	sb.WriteString(m.textInput.View())
 
