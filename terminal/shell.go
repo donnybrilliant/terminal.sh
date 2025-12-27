@@ -2,21 +2,33 @@ package terminal
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
 	"strings"
 	"terminal-sh/cmd"
 	"terminal-sh/database"
 	"terminal-sh/filesystem"
 	"terminal-sh/models"
 	"terminal-sh/services"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
+)
+
+const (
+	gradientFrameCount = 18
+	GradientFrameDelay = 75 * time.Millisecond
+	gradientWidthCap   = 180
+	gradientHeightCap  = 80
 )
 
 // ShellModel handles the interactive shell after login
 type ShellModel struct {
+	db          *database.Database
 	userService *services.UserService
 	user        *models.User
 	vfs         *filesystem.VFS
@@ -37,13 +49,21 @@ type ShellModel struct {
 	shellStack   []ShellContext // Stack for nested SSH sessions
 	sessionID    uuid.UUID      // Session ID for chat
 
+	// Welcome gradient animation state
+	gradientFrames    []string
+	gradientFrameIdx  int
+	gradientAnimating bool
+	gradientSeed      int64
+
 	// Incremental rendering state
-	pendingOutput   string // New output to append (command results)
-	pendingClear    bool   // Whether to clear screen
-	lastPromptLine  string // Last rendered prompt (for detecting changes)
-	initialRender   bool   // First render after transition from login
-	commandPending  bool   // True when waiting for command result (don't update prompt)
-	commandJustDone bool   // True when command just finished (need to move to next line)
+	pendingOutput      string // New output to append (command results)
+	pendingClear       bool   // Whether to clear screen
+	pendingClearScrollback bool // Whether to clear scrollback (after animation)
+	lastPromptLine     string // Last rendered prompt (for detecting changes)
+	initialRender      bool   // First render after transition from login
+	commandPending     bool   // True when waiting for command result (don't update prompt)
+	commandJustDone    bool   // True when command just finished (need to move to next line)
+	lastViewContent    string // Last full view content (to detect if only prompt changed)
 }
 
 // ShellContext represents a shell session context
@@ -99,6 +119,7 @@ func NewShellModelWithSize(db *database.Database, userService *services.UserServ
 
 	// Set up SSH callbacks for nested session handling
 	shellModel := &ShellModel{
+		db:          db,
 		userService: userService,
 		user:        u,
 		vfs:         vfs,
@@ -108,16 +129,22 @@ func NewShellModelWithSize(db *database.Database, userService *services.UserServ
 			command string
 			output  string
 		}, 0),
-		showWelcome:   true,
-		width:         width,
-		height:        height,
-		inputHistory:  NewInputHistory(100), // Keep last 100 commands
-		shellStack:    make([]ShellContext, 0),
-		textInput:     ti,
-		textarea:      ta,
-		initialRender: true,
-		sessionID:     sessionID,
+		showWelcome:      true,
+		width:            width,
+		height:           height,
+		inputHistory:     NewInputHistory(100), // Keep last 100 commands
+		shellStack:       make([]ShellContext, 0),
+		textInput:        ti,
+		textarea:         ta,
+		initialRender:    true,
+		sessionID:        sessionID,
+		gradientAnimating: true,
+		gradientFrameIdx:  0,
+		gradientSeed:      time.Now().UnixNano(),
 	}
+
+	// Precompute initial gradient frames
+	shellModel.refreshGradientFrames()
 
 	// Set SSH callbacks
 	handler.SetSSHCallbacks(
@@ -142,13 +169,19 @@ func NewShellModelWithSize(db *database.Database, userService *services.UserServ
 // Init initializes the shell
 func (m *ShellModel) Init() tea.Cmd {
 	// Send welcome message and request window size
-	return tea.Batch(
+	cmds := []tea.Cmd{
 		func() tea.Msg {
 			return WelcomeMsg{}
 		},
 		tea.WindowSize(),
 		m.textInput.Focus(),
-	)
+	}
+
+	if tick := m.nextGradientTick(); tick != nil {
+		cmds = append(cmds, tick)
+	}
+
+	return tea.Batch(cmds...)
 }
 
 // Update handles messages
@@ -160,6 +193,30 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.textInput.Width = msg.Width
 		m.textarea.SetWidth(msg.Width)
 		m.textarea.SetHeight(msg.Height - 2) // Reserve space for status line and prompt
+		if m.gradientAnimating {
+			m.refreshGradientFrames()
+		}
+		return m, nil
+	case GradientTickMsg:
+		if m.gradientAnimating {
+			// Advance frame; stop when finished
+			if len(m.gradientFrames) == 0 {
+				m.refreshGradientFrames()
+			}
+
+			if m.gradientFrameIdx+1 < len(m.gradientFrames) {
+				m.gradientFrameIdx++
+				return m, m.nextGradientTick()
+			}
+
+			// Animation complete - clear scrollback to remove animation frames
+			m.gradientAnimating = false
+			m.showWelcome = true // keep help text, but no ASCII banner
+			m.gradientFrames = nil
+			m.gradientFrameIdx = 0
+			m.pendingClearScrollback = true // Clear scrollback to remove animation
+			return m, nil
+		}
 		return m, nil
 	case tea.KeyMsg:
 		// Handle edit mode separately
@@ -170,13 +227,11 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			// If in SSH session, exit SSH (same as exit command)
-			// Otherwise, clear current line
 			if m.handler.GetCurrentServerPath() != "" {
 				return m.handleExitSSH()
 			}
-			m.textInput.SetValue("")
-			m.inputHistory.Reset()
-			return m, nil
+			// In base shell, return to login
+			return m.handleLogout()
 		case "up":
 			// Navigate command history backward
 			if cmd, ok := m.inputHistory.Previous(); ok {
@@ -244,7 +299,8 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 			// Add to command history for navigation
 			m.inputHistory.Add(line)
-			m.showWelcome = false
+			// Don't hide welcome screen yet - wait until command completes
+			// This ensures welcome screen stays visible until first command executes
 			return m, m.executeCommand(line)
 		default:
 			var cmd tea.Cmd
@@ -256,6 +312,9 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showWelcome = true
 		// Don't set pendingOutput here - initialRender handles it
 		return m, nil
+	case LogoutMsg:
+		// Return to login screen
+		return m.handleLogout()
 	case CommandResultMsg:
 		// Handle clear command - clear history and terminal
 		if len(m.history) > 0 {
@@ -285,6 +344,10 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					lastIdx = i
 					break
 				}
+			}
+			// Hide welcome screen after first command completes (when we get output)
+			if len(m.history) == 1 && m.history[0].output == "" {
+				m.showWelcome = false
 			}
 			// Set output for the last command
 			var output string
@@ -376,7 +439,14 @@ func (m *ShellModel) executeCommand(command string) tea.Cmd {
 	return func() tea.Msg {
 		// Handle special commands
 		if command == "quit" || command == "exit" {
-			return tea.Quit()
+			// If in SSH session, exit SSH
+			if m.handler.GetCurrentServerPath() != "" {
+				return CommandResultMsg{
+					Result: &cmd.CommandResult{Output: "__EXIT_SSH__"},
+				}
+			}
+			// In base shell, return to login
+			return LogoutMsg{}
 		}
 
 		// Execute command
@@ -413,25 +483,26 @@ func (m *ShellModel) GetIncrementalOutput() (output string, isClear bool, prompt
 		promptLine := m.getPromptLine(username)
 
 		if m.showWelcome {
-			welcome := AnimatedWelcome() + "\n" + WelcomeHelpText()
-			welcomeLinesList := strings.Split(welcome, "\n")
-			welcomeLines := len(welcomeLinesList)
+			ascii := AnimatedWelcome()
+			help := strings.TrimSuffix(WelcomeHelpText(m.user, m.db), "\n")
 
-			sb.WriteString(welcome)
+			centered := lipgloss.Place(
+				m.width,
+				m.height-3, // reserve lines for help + spacer + prompt
+				lipgloss.Center,
+				lipgloss.Center,
+				ascii,
+			)
+
+			sb.WriteString(centered)
 			sb.WriteString("\n")
+			sb.WriteString(help)
+			sb.WriteString("\n\n") // spacer line above prompt
 			sb.WriteString(promptLine)
-
-			// Calculate start row to push content to bottom
-			// Total lines = welcomeLines + 1 (prompt)
-			totalLines := welcomeLines + 1
-			startRow := m.height - totalLines + 1
-			if startRow < 1 {
-				startRow = 1
-			}
 
 			m.lastPromptLine = promptLine
 			m.pendingOutput = ""
-			return sb.String(), false, false, startRow
+			return sb.String(), false, false, 1
 		} else {
 			// No welcome - just prompt at bottom
 			m.lastPromptLine = promptLine
@@ -487,18 +558,28 @@ func (m *ShellModel) IsEditMode() bool {
 	return m.editMode
 }
 
-// NeedsClearScrollback returns true if scrollback should be cleared (after clear command)
+// NeedsClearScrollback returns true if scrollback should be cleared (after clear command or animation)
 // Calling this resets the flag
 func (m *ShellModel) NeedsClearScrollback() bool {
 	if m.pendingClear {
 		m.pendingClear = false
 		return true
 	}
+	if m.pendingClearScrollback {
+		m.pendingClearScrollback = false
+		return true
+	}
 	return false
 }
 
-// View renders the shell (used for edit mode and fallback)
-func (m *ShellModel) View() string {
+// IsGradientAnimating reports whether the welcome gradient is currently running.
+func (m *ShellModel) IsGradientAnimating() bool {
+	return m.gradientAnimating
+}
+
+// GetViewContent returns the view content without the prompt line
+// Used to detect if only the prompt changed (user typing)
+func (m *ShellModel) GetViewContent() string {
 	// Get username for prompt
 	username := "guest"
 	if m.user != nil && m.user.Username != "" {
@@ -515,14 +596,57 @@ func (m *ShellModel) View() string {
 		height = 24
 	}
 
-	// Build all content lines
+	// Calculate available lines for content (minus 1 for prompt)
+	availableLines := height - 1
+	if availableLines < 1 {
+		availableLines = 1
+	}
+
+	// Animated gradient welcome fills the screen, then disappears
+	if m.gradientAnimating && len(m.history) == 0 {
+		frame := m.getCurrentGradientFrame()
+		frameLines := strings.Split(frame, "\n")
+
+		// Ensure frame height matches available lines
+		if len(frameLines) < availableLines {
+			padding := availableLines - len(frameLines)
+			for i := 0; i < padding; i++ {
+				frameLines = append(frameLines, "")
+			}
+		} else if len(frameLines) > availableLines {
+			frameLines = frameLines[:availableLines]
+		}
+
+		var output strings.Builder
+		for _, line := range frameLines {
+			output.WriteString(line)
+			output.WriteString("\n")
+		}
+		// Note: GetViewContent doesn't include prompt, but View() will add it
+		return output.String()
+	}
+
+	// Build all content lines (without prompt)
 	var contentLines []string
 
 	// Add welcome message as first entry if shown
 	if m.showWelcome && len(m.history) == 0 {
-		welcome := AnimatedWelcome() + "\n" + WelcomeHelpText()
-		welcomeLines := strings.Split(welcome, "\n")
-		contentLines = append(contentLines, welcomeLines...)
+		ascii := AnimatedWelcome()
+		centered := lipgloss.Place(
+			width,
+			availableLines-3, // leave room for help + spacer
+			lipgloss.Center,
+			lipgloss.Center,
+			ascii,
+		)
+		contentLines = append(contentLines, centered)
+
+		// Left-aligned help block directly above the prompt with one spacer line
+		helpLines := strings.Split(strings.TrimSuffix(WelcomeHelpText(m.user, m.db), "\n"), "\n")
+		for _, line := range helpLines {
+			contentLines = append(contentLines, line)
+		}
+		contentLines = append(contentLines, "") // spacer line between help and prompt
 	}
 
 	// Add all history entries
@@ -540,18 +664,7 @@ func (m *ShellModel) View() string {
 		}
 	}
 
-	// Build the current prompt line
-	m.textInput.Prompt = RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
-	m.textInput.Width = width
-	promptLine := m.textInput.View()
-
-	// Calculate available lines for content (minus 1 for prompt)
-	availableLines := height - 1
-	if availableLines < 1 {
-		availableLines = 1
-	}
-
-	// Build output
+	// Build output (without prompt)
 	var output strings.Builder
 
 	if m.editMode {
@@ -586,30 +699,75 @@ func (m *ShellModel) View() string {
 		// Add textarea
 		output.WriteString(m.textarea.View())
 		output.WriteString("\n")
-
-		// Add status line
-		statusLine := fmt.Sprintf("-- Edit mode: %s | Ctrl+S to save, Esc/Ctrl+Q to exit --", m.editFilename)
-		output.WriteString(statusLine)
 	} else {
-		// Normal mode - for full View() (SSH compatibility)
-		// When content is short, pad to push prompt to bottom
-		if len(contentLines) < availableLines {
-			paddingLines := availableLines - len(contentLines)
-			for i := 0; i < paddingLines; i++ {
-				output.WriteString("\n")
-			}
-		}
-
-		// Output all content
+		// Normal mode - output all content without padding
+		// Padding is handled by View() method which adds prompt at the end
 		for _, line := range contentLines {
 			output.WriteString(line)
 			output.WriteString("\n")
 		}
-
-		// Add prompt at the end
-		output.WriteString(promptLine)
 	}
 
+	return output.String()
+}
+
+// View renders the shell (used for edit mode and fallback)
+func (m *ShellModel) View() string {
+	// Get username for prompt
+	username := "guest"
+	if m.user != nil && m.user.Username != "" {
+		username = m.user.Username
+	}
+
+	// Ensure we have valid dimensions
+	width := m.width
+	height := m.height
+	if width <= 0 {
+		width = 80
+	}
+	if height <= 0 {
+		height = 24
+	}
+
+	// Get content without prompt
+	content := m.GetViewContent()
+	
+	// Calculate available lines for content (minus 1 for prompt)
+	contentHeight := m.height
+	if contentHeight <= 0 {
+		contentHeight = 24
+	}
+	availableLines := contentHeight - 1
+	if availableLines < 1 {
+		availableLines = 1
+	}
+	
+	// Count content lines (excluding trailing newlines)
+	contentLines := strings.Split(strings.TrimRight(content, "\n"), "\n")
+	contentLineCount := len(contentLines)
+	if contentLineCount == 0 || (contentLineCount == 1 && contentLines[0] == "") {
+		contentLineCount = 0
+	}
+	
+	// Add padding to push prompt to bottom if content is short
+	var output strings.Builder
+	if contentLineCount < availableLines && !m.editMode {
+		paddingLines := availableLines - contentLineCount
+		for i := 0; i < paddingLines; i++ {
+			output.WriteString("\n")
+		}
+	}
+	
+	// Add content
+	output.WriteString(content)
+	
+	// Build the current prompt line
+	m.textInput.Prompt = RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
+	m.textInput.Width = width
+	promptLine := m.textInput.View()
+
+	// Combine content and prompt
+	output.WriteString(promptLine)
 	return output.String()
 }
 
@@ -619,6 +777,10 @@ type WelcomeMsg struct{}
 type CommandResultMsg struct {
 	Result *cmd.CommandResult
 }
+
+type LogoutMsg struct{}
+
+type GradientTickMsg struct{}
 
 // getCommandMatches returns commands that start with the given prefix
 func (m *ShellModel) getCommandMatches(prefix string) []string {
@@ -650,10 +812,19 @@ func (m *ShellModel) getFileMatches(prefix string) []string {
 	return matches
 }
 
+// handleLogout returns to the login screen
+func (m *ShellModel) handleLogout() (tea.Model, tea.Cmd) {
+	// Create a new login model with current window size
+	loginModel := NewLoginModel(m.db, m.userService, m.chatService, "", "")
+	loginModel.width = m.width
+	loginModel.height = m.height
+	return loginModel, loginModel.Init()
+}
+
 // handleExitSSH handles exiting from an SSH session
 func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
 	if len(m.shellStack) == 0 {
-		// No more shells in stack, quit program
+		// No more shells in stack, quit program (SSH closes connection)
 		return m, tea.Quit
 	}
 
@@ -720,4 +891,125 @@ func (m *ShellModel) handleEditModeInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.textarea, cmd = m.textarea.Update(msg)
 		return m, cmd
 	}
+}
+
+// nextGradientTick schedules the next animation frame if the welcome animation is active.
+func (m *ShellModel) nextGradientTick() tea.Cmd {
+	if !m.gradientAnimating {
+		return nil
+	}
+	return tea.Tick(GradientFrameDelay, func(time.Time) tea.Msg {
+		return GradientTickMsg{}
+	})
+}
+
+// refreshGradientFrames rebuilds the gradient frames for the current viewport.
+func (m *ShellModel) refreshGradientFrames() {
+	if !m.gradientAnimating {
+		m.gradientFrames = nil
+		return
+	}
+
+	m.gradientFrames = m.buildGradientFrames()
+	if m.gradientFrameIdx >= len(m.gradientFrames) {
+		m.gradientFrameIdx = 0
+	}
+}
+
+// buildGradientFrames produces a set of animated gradient frames that fill the screen.
+func (m *ShellModel) buildGradientFrames() []string {
+	width := m.width
+	height := m.height
+
+	// Ensure reasonable bounds to keep rendering fast
+	if width <= 0 {
+		width = 80
+	}
+	if height <= 0 {
+		height = 24
+	}
+	if width > gradientWidthCap {
+		width = gradientWidthCap
+	}
+	if height > gradientHeightCap {
+		height = gradientHeightCap
+	}
+
+	usableHeight := height - 1 // reserve one line for the prompt
+	if usableHeight < 4 {
+		usableHeight = 4
+	}
+
+	// Palette: existing magenta gradient plus monochrome tones
+	primary := []string{"205", "213", "207", "219", "218", "212", "205"}
+	greys := []string{"232", "235", "237", "240", "244", "248", "252", "255"}
+	palette := append(primary, greys...)
+
+	rng := rand.New(rand.NewSource(m.gradientSeed))
+	frames := make([]string, gradientFrameCount)
+
+	for f := 0; f < gradientFrameCount; f++ {
+		var sb strings.Builder
+		phase := rng.Float64() * 6
+
+		for y := 0; y < usableHeight; y++ {
+			for x := 0; x < width; x++ {
+				// Wave + noise to keep the gradient organic
+				wave := math.Sin((float64(x)+phase)/5.0) + math.Cos((float64(y)+float64(f)*1.4)/4.0)
+				baseIdx := int(math.Abs(wave) * float64(len(palette)))
+				baseIdx = clampInt(baseIdx, 0, len(palette)-1)
+
+				// Occasionally inject bright accent pixels to mimic the ASCII style
+				if (x+y+f)%13 == 0 || rng.Float64() > 0.92 {
+					accentIdx := int(math.Abs(math.Sin(float64(f)+float64(x)/3+float64(y)/3)) * float64(len(primary)))
+					accentIdx = clampInt(accentIdx, 0, len(primary)-1)
+					sb.WriteString("\x1b[38;5;")
+					sb.WriteString(primary[accentIdx])
+					sb.WriteString("m█")
+					continue
+				}
+
+				sb.WriteString("\x1b[38;5;")
+				sb.WriteString(palette[baseIdx%len(palette)])
+				sb.WriteString("m█")
+			}
+
+			// Reset color at end of each line
+			sb.WriteString("\x1b[0m")
+			if y < usableHeight-1 {
+				sb.WriteString("\n")
+			}
+		}
+
+		frames[f] = sb.String()
+	}
+
+	return frames
+}
+
+// getCurrentGradientFrame returns the active frame (building frames on demand).
+func (m *ShellModel) getCurrentGradientFrame() string {
+	if !m.gradientAnimating {
+		return ""
+	}
+	if len(m.gradientFrames) == 0 {
+		m.refreshGradientFrames()
+	}
+	if len(m.gradientFrames) == 0 {
+		return ""
+	}
+	if m.gradientFrameIdx >= len(m.gradientFrames) {
+		m.gradientFrameIdx = 0
+	}
+	return m.gradientFrames[m.gradientFrameIdx]
+}
+
+func clampInt(value, min, max int) int {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }

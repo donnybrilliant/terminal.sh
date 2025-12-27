@@ -7,6 +7,7 @@ import (
 	"terminal-sh/database"
 	"terminal-sh/services"
 	"terminal-sh/terminal"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gorilla/websocket"
@@ -52,7 +53,10 @@ type BubbleTeaBridge struct {
 	height      int
 	renderMode  RenderMode
 	lastView    string
-	promptRow   int // Track which row the prompt is on for updates
+	lastContent string // Track last content (without prompt) to detect prompt-only changes
+	promptRow   int    // Track which row the prompt is on for updates
+
+	gradientTickerRunning bool
 }
 
 // NewBubbleTeaBridge creates a new bridge between Bubble Tea and WebSocket
@@ -204,11 +208,12 @@ func prepareIncrementalOutput(content string, startRow int) string {
 	return sb.String()
 }
 
-// preparePromptUpdate prepares a prompt-only update at a specific row
+// preparePromptUpdate prepares a prompt-only update
+// Uses cursor save/restore to update the prompt line in place without affecting scrollback
 func preparePromptUpdate(promptLine string, row int) string {
 	var sb strings.Builder
-	// Position at the prompt row
-	sb.WriteString(fmt.Sprintf("\x1b[%d;1H", row))
+	// Go to beginning of current line and clear it
+	sb.WriteString("\r")       // Carriage return - go to column 1
 	sb.WriteString(clearLine)  // Clear the entire line
 	sb.WriteString(promptLine) // Write new prompt
 	sb.WriteString(hideCursor)
@@ -354,7 +359,7 @@ func (b *BubbleTeaBridge) processMessages() {
 			isChat := b.isChatModel()
 
 			if wasLogin && !isLogin && !isChat {
-				// Transition: exit alternate screen to enable scrollback
+				// Transition: login -> shell: exit alternate screen to enable scrollback
 				transitionMsg := OutputMessage{
 					Type: MessageTypeOutput,
 					Data: exitAltScreen + clearScreen + cursorHome,
@@ -363,6 +368,24 @@ func (b *BubbleTeaBridge) processMessages() {
 					return
 				}
 				b.renderMode = RenderModeIncremental
+				b.lastView = ""    // Force redraw
+				b.lastContent = "" // Reset content tracking
+				// Note: lastContent will be set after first render
+			}
+
+			if !wasLogin && isLogin {
+				// Transition: shell -> login: enter alternate screen for login
+				// Stop gradient ticker if running
+				b.gradientTickerRunning = false
+				
+				transitionMsg := OutputMessage{
+					Type: MessageTypeOutput,
+					Data: enterAltScreen + clearScreen + cursorHome,
+				}
+				if err := b.conn.WriteJSON(transitionMsg); err != nil {
+					return
+				}
+				b.renderMode = RenderModeFullScreen
 				b.lastView = "" // Force redraw
 			}
 
@@ -382,6 +405,14 @@ func (b *BubbleTeaBridge) processMessages() {
 
 			wasLogin = isLogin
 			wasChat = isChat
+			
+			// If we're in shell and the gradient animation is running, start a bridge-side ticker
+			if shell := b.getShellModel(); shell != nil {
+				if shell.IsGradientAnimating() && !b.gradientTickerRunning {
+					b.gradientTickerRunning = true
+					go b.runGradientTicker(shell)
+				}
+			}
 			
 			// Render based on mode
 			if b.renderMode == RenderModeFullScreen {
@@ -408,40 +439,50 @@ func (b *BubbleTeaBridge) processMessages() {
 					return
 				}
 				b.lastView = currentView
-			} else {
-				// Shell mode - use full screen redraw for reliability
-				shell := b.getShellModel()
-				
-				// Check if we need to clear scrollback (after clear command)
-				needsClearScrollback := false
-				if shell != nil {
-					needsClearScrollback = shell.NeedsClearScrollback()
-				}
-				
-				currentView := b.model.View()
-				
-				// Skip if unchanged (unless we need to clear scrollback)
-				if currentView == b.lastView && !needsClearScrollback {
-					continue
-				}
-				
-				var output string
-				if needsClearScrollback {
-					// Clear everything including scrollback
-					output = prepareShellOutputWithClear(currentView, b.height)
-				} else {
-					output = prepareShellOutput(currentView, b.height)
-				}
-				
-				msg := OutputMessage{
-					Type: MessageTypeOutput,
-					Data: output,
-				}
-				if err := b.conn.WriteJSON(msg); err != nil {
-					return
-				}
-				b.lastView = currentView
+		} else {
+			// Shell mode - always use clearAll to prevent scrollback accumulation
+			shell := b.getShellModel()
+			if shell == nil {
+				continue
 			}
+			
+			// Consume any pending clear flags
+			shell.NeedsClearScrollback()
+			
+			// Get current view
+			currentView := b.model.View()
+			
+			// Skip if unchanged
+			if currentView == b.lastView {
+				continue
+			}
+			
+			// Always clear screen+scrollback and redraw to prevent line accumulation
+			// This sacrifices scrollback history but ensures clean rendering
+			var data strings.Builder
+			data.WriteString(clearAll)
+			data.WriteString(cursorHome)
+			data.WriteString(hideCursor)
+			
+			lines := strings.Split(currentView, "\n")
+			for i, line := range lines {
+				data.WriteString(line)
+				data.WriteString(clearToEOL)
+				if i < len(lines)-1 {
+					data.WriteString("\r\n")
+				}
+			}
+			
+			b.lastView = currentView
+			
+			msg := OutputMessage{
+				Type: MessageTypeOutput,
+				Data: data.String(),
+			}
+			if err := b.conn.WriteJSON(msg); err != nil {
+				return
+			}
+		}
 		}
 	}
 }
@@ -483,6 +524,38 @@ func (b *BubbleTeaBridge) closeDone() {
 // Close closes the bridge
 func (b *BubbleTeaBridge) Close() {
 	b.closeDone()
+}
+
+// runGradientTicker injects gradient tick messages while the shell welcome animation is active.
+// This ensures web sessions (which rely on bridge-driven redraws) animate like SSH.
+func (b *BubbleTeaBridge) runGradientTicker(shell *terminal.ShellModel) {
+	ticker := time.NewTicker(terminal.GradientFrameDelay)
+	defer ticker.Stop()
+	defer func() { b.gradientTickerRunning = false }()
+
+	for {
+		select {
+		case <-b.done:
+			return
+		case <-ticker.C:
+			// Check if we're still in shell mode
+			currentShell := b.getShellModel()
+			if currentShell == nil || currentShell != shell {
+				// Model changed, stop ticker
+				return
+			}
+			if !shell.IsGradientAnimating() {
+				return
+			}
+			select {
+			case b.msgChan <- terminal.GradientTickMsg{}:
+			case <-b.done:
+				return
+			default:
+				// Drop tick if channel is full; next tick will try again.
+			}
+		}
+	}
 }
 
 // convertToKeyMsg converts a WebSocket InputMessage to a Bubble Tea KeyMsg
