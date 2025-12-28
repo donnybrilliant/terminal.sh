@@ -67,7 +67,8 @@ func StartServer(cfg *config.Config, db *database.Database, chatService *service
 				model := terminal.NewLoginModel(db, userService, chatService, username, "")
 				
 				// After login, transition to shell
-				return model, []tea.ProgramOption{tea.WithAltScreen()}
+				// Note: We don't use tea.WithAltScreen() because we want scrollback history in shell
+				return model, []tea.ProgramOption{}
 			}),
 		),
 		// No authentication callbacks = no SSH auth required

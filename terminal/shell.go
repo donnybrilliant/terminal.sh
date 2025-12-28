@@ -14,7 +14,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 )
@@ -345,10 +345,6 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-			// Hide welcome screen after first command completes (when we get output)
-			if len(m.history) == 1 && m.history[0].output == "" {
-				m.showWelcome = false
-			}
 			// Set output for the last command
 			var output string
 			if msg.Result.Error != nil {
@@ -419,6 +415,11 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			// Set output in history
 			m.history[lastIdx].output = output
+
+			// Hide welcome screen after first command completes (when we get output)
+			if len(m.history) == 1 && output != "" {
+				m.showWelcome = false
+			}
 
 			// Queue output as pending for incremental render
 			// Trim any trailing whitespace/newlines to avoid blank lines
