@@ -64,6 +64,10 @@ type ShellModel struct {
 	commandPending     bool   // True when waiting for command result (don't update prompt)
 	commandJustDone    bool   // True when command just finished (need to move to next line)
 	lastViewContent    string // Last full view content (to detect if only prompt changed)
+
+	// In-app scrollback state
+	scrollOffset    int  // Lines scrolled up from bottom (0 = at bottom)
+	isScrolledUp    bool // True if user has scrolled up (shows indicator)
 }
 
 // ShellContext represents a shell session context
@@ -91,7 +95,29 @@ func NewShellModelWithSize(db *database.Database, userService *services.UserServ
 		username = u.Username
 	}
 
-	vfs := filesystem.NewVFS(username)
+	// Create VFS and merge user's saved filesystem changes
+	var vfs *filesystem.VFS
+	if u != nil && u.FileSystem != nil && len(u.FileSystem) > 0 {
+		var err error
+		vfs, err = filesystem.NewVFSFromMap(username, u.FileSystem)
+		if err != nil {
+			// If merge fails, fall back to standard VFS
+			vfs = filesystem.NewVFS(username)
+		}
+	} else {
+		vfs = filesystem.NewVFS(username)
+	}
+	
+	// Set up save callback for user filesystem
+	if u != nil {
+		vfs.SetUserID(u.ID.String())
+		vfs.SetSaveCallback(func(changes map[string]interface{}) error {
+			// Update user's filesystem in database
+			u.FileSystem = changes
+			return db.Model(u).Update("file_system", changes).Error
+		})
+	}
+	
 	handler := cmd.NewCommandHandler(db, vfs, u, userService, chatService)
 
 	// Sync user tools to VFS so they appear in help
@@ -248,6 +274,27 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textInput.SetValue("")
 			}
 			return m, nil
+		case "pgup", "shift+up":
+			// Scroll up through history
+			m.scrollUp(m.height / 2) // Half page at a time
+			return m, nil
+		case "pgdown", "shift+down":
+			// Scroll down through history
+			m.scrollDown(m.height / 2) // Half page at a time
+			return m, nil
+		case "home":
+			// Scroll to top of history (only if ctrl is held for home)
+			// Regular home goes to start of input line
+			if m.scrollOffset > 0 {
+				m.scrollToTop()
+				return m, nil
+			}
+		case "end":
+			// Scroll to bottom (only if scrolled up)
+			if m.scrollOffset > 0 {
+				m.scrollToBottom()
+				return m, nil
+			}
 		case "tab":
 			// Autocomplete
 			line := m.textInput.Value()
@@ -286,6 +333,8 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Empty enter - just add a newline effect
 				return m, nil
 			}
+			// Scroll to bottom when executing command
+			m.scrollToBottom()
 			// Don't clear textInput yet - keep command visible until result comes
 			// Set flag to prevent prompt updates while command executes
 			m.commandPending = true
@@ -303,11 +352,26 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// This ensures welcome screen stays visible until first command executes
 			return m, m.executeCommand(line)
 		default:
+			// Any typing scrolls to bottom
+			if m.scrollOffset > 0 {
+				m.scrollToBottom()
+			}
 			var cmd tea.Cmd
 			m.textInput, cmd = m.textInput.Update(msg)
 			m.inputHistory.Reset() // Reset history index when typing
 			return m, cmd
 		}
+	case tea.MouseMsg:
+		// Handle mouse wheel scrolling
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			m.scrollUp(3) // Scroll 3 lines at a time
+			return m, nil
+		case tea.MouseButtonWheelDown:
+			m.scrollDown(3) // Scroll 3 lines at a time
+			return m, nil
+		}
+		return m, nil
 	case WelcomeMsg:
 		m.showWelcome = true
 		// Don't set pendingOutput here - initialRender handles it
@@ -356,19 +420,32 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if strings.HasPrefix(msg.Result.Output, "__SSH_CONNECT__") {
 					// Handle SSH connection - push to stack and update path
 					newServerPath := strings.TrimPrefix(msg.Result.Output, "__SSH_CONNECT__")
-					// Push current context to stack
-					m.shellStack = append(m.shellStack, ShellContext{
-						serverPath: m.handler.GetCurrentServerPath(),
-						vfs:        m.vfs,
-						handler:    m.handler,
-					})
-					// Update handler's server path
-					m.handler.SetCurrentServerPath(newServerPath)
-					// Add connection message to history
-					parts := strings.Split(newServerPath, ".")
-					serverIP := parts[len(parts)-1]
-					output = fmt.Sprintf("Connected to %s\n", serverIP)
-					output += fmt.Sprintf("Server path: %s\n", newServerPath)
+					
+					// Get server filesystem and create new VFS
+					serverVFS, err := m.handler.CreateServerVFS(newServerPath)
+					if err != nil {
+						output = FormatError(fmt.Errorf("failed to load server filesystem: %w", err))
+					} else {
+						// Push current context to stack
+						m.shellStack = append(m.shellStack, ShellContext{
+							serverPath: m.handler.GetCurrentServerPath(),
+							vfs:        m.vfs,
+							handler:    m.handler,
+						})
+						
+						// Switch to server VFS
+						m.vfs = serverVFS
+						m.handler.SetVFS(serverVFS)
+						
+						// Update handler's server path
+						m.handler.SetCurrentServerPath(newServerPath)
+						
+						// Add connection message to history
+						parts := strings.Split(newServerPath, ".")
+						serverIP := parts[len(parts)-1]
+						output = fmt.Sprintf("Connected to %s\n", serverIP)
+						output += fmt.Sprintf("Server path: %s\n", newServerPath)
+					}
 				} else if msg.Result.Output == "__EXIT_SSH__" {
 					// Handle exit from SSH session - return immediately
 					return m.handleExitSSH()
@@ -578,6 +655,102 @@ func (m *ShellModel) IsGradientAnimating() bool {
 	return m.gradientAnimating
 }
 
+// scrollUp scrolls the view up by n lines
+func (m *ShellModel) scrollUp(n int) {
+	// Calculate total content lines to determine max scroll
+	totalLines := m.getTotalContentLines()
+	viewportHeight := m.height - 1 // -1 for prompt line
+	if viewportHeight < 1 {
+		viewportHeight = 1
+	}
+	
+	// Max scroll is total lines minus viewport (can't scroll past the beginning)
+	maxScroll := totalLines - viewportHeight
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	
+	m.scrollOffset += n
+	if m.scrollOffset > maxScroll {
+		m.scrollOffset = maxScroll
+	}
+	m.isScrolledUp = m.scrollOffset > 0
+}
+
+// scrollDown scrolls the view down by n lines
+func (m *ShellModel) scrollDown(n int) {
+	m.scrollOffset -= n
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
+	m.isScrolledUp = m.scrollOffset > 0
+}
+
+// scrollToTop scrolls to the top of history
+func (m *ShellModel) scrollToTop() {
+	totalLines := m.getTotalContentLines()
+	viewportHeight := m.height - 1
+	if viewportHeight < 1 {
+		viewportHeight = 1
+	}
+	
+	maxScroll := totalLines - viewportHeight
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	m.scrollOffset = maxScroll
+	m.isScrolledUp = m.scrollOffset > 0
+}
+
+// scrollToBottom scrolls to the bottom (most recent)
+func (m *ShellModel) scrollToBottom() {
+	m.scrollOffset = 0
+	m.isScrolledUp = false
+}
+
+// getTotalContentLines calculates the total number of content lines in history
+func (m *ShellModel) getTotalContentLines() int {
+	total := 0
+	
+	// Welcome content if shown
+	if m.showWelcome && len(m.history) == 0 {
+		// ASCII art + help text + spacer
+		total += m.height - 1 // Welcome takes full screen minus prompt
+	}
+	
+	// Count history lines
+	for _, entry := range m.history {
+		total++ // Command line itself
+		if entry.output != "" {
+			outputLines := strings.Split(strings.TrimSuffix(entry.output, "\n"), "\n")
+			total += len(outputLines)
+		}
+	}
+	
+	return total
+}
+
+// renderScrollIndicator renders a scroll position indicator
+func (m *ShellModel) renderScrollIndicator(totalLines, startLine, viewportHeight int) string {
+	// Calculate position percentage
+	endLine := startLine + viewportHeight
+	if endLine > totalLines {
+		endLine = totalLines
+	}
+	
+	// Style the indicator
+	indicatorStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("243")).
+		Background(lipgloss.Color("235")).
+		Padding(0, 1)
+	
+	// Show lines range and scroll hint
+	indicator := fmt.Sprintf("↑ lines %d-%d of %d (PgUp/PgDn to scroll, End to return)", 
+		startLine+1, endLine, totalLines)
+	
+	return indicatorStyle.Render(indicator)
+}
+
 // GetViewContent returns the view content without the prompt line
 // Used to detect if only the prompt changed (user typing)
 func (m *ShellModel) GetViewContent() string {
@@ -701,10 +874,53 @@ func (m *ShellModel) GetViewContent() string {
 		output.WriteString(m.textarea.View())
 		output.WriteString("\n")
 	} else {
-		// Normal mode - output all content without padding
-		// Padding is handled by View() method which adds prompt at the end
-		for _, line := range contentLines {
-			output.WriteString(line)
+		// Normal mode with scrollback support
+		// Calculate viewport window based on scroll offset
+		totalLines := len(contentLines)
+		viewportHeight := availableLines
+		
+		// Reserve 1 line for scroll indicator if scrolled up
+		if m.isScrolledUp {
+			viewportHeight--
+		}
+		
+		// Calculate which lines to show
+		// scrollOffset=0 means show the most recent lines (bottom)
+		// scrollOffset>0 means we're scrolled up into history
+		var startLine, endLine int
+		
+		if totalLines <= viewportHeight {
+			// All content fits - show everything
+			startLine = 0
+			endLine = totalLines
+		} else {
+			// Need to window into the content
+			// endLine is where we stop (exclusive), startLine is where we start
+			endLine = totalLines - m.scrollOffset
+			startLine = endLine - viewportHeight
+			
+			// Clamp to valid range
+			if startLine < 0 {
+				startLine = 0
+			}
+			if endLine > totalLines {
+				endLine = totalLines
+			}
+			if endLine < startLine {
+				endLine = startLine
+			}
+		}
+		
+		// Output the visible window
+		for i := startLine; i < endLine; i++ {
+			output.WriteString(contentLines[i])
+			output.WriteString("\n")
+		}
+		
+		// Add scroll indicator if scrolled up
+		if m.isScrolledUp {
+			indicator := m.renderScrollIndicator(totalLines, startLine, viewportHeight)
+			output.WriteString(indicator)
 			output.WriteString("\n")
 		}
 	}
@@ -837,6 +1053,9 @@ func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
 	// Restore VFS and handler
 	m.vfs = context.vfs
 	m.handler = context.handler
+	
+	// Update handler's VFS reference
+	m.handler.SetVFS(context.vfs)
 
 	// Update handler's server path
 	m.handler.SetCurrentServerPath(context.serverPath)

@@ -32,19 +32,19 @@ var (
 		Foreground(lipgloss.Color("46"))
 )
 
-// RenderPrompt renders the shell prompt
+// RenderPrompt renders the shell prompt with styled user, hostname, and path.
 func RenderPrompt(user, hostname, path string) string {
 	prompt := fmt.Sprintf("%s@%s:%s$ ", user, hostname, path)
 	return promptStyle.Render(prompt)
 }
 
-// FormatDirList formats a list of filesystem nodes for display
-// Returns output with trailing newline, or empty string if no nodes
+// FormatDirList formats a list of filesystem nodes for display.
+// Returns output with trailing newline, or empty string if no nodes.
 func FormatDirList(nodes []*filesystem.Node) string {
 	return FormatDirListWithOptions(nodes, false)
 }
 
-// FormatDirListWithOptions formats a list with optional long format
+// FormatDirListWithOptions formats a list with optional long format (detailed view).
 func FormatDirListWithOptions(nodes []*filesystem.Node, longFormat bool) string {
 	if len(nodes) == 0 {
 		return ""

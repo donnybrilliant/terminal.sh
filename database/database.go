@@ -1,3 +1,5 @@
+// Package database provides database connection and migration management using GORM.
+// It supports both SQLite and PostgreSQL backends.
 package database
 
 import (
@@ -14,14 +16,16 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// Database wraps gorm.DB for dependency injection
+// Database wraps gorm.DB for dependency injection and provides additional database operations.
 type Database struct {
 	*gorm.DB
 }
 
-// NewDB creates a new database connection and runs migrations
-// If dbURL is provided and starts with "postgres://" or "postgresql://", it uses PostgreSQL
-// Otherwise, it uses SQLite with dbPath
+// NewDB creates a new database connection and runs migrations.
+// If dbURL is provided and starts with "postgres://" or "postgresql://", it uses PostgreSQL.
+// Otherwise, it uses SQLite with the provided dbPath.
+// The database directory will be created automatically for SQLite if it doesn't exist.
+// Returns a Database instance and any error that occurred during connection or migration.
 func NewDB(dbPath, dbURL string) (*Database, error) {
 	var gormDB *gorm.DB
 	var err error
@@ -64,7 +68,9 @@ func NewDB(dbPath, dbURL string) (*Database, error) {
 	return db, nil
 }
 
-// Migrate runs database migrations
+// Migrate runs database migrations for all registered models.
+// This creates or updates database tables to match the model definitions.
+// Returns an error if migration fails.
 func (db *Database) Migrate() error {
 	// Auto-migrate all models
 	err := db.AutoMigrate(
@@ -93,7 +99,8 @@ func (db *Database) Migrate() error {
 	return nil
 }
 
-// Close closes the database connection
+// Close closes the database connection.
+// Returns an error if the connection cannot be closed.
 func (db *Database) Close() error {
 	if db.DB != nil {
 		sqlDB, err := db.DB.DB()

@@ -187,12 +187,12 @@ term.onKey((event) => {
             char = '';
             break;
         case 'ArrowUp':
-            keyName = 'Up';
+            keyName = domEvent.shiftKey ? 'shift+up' : 'Up';
             char = '';
             domEvent.preventDefault();
             break;
         case 'ArrowDown':
-            keyName = 'Down';
+            keyName = domEvent.shiftKey ? 'shift+down' : 'Down';
             char = '';
             domEvent.preventDefault();
             break;
@@ -205,6 +205,24 @@ term.onKey((event) => {
             keyName = 'Right';
             char = '';
             domEvent.preventDefault();
+            break;
+        case 'PageUp':
+            keyName = 'pgup';
+            char = '';
+            domEvent.preventDefault();
+            break;
+        case 'PageDown':
+            keyName = 'pgdown';
+            char = '';
+            domEvent.preventDefault();
+            break;
+        case 'Home':
+            keyName = 'home';
+            char = '';
+            break;
+        case 'End':
+            keyName = 'end';
+            char = '';
             break;
         default:
             // Handle Ctrl+key combinations
@@ -245,6 +263,25 @@ term.onKey((event) => {
 terminalContainer.addEventListener('contextmenu', (e) => {
     e.preventDefault();
 });
+
+// Handle mouse wheel for in-app scrollback
+terminalContainer.addEventListener('wheel', (e) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    
+    // Determine scroll direction
+    const button = e.deltaY < 0 ? 'wheelUp' : 'wheelDown';
+    
+    // Send mouse message to server
+    ws.send(JSON.stringify({
+        type: 'mouse',
+        button: button,
+        x: 0,
+        y: 0
+    }));
+    
+    // Prevent default xterm.js scrolling (we handle it server-side now)
+    e.preventDefault();
+}, { passive: false });
 
 // Connect when page loads
 document.addEventListener('DOMContentLoaded', () => {

@@ -12,7 +12,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// ChatService manages chat rooms, memberships, and message broadcasting
+// ChatService manages chat rooms, memberships, and real-time message broadcasting.
+// It maintains an in-memory cache of rooms and active sessions for efficient message delivery.
 type ChatService struct {
 	db             *database.Database
 	rooms          map[uuid.UUID]*models.ChatRoom
@@ -22,7 +23,7 @@ type ChatService struct {
 	mu             sync.RWMutex
 }
 
-// NewChatService creates a new chat service
+// NewChatService creates a new ChatService and loads all rooms from the database into memory.
 func NewChatService(db *database.Database) *ChatService {
 	service := &ChatService{
 		db:             db,
@@ -65,7 +66,8 @@ func (s *ChatService) loadRoomMembers(roomID uuid.UUID) {
 	}
 }
 
-// InitializeDefaultRoom creates the default #public room if it doesn't exist
+// InitializeDefaultRoom creates the default "#public" chat room if it doesn't exist.
+// This should be called during application startup.
 func (s *ChatService) InitializeDefaultRoom() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -102,7 +104,8 @@ func (s *ChatService) InitializeDefaultRoom() error {
 	return nil
 }
 
-// CreateRoom creates a new chat room
+// CreateRoom creates a new chat room with the specified name, type, and optional password.
+// Room types: "public", "private", or "password". Returns the created room or an error.
 func (s *ChatService) CreateRoom(name, roomType, password string, creatorID uuid.UUID) (*models.ChatRoom, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -147,7 +150,7 @@ func (s *ChatService) CreateRoom(name, roomType, password string, creatorID uuid
 	return room, nil
 }
 
-// GetRoomByName retrieves a room by name
+// GetRoomByName retrieves a chat room by its name, checking the in-memory cache first, then the database.
 func (s *ChatService) GetRoomByName(name string) (*models.ChatRoom, error) {
 	s.mu.RLock()
 

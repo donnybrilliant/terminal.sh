@@ -7,26 +7,26 @@ import (
 	"gorm.io/gorm"
 )
 
-// ServerResources represents server computational resources
+// ServerResources represents server computational resources.
 type ServerResources struct {
 	CPU      int     `json:"cpu"`
 	Bandwidth float64 `json:"bandwidth"`
 	RAM      int     `json:"ram"`
 }
 
-// ServerWallet represents server's currency
+// ServerWallet represents a server's currency balances.
 type ServerWallet struct {
 	Crypto float64 `json:"crypto"`
 	Data   float64 `json:"data"`
 }
 
-// Vulnerability represents a service vulnerability
+// Vulnerability represents a service vulnerability type and level.
 type Vulnerability struct {
 	Type  string `json:"type"`
 	Level int    `json:"level"`
 }
 
-// Service represents a server service
+// Service represents a network service running on a server.
 type Service struct {
 	Name          string         `json:"name"`
 	Description   string         `json:"description"`
@@ -36,13 +36,13 @@ type Service struct {
 	Vulnerabilities []Vulnerability `json:"vulnerabilities"`
 }
 
-// Role represents a server role/user
+// Role represents a server role or user account on a server.
 type Role struct {
 	Role  string `json:"role"`
 	Level int    `json:"level"`
 }
 
-// Server represents a game server
+// Server represents a game server that can be scanned, exploited, and accessed.
 type Server struct {
 	ID            uuid.UUID       `gorm:"type:text;primary_key" json:"id"`
 	IP            string          `gorm:"uniqueIndex;not null" json:"ip"`
@@ -60,7 +60,7 @@ type Server struct {
 	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
-// BeforeCreate hook to generate UUID
+// BeforeCreate is a GORM hook that generates a UUID for the server if one doesn't exist.
 func (s *Server) BeforeCreate(tx *gorm.DB) error {
 	if s.ID == uuid.Nil {
 		s.ID = uuid.New()

@@ -10,7 +10,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// SeedInitialData seeds the database with initial game data from JSON files
+// SeedInitialData seeds the database with initial game data from JSON files (servers, shops, patches).
+// This should be called during application initialization.
 func SeedInitialData(db *database.Database) error {
 	// Seed servers from JSON
 	if err := seedServersFromJSON(db); err != nil {

@@ -10,13 +10,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// ShopService handles shop-related operations
+// ShopService handles shop-related operations including creation, item management, and purchases.
 type ShopService struct {
 	db            *database.Database
 	serverService *ServerService
 }
 
-// NewShopService creates a new shop service
+// NewShopService creates a new ShopService with the provided database and server service.
 func NewShopService(db *database.Database, serverService *ServerService) *ShopService {
 	return &ShopService{
 		db:            db,

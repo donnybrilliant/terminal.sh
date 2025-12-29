@@ -403,6 +403,20 @@ func (b *BubbleTeaBridge) processMessages() {
 				}
 			}
 
+			// Transition: chat -> shell: reset to incremental mode
+			if wasChat && !isChat && !isLogin {
+				transitionMsg := OutputMessage{
+					Type: MessageTypeOutput,
+					Data: clearScreen + cursorHome,
+				}
+				if err := b.conn.WriteJSON(transitionMsg); err != nil {
+					return
+				}
+				b.renderMode = RenderModeIncremental
+				b.lastView = ""    // Force redraw
+				b.lastContent = "" // Reset content tracking
+			}
+
 			wasLogin = isLogin
 			wasChat = isChat
 			
@@ -507,6 +521,34 @@ func (b *BubbleTeaBridge) HandleResize(msg ResizeMessage) error {
 		Width:  msg.Width,
 		Height: msg.Height,
 	}:
+	default:
+		// Channel full, drop message
+	}
+	
+	return nil
+}
+
+// HandleMouse handles mouse messages from the WebSocket client
+func (b *BubbleTeaBridge) HandleMouse(msg MouseMessage) error {
+	var button tea.MouseButton
+	switch msg.Button {
+	case "wheelUp":
+		button = tea.MouseButtonWheelUp
+	case "wheelDown":
+		button = tea.MouseButtonWheelDown
+	default:
+		return nil // Ignore other mouse events for now
+	}
+	
+	mouseMsg := tea.MouseMsg{
+		X:      msg.X,
+		Y:      msg.Y,
+		Button: button,
+		Action: tea.MouseActionPress,
+	}
+	
+	select {
+	case b.msgChan <- mouseMsg:
 	default:
 		// Channel full, drop message
 	}

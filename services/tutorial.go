@@ -8,13 +8,13 @@ import (
 	"terminal-sh/models"
 )
 
-// TutorialService handles tutorial-related operations
+// TutorialService handles tutorial-related operations including loading and retrieval.
 type TutorialService struct {
 	tutorials []models.Tutorial
 	dataPath  string
 }
 
-// NewTutorialService creates a new tutorial service
+// NewTutorialService creates a new TutorialService and loads tutorials from the specified path.
 func NewTutorialService(dataPath string) (*TutorialService, error) {
 	service := &TutorialService{
 		dataPath: dataPath,

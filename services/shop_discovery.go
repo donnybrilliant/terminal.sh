@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// ShopDiscovery handles shop discovery logic
+// ShopDiscovery handles shop discovery logic, automatically creating shops on servers when discovered.
 type ShopDiscovery struct {
 	shopService    *ShopService
 	serverService  *ServerService
@@ -17,7 +17,7 @@ type ShopDiscovery struct {
 	toolService    *ToolService
 }
 
-// NewShopDiscovery creates a new shop discovery service
+// NewShopDiscovery creates a new ShopDiscovery service with the provided dependencies.
 func NewShopDiscovery(shopService *ShopService, serverService *ServerService, patchService *PatchService, toolService *ToolService) *ShopDiscovery {
 	return &ShopDiscovery{
 		shopService:   shopService,
@@ -27,7 +27,7 @@ func NewShopDiscovery(shopService *ShopService, serverService *ServerService, pa
 	}
 }
 
-// DiscoverShopsOnServer checks if a server has a shop and creates it if found
+// DiscoverShopsOnServer checks if a server has a shop configuration and creates it if found.
 func (s *ShopDiscovery) DiscoverShopsOnServer(serverIP string) (*models.Shop, error) {
 	// Check if shop already exists
 	shop, err := s.shopService.GetShopByServerIP(serverIP)

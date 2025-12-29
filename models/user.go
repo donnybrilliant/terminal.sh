@@ -1,3 +1,5 @@
+// Package models provides data models for the terminal.sh game database.
+// All models use GORM for ORM functionality and include UUID primary keys.
 package models
 
 import (
@@ -7,20 +9,20 @@ import (
 	"gorm.io/gorm"
 )
 
-// Resources represents user computational resources
+// Resources represents user computational resources.
 type Resources struct {
 	CPU      int     `json:"cpu"`
 	Bandwidth float64 `json:"bandwidth"`
 	RAM      int     `json:"ram"`
 }
 
-// Wallet represents user's currency
+// Wallet represents a user's currency balances.
 type Wallet struct {
 	Crypto float64 `json:"crypto"`
 	Data   float64 `json:"data"`
 }
 
-// User represents a game user
+// User represents a game user account with authentication, resources, and progress tracking.
 type User struct {
 	ID              uuid.UUID `gorm:"type:text;primary_key" json:"id"`
 	Username        string    `gorm:"uniqueIndex;not null" json:"username"`
@@ -32,6 +34,7 @@ type User struct {
 	Experience      int       `gorm:"default:0" json:"experience"`
 	Resources       Resources  `gorm:"type:text;serializer:json" json:"resources"`
 	Wallet          Wallet     `gorm:"type:text;serializer:json" json:"wallet"`
+	FileSystem      map[string]interface{} `gorm:"type:text;serializer:json" json:"file_system"` // User's filesystem changes
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 	
@@ -46,7 +49,7 @@ type User struct {
 	Sessions        []Session         `gorm:"foreignKey:UserID" json:"sessions,omitempty"`
 }
 
-// BeforeCreate hook to generate UUID
+// BeforeCreate is a GORM hook that generates a UUID for the user if one doesn't exist.
 func (u *User) BeforeCreate(tx *gorm.DB) error {
 	if u.ID == uuid.Nil {
 		u.ID = uuid.New()

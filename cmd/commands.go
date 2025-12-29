@@ -1,3 +1,4 @@
+// Package cmd provides command handlers for terminal commands executed in the game shell.
 package cmd
 
 import (
@@ -13,6 +14,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// CommandResult represents the result of executing a command, including output, errors, and optional filesystem nodes.
 type CommandResult struct {
 	Output     string
 	Error      error
@@ -20,6 +22,7 @@ type CommandResult struct {
 	LongFormat bool                // For ls -l format
 }
 
+// CommandHandler handles execution of terminal commands and manages game state.
 type CommandHandler struct {
 	db              *database.Database
 	vfs            *filesystem.VFS
@@ -43,6 +46,8 @@ type CommandHandler struct {
 	onSSHDisconnect func() error // Callback for SSH disconnection
 }
 
+// NewCommandHandler creates a new CommandHandler with the provided dependencies.
+// Initializes all required services for command execution.
 func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.User, userService *services.UserService, chatService *services.ChatService) *CommandHandler {
 	serverService := services.NewServerService(db)
 	toolService := services.NewToolService(db, serverService)
@@ -78,25 +83,57 @@ func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.
 	}
 }
 
-// SetSessionID sets the current session ID
+// SetSessionID sets the current session ID for this command handler.
 func (h *CommandHandler) SetSessionID(sessionID uuid.UUID) {
 	h.sessionID = &sessionID
 }
 
-// SetSSHCallbacks sets callbacks for SSH connect/disconnect
+// SetSSHCallbacks sets callbacks for SSH connect and disconnect events.
 func (h *CommandHandler) SetSSHCallbacks(onConnect func(serverPath string) error, onDisconnect func() error) {
 	h.onSSHConnect = onConnect
 	h.onSSHDisconnect = onDisconnect
 }
 
-// GetCurrentServerPath returns the current server path
+// GetCurrentServerPath returns the current server path (empty if on user's local system).
 func (h *CommandHandler) GetCurrentServerPath() string {
 	return h.currentServerPath
 }
 
-// SetCurrentServerPath sets the current server path (for restoring from stack)
+// SetCurrentServerPath sets the current server path (used for restoring from session stack).
 func (h *CommandHandler) SetCurrentServerPath(path string) {
 	h.currentServerPath = path
+}
+
+// SetVFS sets the VFS (Virtual FileSystem) for the command handler.
+func (h *CommandHandler) SetVFS(vfs *filesystem.VFS) {
+	h.vfs = vfs
+}
+
+// CreateServerVFS creates a VFS for a server by loading its filesystem from the database.
+// Returns the created VFS or an error if the server is not found.
+func (h *CommandHandler) CreateServerVFS(serverPath string) (*filesystem.VFS, error) {
+	// Get server by path
+	server, err := h.serverService.GetServerByPath(serverPath)
+	if err != nil {
+		return nil, fmt.Errorf("server not found: %w", err)
+	}
+	
+	// Create standard VFS (use "root" as username for server filesystems)
+	vfs, err := filesystem.NewVFSFromMap("root", server.FileSystem)
+	if err != nil {
+		// Fall back to standard VFS if merge fails
+		vfs = filesystem.NewVFS("root")
+	}
+	
+	// Set up save callback for server filesystem
+	vfs.SetServerID(serverPath)
+	vfs.SetSaveCallback(func(changes map[string]interface{}) error {
+		// Update server's filesystem in database
+		server.FileSystem = changes
+		return h.db.Model(&server).Update("file_system", changes).Error
+	})
+	
+	return vfs, nil
 }
 
 // SyncUserToolsToVFS syncs user's owned tools to /usr/bin in the VFS

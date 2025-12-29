@@ -1,3 +1,5 @@
+// Package config provides configuration management for the terminal.sh server.
+// It loads settings from environment variables and optional .env files.
 package config
 
 import (
@@ -7,20 +9,22 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Config holds the application configuration including server ports, database settings, and JWT secret.
 type Config struct {
-	Host        string
-	Port        int
-	WebHost     string
-	WebPort     int
-	HostKeyPath string
-	DatabasePath string
-	DatabaseURL  string // For PostgreSQL support
-	JWTSecret    string
+	Host         string // SSH server host (default: "0.0.0.0")
+	Port         int    // SSH server port (default: 2222)
+	WebHost      string // Web server host (default: same as Host)
+	WebPort      int    // Web server port (default: 8080)
+	HostKeyPath  string // Path to SSH host key file (optional)
+	DatabasePath string // Path to SQLite database file (default: "data/terminal.db")
+	DatabaseURL  string // PostgreSQL connection URL (optional, takes precedence over DatabasePath)
+	JWTSecret    string // Secret key for JWT token signing
 }
 
-// Load loads configuration from environment variables and .env file
-// Environment variables take precedence over .env file values
-// .env file is loaded for local development convenience
+// Load loads configuration from environment variables and .env file.
+// Environment variables take precedence over .env file values.
+// The .env file is loaded for local development convenience and is optional.
+// Returns a Config instance with defaults applied for any missing values.
 func Load() *Config {
 	// Load .env file if it exists (ignore errors - it's optional)
 	// This is useful for local development

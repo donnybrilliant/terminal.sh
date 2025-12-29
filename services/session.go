@@ -10,13 +10,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// SessionService handles SSH session management
+// SessionService handles SSH and terminal session management.
 type SessionService struct {
 	db            *database.Database
 	serverService *ServerService
 }
 
-// NewSessionService creates a new session service
+// NewSessionService creates a new SessionService with the provided database and server service.
 func NewSessionService(db *database.Database, serverService *ServerService) *SessionService {
 	return &SessionService{
 		db:            db,
@@ -24,7 +24,8 @@ func NewSessionService(db *database.Database, serverService *ServerService) *Ses
 	}
 }
 
-// CreateSession creates a new SSH session
+// CreateSession creates a new SSH or terminal session for a user.
+// Supports nested sessions (SSH within SSH) via parentSessionID.
 func (s *SessionService) CreateSession(userID uuid.UUID, sshConnID string, currentServerPath string, parentSessionID *uuid.UUID) (*models.Session, error) {
 	session := &models.Session{
 		UserID:          userID,

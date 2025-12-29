@@ -11,13 +11,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// PatchService handles patch-related operations
+// PatchService handles patch-related operations including retrieval, application, and seeding.
 type PatchService struct {
 	db          *database.Database
 	toolService *ToolService
 }
 
-// NewPatchService creates a new patch service
+// NewPatchService creates a new PatchService with the provided database and tool service.
 func NewPatchService(db *database.Database, toolService *ToolService) *PatchService {
 	return &PatchService{
 		db:          db,
@@ -25,7 +25,7 @@ func NewPatchService(db *database.Database, toolService *ToolService) *PatchServ
 	}
 }
 
-// GetPatchByName retrieves a patch by name
+// GetPatchByName retrieves a patch by its name from the database.
 func (s *PatchService) GetPatchByName(name string) (*models.Patch, error) {
 	var patch models.Patch
 	if err := s.db.Where("name = ?", name).First(&patch).Error; err != nil {

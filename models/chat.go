@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// ChatRoom represents a chat room/channel
+// ChatRoom represents a chat room or channel for player communication.
 type ChatRoom struct {
 	ID        uuid.UUID `gorm:"type:text;primary_key" json:"id"`
 	Name      string    `gorm:"uniqueIndex;not null" json:"name"` // e.g., "#public", "mygroup"
@@ -18,7 +18,7 @@ type ChatRoom struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// BeforeCreate hook to generate UUID
+// BeforeCreate is a GORM hook that generates a UUID for the chat room if one doesn't exist.
 func (r *ChatRoom) BeforeCreate(tx *gorm.DB) error {
 	if r.ID == uuid.Nil {
 		r.ID = uuid.New()
@@ -26,7 +26,7 @@ func (r *ChatRoom) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// ChatMessage represents a message in a chat room
+// ChatMessage represents a message sent in a chat room.
 type ChatMessage struct {
 	ID        uuid.UUID `gorm:"type:text;primary_key" json:"id"`
 	RoomID    uuid.UUID `gorm:"type:text;not null;index" json:"room_id"`
@@ -36,7 +36,7 @@ type ChatMessage struct {
 	CreatedAt time.Time `gorm:"not null;index" json:"created_at"`
 }
 
-// BeforeCreate hook to generate UUID
+// BeforeCreate is a GORM hook that generates a UUID for the chat message if one doesn't exist.
 func (m *ChatMessage) BeforeCreate(tx *gorm.DB) error {
 	if m.ID == uuid.Nil {
 		m.ID = uuid.New()
@@ -44,7 +44,7 @@ func (m *ChatMessage) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// ChatRoomMember represents membership in a chat room
+// ChatRoomMember represents a user's membership in a chat room.
 type ChatRoomMember struct {
 	RoomID   uuid.UUID `gorm:"type:text;primary_key" json:"room_id"`
 	UserID   uuid.UUID `gorm:"type:text;primary_key" json:"user_id"`

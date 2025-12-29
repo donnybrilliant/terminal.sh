@@ -19,7 +19,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-// WebSocketSession manages a WebSocket connection and its Bubble Tea program
+// WebSocketSession manages a WebSocket connection and its associated Bubble Tea program.
 type WebSocketSession struct {
 	conn      *websocket.Conn
 	bridge    *BubbleTeaBridge
@@ -29,7 +29,8 @@ type WebSocketSession struct {
 	height    int
 }
 
-// HandleWebSocket handles WebSocket upgrade and manages the session
+// HandleWebSocket handles WebSocket upgrade and manages the session lifecycle.
+// Creates a Bubble Tea bridge and processes incoming messages until the connection closes.
 func HandleWebSocket(w http.ResponseWriter, r *http.Request, db *database.Database, userService *services.UserService, chatService *services.ChatService) error {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -105,6 +106,13 @@ func (s *WebSocketSession) handleMessages() error {
 				s.height = resizeMsg.Height
 				if err := s.bridge.HandleResize(resizeMsg); err != nil {
 					log.Printf("Error handling resize: %v", err)
+				}
+			}
+		case MessageTypeMouse:
+			var mouseMsg MouseMessage
+			if err := json.Unmarshal(message, &mouseMsg); err == nil {
+				if err := s.bridge.HandleMouse(mouseMsg); err != nil {
+					log.Printf("Error handling mouse: %v", err)
 				}
 			}
 		case MessageTypeClose:

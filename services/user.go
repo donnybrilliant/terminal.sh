@@ -1,3 +1,5 @@
+// Package services provides business logic services for the terminal.sh game.
+// Services handle operations related to users, servers, tools, exploitation, mining, and more.
 package services
 
 import (
@@ -13,13 +15,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// UserService handles user-related operations
+// UserService handles user-related operations including registration, authentication, and user management.
 type UserService struct {
 	db           *database.Database
 	tokenManager *auth.TokenManager
 }
 
-// NewUserService creates a new user service
+// NewUserService creates a new UserService with the provided database and JWT secret.
 func NewUserService(db *database.Database, jwtSecret string) *UserService {
 	return &UserService{
 		db:           db,
@@ -27,7 +29,8 @@ func NewUserService(db *database.Database, jwtSecret string) *UserService {
 	}
 }
 
-// Register creates a new user
+// Register creates a new user account with the provided username and password.
+// Generates IP addresses, MAC address, and initial resources. Returns the created user or an error.
 func (s *UserService) Register(username, password string) (*models.User, error) {
 	// Validate username
 	if username == "" || username == "guest" {
@@ -78,7 +81,8 @@ func (s *UserService) Register(username, password string) (*models.User, error) 
 	return user, nil
 }
 
-// Login authenticates a user and returns a JWT token
+// Login authenticates a user with username and password, returning the user, JWT token, and any error.
+// If the user doesn't exist, automatically registers them (auto-registration).
 func (s *UserService) Login(username, password string) (*models.User, string, error) {
 	var user models.User
 	if err := s.db.Where("username = ?", username).First(&user).Error; err != nil {
@@ -111,7 +115,7 @@ func (s *UserService) Login(username, password string) (*models.User, string, er
 	return &user, token, nil
 }
 
-// GetUserByID retrieves a user by ID
+// GetUserByID retrieves a user by their UUID, including related tools and achievements.
 func (s *UserService) GetUserByID(userID uuid.UUID) (*models.User, error) {
 	var user models.User
 	if err := s.db.Preload("Tools").Preload("Achievements").First(&user, "id = ?", userID).Error; err != nil {
@@ -120,7 +124,7 @@ func (s *UserService) GetUserByID(userID uuid.UUID) (*models.User, error) {
 	return &user, nil
 }
 
-// GetUserByUsername retrieves a user by username
+// GetUserByUsername retrieves a user by their username, including related tools and achievements.
 func (s *UserService) GetUserByUsername(username string) (*models.User, error) {
 	var user models.User
 	if err := s.db.Preload("Tools").Preload("Achievements").First(&user, "username = ?", username).Error; err != nil {
@@ -129,7 +133,8 @@ func (s *UserService) GetUserByUsername(username string) (*models.User, error) {
 	return &user, nil
 }
 
-// UpdateUsername updates a user's username
+// UpdateUsername updates a user's username to a new value.
+// Returns an error if the username is invalid or already taken.
 func (s *UserService) UpdateUsername(userID uuid.UUID, newUsername string) error {
 	if newUsername == "" || newUsername == "guest" {
 		return fmt.Errorf("invalid username")
@@ -144,7 +149,8 @@ func (s *UserService) UpdateUsername(userID uuid.UUID, newUsername string) error
 	return s.db.Model(&models.User{}).Where("id = ?", userID).Update("username", newUsername).Error
 }
 
-// AddExperience adds experience to a user and levels them up if needed
+// AddExperience adds experience points to a user and levels them up if the threshold is reached.
+// Level calculation: 100 experience points per level.
 func (s *UserService) AddExperience(userID uuid.UUID, amount int) error {
 	user, err := s.GetUserByID(userID)
 	if err != nil {
@@ -198,7 +204,8 @@ func randomInt(min, max int) int {
 	return int(n.Int64()) + min
 }
 
-// ValidateToken validates a JWT token and returns the user
+// ValidateToken validates a JWT token string and returns the associated user.
+// Returns an error if the token is invalid or expired.
 func (s *UserService) ValidateToken(tokenString string) (*models.User, error) {
 	claims, err := s.tokenManager.ValidateToken(tokenString)
 	if err != nil {

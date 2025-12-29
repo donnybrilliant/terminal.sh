@@ -5,25 +5,26 @@ import (
 	"terminal-sh/models"
 )
 
-// OperationType represents the type of operation
+// OperationType represents the type of operation for progress calculation.
 type OperationType string
 
 const (
-	OperationDownload OperationType = "download"
-	OperationExploit  OperationType = "exploit"
-	OperationSSH      OperationType = "ssh"
-	OperationTransfer OperationType = "transfer"
+	OperationDownload OperationType = "download" // Tool download operation
+	OperationExploit  OperationType = "exploit"  // Server exploitation operation
+	OperationSSH      OperationType = "ssh"      // SSH connection operation
+	OperationTransfer OperationType = "transfer" // Data transfer operation
 )
 
-// ProgressService handles progress calculation for operations
+// ProgressService handles progress calculation for game operations based on user resources.
 type ProgressService struct{}
 
-// NewProgressService creates a new progress service
+// NewProgressService creates a new ProgressService.
 func NewProgressService() *ProgressService {
 	return &ProgressService{}
 }
 
-// CalculateOperationTime calculates the time needed for an operation based on user resources
+// CalculateOperationTime calculates the time needed for an operation based on user resources.
+// Returns the operation time in seconds.
 func (s *ProgressService) CalculateOperationTime(operationType OperationType, userResources models.Resources) float64 {
 	// Base times in seconds
 	baseTimes := map[OperationType]float64{

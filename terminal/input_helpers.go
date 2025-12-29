@@ -1,15 +1,16 @@
+// Package terminal provides terminal UI components and utilities using Bubble Tea.
 package terminal
 
 import "strings"
 
-// InputHistory manages command history with up/down navigation
+// InputHistory manages command history with up/down navigation for terminal input.
 type InputHistory struct {
 	commands []string
 	index    int
 	maxSize  int
 }
 
-// NewInputHistory creates a new input history with specified max size
+// NewInputHistory creates a new InputHistory with the specified maximum size.
 func NewInputHistory(maxSize int) *InputHistory {
 	return &InputHistory{
 		commands: make([]string, 0),
@@ -18,7 +19,7 @@ func NewInputHistory(maxSize int) *InputHistory {
 	}
 }
 
-// Add adds a command to history (skips duplicates of last command)
+// Add adds a command to history, skipping duplicates of the last command.
 func (h *InputHistory) Add(cmd string) {
 	if cmd == "" {
 		return
@@ -35,7 +36,7 @@ func (h *InputHistory) Add(cmd string) {
 	h.index = -1
 }
 
-// Previous returns the previous command in history (for up arrow)
+// Previous returns the previous command in history (for up arrow navigation).
 func (h *InputHistory) Previous() (string, bool) {
 	if len(h.commands) == 0 {
 		return "", false
@@ -48,8 +49,8 @@ func (h *InputHistory) Previous() (string, bool) {
 	return h.commands[h.index], true
 }
 
-// Next returns the next command in history (for down arrow)
-// Returns empty string and false when past end of history
+// Next returns the next command in history (for down arrow navigation).
+// Returns empty string and false when past the end of history.
 func (h *InputHistory) Next() (string, bool) {
 	if h.index < 0 {
 		return "", false
@@ -62,15 +63,15 @@ func (h *InputHistory) Next() (string, bool) {
 	return h.commands[h.index], true
 }
 
-// Reset resets the history navigation index
+// Reset resets the history navigation index to the default position.
 func (h *InputHistory) Reset() {
 	h.index = -1
 }
 
-// Autocompleter provides autocomplete functionality
+// Autocompleter provides autocomplete functionality (placeholder for future use).
 type Autocompleter struct{}
 
-// FindCommonPrefix returns the common prefix of all strings in the slice
+// FindCommonPrefix returns the common prefix of all strings in the slice.
 func FindCommonPrefix(items []string) string {
 	if len(items) == 0 {
 		return ""
@@ -103,7 +104,7 @@ func commonPrefixOf(a, b string) string {
 	return a[:minLen]
 }
 
-// FilterByPrefix returns all items that start with the given prefix
+// FilterByPrefix returns all items that start with the given prefix.
 func FilterByPrefix(items []string, prefix string) []string {
 	var matches []string
 	for _, item := range items {
@@ -114,8 +115,8 @@ func FilterByPrefix(items []string, prefix string) []string {
 	return matches
 }
 
-// CompleteFromList attempts to autocomplete a prefix from a list of options
-// Returns the completed string and whether completion happened
+// CompleteFromList attempts to autocomplete a prefix from a list of options.
+// Returns the completed string and whether completion happened.
 func CompleteFromList(prefix string, options []string) (string, bool) {
 	matches := FilterByPrefix(options, prefix)
 

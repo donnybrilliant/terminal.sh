@@ -259,8 +259,8 @@ func (h *CommandHandler) handleChatInvite(args []string, currentRoomName string)
 		return &CommandResult{Error: fmt.Errorf("you must be a member of the room to invite others")}
 	}
 
-	// Add user to room (bypass password check for private rooms)
-	err = h.chatService.JoinRoom(room.ID, targetUser.ID, "")
+	// Use InviteUser which bypasses private room restrictions
+	err = h.chatService.InviteUser(room.ID, h.user.ID, targetUser.ID, h.user.Username)
 	if err != nil {
 		return &CommandResult{Error: fmt.Errorf("failed to invite user: %w", err)}
 	}

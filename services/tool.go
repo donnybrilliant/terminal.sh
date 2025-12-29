@@ -11,14 +11,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// ToolService handles tool-related operations
+// ToolService handles tool-related operations including retrieval, ownership, and effective tool calculations.
 type ToolService struct {
 	db            *database.Database
 	serverService *ServerService
 	patchService  *PatchService // Will be set after patch service is created
 }
 
-// NewToolService creates a new tool service
+// NewToolService creates a new ToolService with the provided database and server service.
 func NewToolService(db *database.Database, serverService *ServerService) *ToolService {
 	return &ToolService{
 		db:            db,
@@ -26,12 +26,12 @@ func NewToolService(db *database.Database, serverService *ServerService) *ToolSe
 	}
 }
 
-// SetPatchService sets the patch service (called after patch service is created)
+// SetPatchService sets the patch service for this tool service (called after patch service is created).
 func (s *ToolService) SetPatchService(patchService *PatchService) {
 	s.patchService = patchService
 }
 
-// GetToolByName retrieves a tool by name
+// GetToolByName retrieves a tool by its name from the database.
 func (s *ToolService) GetToolByName(name string) (*models.Tool, error) {
 	var tool models.Tool
 	if err := s.db.Where("name = ?", name).First(&tool).Error; err != nil {
@@ -40,7 +40,7 @@ func (s *ToolService) GetToolByName(name string) (*models.Tool, error) {
 	return &tool, nil
 }
 
-// GetAllTools retrieves all tools
+// GetAllTools retrieves all tools from the database.
 func (s *ToolService) GetAllTools() ([]models.Tool, error) {
 	var tools []models.Tool
 	if err := s.db.Find(&tools).Error; err != nil {
@@ -49,7 +49,7 @@ func (s *ToolService) GetAllTools() ([]models.Tool, error) {
 	return tools, nil
 }
 
-// GetUserTools retrieves all tools owned by a user (base tool definitions)
+// GetUserTools retrieves all base tool definitions owned by a user.
 func (s *ToolService) GetUserTools(userID uuid.UUID) ([]models.Tool, error) {
 	var user models.User
 	if err := s.db.Preload("Tools").First(&user, "id = ?", userID).Error; err != nil {
@@ -58,7 +58,7 @@ func (s *ToolService) GetUserTools(userID uuid.UUID) ([]models.Tool, error) {
 	return user.Tools, nil
 }
 
-// GetUserToolState retrieves a user's specific tool state
+// GetUserToolState retrieves a user's specific tool state, including applied patches and calculated properties.
 func (s *ToolService) GetUserToolState(userID uuid.UUID, toolName string) (*models.UserToolState, error) {
 	// Get base tool
 	tool, err := s.GetToolByName(toolName)
@@ -75,7 +75,7 @@ func (s *ToolService) GetUserToolState(userID uuid.UUID, toolName string) (*mode
 	return &toolState, nil
 }
 
-// GetEffectiveTool retrieves a tool with effective stats calculated from user's tool state
+// GetEffectiveTool retrieves a tool with effective stats calculated from the user's tool state (with patches applied).
 func (s *ToolService) GetEffectiveTool(userID uuid.UUID, toolName string) (*models.Tool, error) {
 	toolState, err := s.GetUserToolState(userID, toolName)
 	if err != nil {
