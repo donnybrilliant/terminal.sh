@@ -58,3 +58,6 @@ host_key
 .ssh/
 ssh_host_key
 ssh_host_key.pub
+
+IMPLEMENTATION_SUMMARY.md
+ORIGINAL_PROJECT_REFERENCE.md
