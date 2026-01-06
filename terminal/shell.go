@@ -312,8 +312,27 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.textInput.CursorEnd()
 				}
 			} else {
-				// Complete file/directory name
+				// Check if we should autocomplete command arguments
+				cmd := parts[0]
 				prefix := parts[len(parts)-1]
+				
+				// Handle tutorial name autocomplete
+				if cmd == "tutorial" && len(parts) >= 2 {
+					tutorialNames := m.getTutorialNames(prefix)
+					if completed, ok := CompleteFromList(prefix, tutorialNames); ok {
+						current := m.textInput.Value()
+						lastSpaceIdx := strings.LastIndex(current, " ")
+						if lastSpaceIdx >= 0 {
+							m.textInput.SetValue(current[:lastSpaceIdx+1] + completed)
+						} else {
+							m.textInput.SetValue(completed)
+						}
+						m.textInput.CursorEnd()
+						return m, nil
+					}
+				}
+				
+				// Default: Complete file/directory name
 				files := m.getFileMatches(prefix)
 				if completed, ok := CompleteFromList(prefix, files); ok {
 					current := m.textInput.Value()
@@ -1001,8 +1020,33 @@ type GradientTickMsg struct{}
 
 // getCommandMatches returns commands that start with the given prefix
 func (m *ShellModel) getCommandMatches(prefix string) []string {
+	// Built-in commands (from cmd/commands.go)
+	// Note: crypto_miner, stop_mining, miners are built-in commands, not tool commands
+	builtInCommands := []string{
+		"pwd", "ls", "cd", "cat", "clear", "help", "chat", "tutorial",
+		"login", "logout", "register", "userinfo", "info", "whoami", "name",
+		"ifconfig", "scan", "server", "createServer", "createLocalServer",
+		"ssh", "exit", "get", "tools", "exploited", "shop", "buy",
+		"patches", "patch", "crypto_miner", "stop_mining", "miners", "wallet",
+		"touch", "mkdir", "rm", "cp", "mv", "edit", "vi", "nano",
+	}
+	
+	// Get user's owned tools (only include tool commands the user owns)
+	var userToolCommands []string
+	if m.user != nil && m.handler != nil {
+		// Get user's tools from the handler's tool service
+		tools, err := m.handler.GetUserToolNames()
+		if err == nil {
+			userToolCommands = tools
+		}
+		// If error, just use empty list (user has no tools or error getting them)
+	}
+	
+	// Get VFS commands (filesystem commands)
 	binCommands, usrBinCommands := m.vfs.ListCommands()
-	allCommands := append(binCommands, usrBinCommands...)
+	allCommands := append(builtInCommands, userToolCommands...)
+	allCommands = append(allCommands, binCommands...)
+	allCommands = append(allCommands, usrBinCommands...)
 
 	var matches []string
 	for _, cmd := range allCommands {
@@ -1011,6 +1055,20 @@ func (m *ShellModel) getCommandMatches(prefix string) []string {
 		}
 	}
 	return matches
+}
+
+// getTutorialNames returns tutorial IDs that start with the given prefix
+func (m *ShellModel) getTutorialNames(prefix string) []string {
+	if m.handler == nil {
+		return []string{}
+	}
+	
+	// Get tutorial service from handler (we need to access it)
+	// Since we can't directly access tutorialService from handler, we'll need to
+	// reload tutorials each time. This is acceptable since it's only on tab completion.
+	// We'll use a helper method on CommandHandler to get tutorial names
+	tutorialNames := m.handler.GetTutorialNames(prefix)
+	return tutorialNames
 }
 
 // getFileMatches returns files/directories in current directory that start with prefix
