@@ -1,3 +1,4 @@
+// Package websocket provides WebSocket server functionality for browser-based terminal access.
 package websocket
 
 import (
@@ -21,8 +22,10 @@ var (
 			Foreground(lipgloss.Color("39"))
 )
 
-// StartHTTPServer starts the HTTP server for serving static files and WebSocket connections
-func StartHTTPServer(cfg *config.Config, db *database.Database) error {
+// StartHTTPServer starts the HTTP server for serving static files and WebSocket connections.
+// Serves the web interface from the web/ directory and handles WebSocket upgrades at /ws.
+// Returns an error if the server fails to start.
+func StartHTTPServer(cfg *config.Config, db *database.Database, chatService *services.ChatService) error {
 	userService := services.NewUserService(db, cfg.JWTSecret)
 
 	// Determine web directory path (relative to working directory)
@@ -45,7 +48,7 @@ func StartHTTPServer(cfg *config.Config, db *database.Database) error {
 
 	// WebSocket endpoint
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		if err := HandleWebSocket(w, r, db, userService); err != nil {
+		if err := HandleWebSocket(w, r, db, userService, chatService); err != nil {
 			log.Printf("WebSocket error: %v", err)
 		}
 	})

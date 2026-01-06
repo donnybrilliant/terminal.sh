@@ -7,7 +7,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// UserToolState represents a user's specific state for a tool (CRITICAL: user-specific tool states)
+// UserToolState represents a user's specific state for a tool, including applied patches and calculated properties.
+// This allows different users to have different versions of the same tool based on patches they've applied.
 type UserToolState struct {
 	ID                uuid.UUID      `gorm:"type:text;primary_key" json:"id"`
 	UserID            uuid.UUID      `gorm:"not null;index" json:"user_id"`
@@ -24,7 +25,7 @@ type UserToolState struct {
 	Tool Tool `gorm:"foreignKey:ToolID" json:"tool,omitempty"`
 }
 
-// BeforeCreate hook to generate UUID
+// BeforeCreate is a GORM hook that generates a UUID for the user tool state if one doesn't exist.
 func (uts *UserToolState) BeforeCreate(tx *gorm.DB) error {
 	if uts.ID == uuid.Nil {
 		uts.ID = uuid.New()
@@ -32,7 +33,7 @@ func (uts *UserToolState) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// TableName specifies the table name for UserToolState
+// TableName specifies the table name for UserToolState in the database.
 func (UserToolState) TableName() string {
 	return "user_tool_states"
 }

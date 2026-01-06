@@ -3,8 +3,11 @@ package terminal
 import (
 	"fmt"
 	"strings"
+	"time"
 
+	"terminal-sh/database"
 	"terminal-sh/filesystem"
+	"terminal-sh/models"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -29,19 +32,19 @@ var (
 		Foreground(lipgloss.Color("46"))
 )
 
-// RenderPrompt renders the shell prompt
+// RenderPrompt renders the shell prompt with styled user, hostname, and path.
 func RenderPrompt(user, hostname, path string) string {
 	prompt := fmt.Sprintf("%s@%s:%s$ ", user, hostname, path)
 	return promptStyle.Render(prompt)
 }
 
-// FormatDirList formats a list of filesystem nodes for display
-// Returns output with trailing newline, or empty string if no nodes
+// FormatDirList formats a list of filesystem nodes for display.
+// Returns output with trailing newline, or empty string if no nodes.
 func FormatDirList(nodes []*filesystem.Node) string {
 	return FormatDirListWithOptions(nodes, false)
 }
 
-// FormatDirListWithOptions formats a list with optional long format
+// FormatDirListWithOptions formats a list with optional long format (detailed view).
 func FormatDirListWithOptions(nodes []*filesystem.Node, longFormat bool) string {
 	if len(nodes) == 0 {
 		return ""
@@ -143,21 +146,42 @@ func AnimatedWelcome() string {
 }
 
 // WelcomeHelpText returns the help text that appears below the ASCII art
-func WelcomeHelpText() string {
+// If user is provided, shows conditional message (first login vs last login)
+func WelcomeHelpText(user *models.User, db *database.Database) string {
 	var styled strings.Builder
 	
 	styled.WriteString("\n")
 	
-	// Subtitle with instructions
-	subtitleStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
-		Italic(true)
-	styled.WriteString(subtitleStyle.Render("Type 'help' for available commands\n"))
+	// Subtitle with instructions - use plain ANSI codes for consistent alignment
+	styled.WriteString("\x1b[38;5;39m\x1b[3mType 'help' for available commands\x1b[0m\n")
 	
-	noteStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
-		Faint(true)
-	styled.WriteString(noteStyle.Render("Note: Your account was auto-created on first login"))
+	// Conditional note based on first login or last login
+	if user != nil && db != nil {
+		// Check if this is a first login (user created within last 2 minutes)
+		isFirstLogin := time.Since(user.CreatedAt) < 2*time.Minute
+		
+		if isFirstLogin {
+			// First login - show auto-created message
+			styled.WriteString("\x1b[38;5;240m\x1b[2mNote: Your account was auto-created on first login\x1b[0m")
+		} else {
+			// Not first login - show last login info
+			// Query for the most recent session before this one (exclude sessions from last 30 seconds to avoid current session)
+			var lastSession models.Session
+			cutoffTime := time.Now().Add(-30 * time.Second)
+			if err := db.Where("user_id = ? AND created_at < ?", user.ID, cutoffTime).Order("created_at DESC").First(&lastSession).Error; err == nil {
+				// Found a previous session - show last login time
+				lastLoginTime := lastSession.CreatedAt.Format("Mon Jan 2 15:04:05 MST 2006")
+				styled.WriteString("\x1b[38;5;39mLast login: \x1b[38;5;252m" + lastLoginTime + "\x1b[0m")
+			} else {
+				// No previous session found, but account is old - show account creation date
+				createdTime := user.CreatedAt.Format("Mon Jan 2 15:04:05 MST 2006")
+				styled.WriteString("\x1b[38;5;39mAccount created: \x1b[38;5;252m" + createdTime + "\x1b[0m")
+			}
+		}
+	} else {
+		// Fallback if no user/db provided
+		styled.WriteString("\x1b[38;5;240m\x1b[2mNote: Your account was auto-created on first login\x1b[0m")
+	}
 	
 	return styled.String()
 }

@@ -1,3 +1,4 @@
+// Package auth provides JWT token management and authentication utilities.
 package auth
 
 import (
@@ -15,26 +16,31 @@ var (
 	ErrExpiredToken = errors.New("token has expired")
 )
 
-// JWTClaims represents the JWT claims structure
+// JWTClaims represents the JWT claims structure used for authentication tokens.
+// It includes the user ID and username along with standard JWT registered claims.
 type JWTClaims struct {
 	UserID   uuid.UUID `json:"user_id"`
 	Username string     `json:"username"`
 	jwt.RegisteredClaims
 }
 
-// TokenManager handles JWT token operations
+// TokenManager handles JWT token generation and validation operations.
+// It manages tokens using a secret key for signing and verification.
 type TokenManager struct {
 	secretKey []byte
 }
 
-// NewTokenManager creates a new token manager
+// NewTokenManager creates a new TokenManager with the provided secret key.
+// The secret key is used to sign and verify JWT tokens.
 func NewTokenManager(secretKey string) *TokenManager {
 	return &TokenManager{
 		secretKey: []byte(secretKey),
 	}
 }
 
-// GenerateToken generates a JWT token for a user
+// GenerateToken generates a JWT token for a user.
+// The token is valid for 24 hours and includes the user ID and username in the claims.
+// Returns the token string and any error that occurred during generation.
 func (tm *TokenManager) GenerateToken(userID uuid.UUID, username string) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour) // Token valid for 24 hours
 	
@@ -58,7 +64,9 @@ func (tm *TokenManager) GenerateToken(userID uuid.UUID, username string) (string
 	return tokenString, nil
 }
 
-// ValidateToken validates a JWT token and returns the claims
+// ValidateToken validates a JWT token string and returns the claims if valid.
+// Returns ErrInvalidToken if the token is malformed or invalid, or ErrExpiredToken
+// if the token has expired. Returns the claims and nil error if validation succeeds.
 func (tm *TokenManager) ValidateToken(tokenString string) (*JWTClaims, error) {
 	claims := &JWTClaims{}
 	

@@ -121,12 +121,39 @@ function connectWebSocket() {
 }
 
 // Handle keyboard input
+// Send printable characters via onData; keep onKey for control/navigation
+term.onData((data) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!data) return;
+    // Only send printable ASCII characters (avoid control sequences)
+    // This prevents double-sending special keys handled in onKey
+    if (data.length === 1) {
+        const code = data.charCodeAt(0);
+        if (code >= 32 && code <= 126) {
+            ws.send(JSON.stringify({
+                type: 'input',
+                key: data,
+                char: data,
+                modifiers: []
+            }));
+        }
+    }
+});
+
 term.onKey((event) => {
     const { key, domEvent } = event;
     
     // Prevent browser default for special keys
     if (domEvent.key === 'Tab') {
         domEvent.preventDefault();
+    }
+
+    // If this is a plain printable character without modifiers, let onData handle it
+    if (!domEvent.ctrlKey && !domEvent.altKey && !domEvent.metaKey && domEvent.key.length === 1) {
+        const code = domEvent.key.charCodeAt(0);
+        if (code >= 32 && code <= 126) {
+            return;
+        }
     }
     
     // Build modifiers array
@@ -160,12 +187,12 @@ term.onKey((event) => {
             char = '';
             break;
         case 'ArrowUp':
-            keyName = 'Up';
+            keyName = domEvent.shiftKey ? 'shift+up' : 'Up';
             char = '';
             domEvent.preventDefault();
             break;
         case 'ArrowDown':
-            keyName = 'Down';
+            keyName = domEvent.shiftKey ? 'shift+down' : 'Down';
             char = '';
             domEvent.preventDefault();
             break;
@@ -178,6 +205,24 @@ term.onKey((event) => {
             keyName = 'Right';
             char = '';
             domEvent.preventDefault();
+            break;
+        case 'PageUp':
+            keyName = 'pgup';
+            char = '';
+            domEvent.preventDefault();
+            break;
+        case 'PageDown':
+            keyName = 'pgdown';
+            char = '';
+            domEvent.preventDefault();
+            break;
+        case 'Home':
+            keyName = 'home';
+            char = '';
+            break;
+        case 'End':
+            keyName = 'end';
+            char = '';
             break;
         default:
             // Handle Ctrl+key combinations
@@ -218,6 +263,25 @@ term.onKey((event) => {
 terminalContainer.addEventListener('contextmenu', (e) => {
     e.preventDefault();
 });
+
+// Handle mouse wheel for in-app scrollback
+terminalContainer.addEventListener('wheel', (e) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    
+    // Determine scroll direction
+    const button = e.deltaY < 0 ? 'wheelUp' : 'wheelDown';
+    
+    // Send mouse message to server
+    ws.send(JSON.stringify({
+        type: 'mouse',
+        button: button,
+        x: 0,
+        y: 0
+    }));
+    
+    // Prevent default xterm.js scrolling (we handle it server-side now)
+    e.preventDefault();
+}, { passive: false });
 
 // Connect when page loads
 document.addEventListener('DOMContentLoaded', () => {

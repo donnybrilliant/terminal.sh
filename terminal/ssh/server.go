@@ -1,3 +1,5 @@
+// Package ssh provides SSH server functionality using the Wish framework.
+// It allows clients to connect via SSH and access the terminal.sh game interface.
 package ssh
 
 import (
@@ -30,9 +32,10 @@ var (
 	serverMu   sync.Mutex
 )
 
-// StartServer starts the SSH server using Wish framework
-// No SSH authentication - everyone connects and sees the Bubble Tea login form
-func StartServer(cfg *config.Config, db *database.Database) error {
+// StartServer starts the SSH server using the Wish framework.
+// No SSH authentication is required - all connections see the Bubble Tea login form.
+// Returns an error if the server fails to start.
+func StartServer(cfg *config.Config, db *database.Database, chatService *services.ChatService) error {
 	userService := services.NewUserService(db, cfg.JWTSecret)
 
 	// Use default host key path if not provided
@@ -64,10 +67,12 @@ func StartServer(cfg *config.Config, db *database.Database) error {
 				
 				// Create login model with prefilled username (no password from SSH)
 				// Everyone sees the login form - no SSH auth required
-				model := terminal.NewLoginModel(db, userService, username, "")
+				model := terminal.NewLoginModel(db, userService, chatService, username, "")
 				
 				// After login, transition to shell
-				return model, []tea.ProgramOption{tea.WithAltScreen()}
+				// Note: We don't use tea.WithAltScreen() because we want scrollback history in shell
+				// Enable mouse support for scroll wheel
+				return model, []tea.ProgramOption{tea.WithMouseCellMotion()}
 			}),
 		),
 		// No authentication callbacks = no SSH auth required

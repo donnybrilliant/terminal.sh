@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// UserAchievement represents a user's achievement
+// UserAchievement represents an achievement unlocked by a user.
 type UserAchievement struct {
 	ID           uuid.UUID `gorm:"type:text;primary_key" json:"id"`
 	UserID       uuid.UUID `gorm:"type:text;not null;index" json:"user_id"`
@@ -15,7 +15,7 @@ type UserAchievement struct {
 	UnlockedAt   time.Time `gorm:"not null" json:"unlocked_at"`
 }
 
-// BeforeCreate hook to generate UUID
+// BeforeCreate is a GORM hook that generates a UUID for the user achievement if one doesn't exist.
 func (u *UserAchievement) BeforeCreate(tx *gorm.DB) error {
 	if u.ID == uuid.Nil {
 		u.ID = uuid.New()

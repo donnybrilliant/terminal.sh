@@ -7,17 +7,17 @@ import (
 	"gorm.io/gorm"
 )
 
-// ShopType represents the type of shop
+// ShopType represents the type of shop.
 type ShopType string
 
 const (
-	ShopTypeRepo     ShopType = "repo"     // Free downloadable resources
-	ShopTypeTools    ShopType = "tools"    // Purchasable tools
+	ShopTypeRepo      ShopType = "repo"      // Free downloadable resources
+	ShopTypeTools     ShopType = "tools"     // Purchasable tools
 	ShopTypeResources ShopType = "resources" // CPU/RAM/Bandwidth upgrades
-	ShopTypeMixed    ShopType = "mixed"    // Combination of above
+	ShopTypeMixed     ShopType = "mixed"     // Combination of above
 )
 
-// Shop represents a shop on a server
+// Shop represents a shop on a server where users can purchase items.
 type Shop struct {
 	ID          uuid.UUID `gorm:"type:text;primary_key" json:"id"`
 	ServerIP    string    `gorm:"uniqueIndex;not null" json:"server_ip"`
@@ -31,7 +31,7 @@ type Shop struct {
 	Items []ShopItem `gorm:"foreignKey:ShopID" json:"items,omitempty"`
 }
 
-// BeforeCreate hook to generate UUID
+// BeforeCreate is a GORM hook that generates a UUID for the shop if one doesn't exist.
 func (s *Shop) BeforeCreate(tx *gorm.DB) error {
 	if s.ID == uuid.Nil {
 		s.ID = uuid.New()
@@ -39,16 +39,16 @@ func (s *Shop) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// ItemType represents the type of shop item
+// ItemType represents the type of shop item.
 type ItemType string
 
 const (
-	ItemTypeTool     ItemType = "tool"
-	ItemTypePatch    ItemType = "patch"
-	ItemTypeResource ItemType = "resource"
+	ItemTypeTool     ItemType = "tool"     // Hacking tool
+	ItemTypePatch    ItemType = "patch"    // Tool upgrade patch
+	ItemTypeResource ItemType = "resource" // Resource upgrade
 )
 
-// ShopItem represents an item for sale in a shop
+// ShopItem represents an item for sale in a shop.
 type ShopItem struct {
 	ID          uuid.UUID `gorm:"type:text;primary_key" json:"id"`
 	ShopID      uuid.UUID `gorm:"not null" json:"shop_id"`
@@ -65,7 +65,7 @@ type ShopItem struct {
 	Shop Shop `gorm:"foreignKey:ShopID" json:"shop,omitempty"`
 }
 
-// BeforeCreate hook to generate UUID
+// BeforeCreate is a GORM hook that generates a UUID for the shop item if one doesn't exist.
 func (si *ShopItem) BeforeCreate(tx *gorm.DB) error {
 	if si.ID == uuid.Nil {
 		si.ID = uuid.New()
@@ -73,7 +73,7 @@ func (si *ShopItem) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// UserPurchase represents a purchase made by a user
+// UserPurchase represents a purchase made by a user from a shop.
 type UserPurchase struct {
 	ID        uuid.UUID `gorm:"type:text;primary_key" json:"id"`
 	UserID    uuid.UUID `gorm:"not null;index" json:"user_id"`
@@ -90,7 +90,7 @@ type UserPurchase struct {
 	Shop Shop `gorm:"foreignKey:ShopID" json:"shop,omitempty"`
 }
 
-// BeforeCreate hook to generate UUID
+// BeforeCreate is a GORM hook that generates a UUID for the user purchase if one doesn't exist.
 func (up *UserPurchase) BeforeCreate(tx *gorm.DB) error {
 	if up.ID == uuid.Nil {
 		up.ID = uuid.New()

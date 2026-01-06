@@ -5,25 +5,25 @@ import (
 	"terminal-sh/models"
 )
 
-// NetworkService handles network scanning operations
+// NetworkService handles network scanning operations including internet and local network scans.
 type NetworkService struct {
 	serverService *ServerService
 	shopService   *ShopService // Will be set if available
 }
 
-// NewNetworkService creates a new network service
+// NewNetworkService creates a new NetworkService with the provided server service.
 func NewNetworkService(serverService *ServerService) *NetworkService {
 	return &NetworkService{
 		serverService: serverService,
 	}
 }
 
-// SetShopService sets the shop service (called after shop service is created)
+// SetShopService sets the shop service for this network service (called after shop service is created).
 func (n *NetworkService) SetShopService(shopService *ShopService) {
 	n.shopService = shopService
 }
 
-// ScanInternet scans the internet for top-level servers
+// ScanInternet scans the internet for top-level servers (servers not in local networks).
 func (n *NetworkService) ScanInternet() ([]models.Server, error) {
 	servers, err := n.serverService.GetAllTopLevelServers()
 	if err != nil {
@@ -32,7 +32,7 @@ func (n *NetworkService) ScanInternet() ([]models.Server, error) {
 	return servers, nil
 }
 
-// ScanIP scans a specific IP address for services and vulnerabilities
+// ScanIP scans a specific IP address for services and vulnerabilities.
 func (n *NetworkService) ScanIP(ip string) (*models.Server, error) {
 	server, err := n.serverService.GetServerByIP(ip)
 	if err != nil {
@@ -41,7 +41,7 @@ func (n *NetworkService) ScanIP(ip string) (*models.Server, error) {
 	return server, nil
 }
 
-// ScanLocalNetwork scans the local network of a server (connected IPs)
+// ScanLocalNetwork scans the local network of a server (retrieves connected servers).
 func (n *NetworkService) ScanLocalNetwork(serverIP string) ([]models.Server, error) {
 	servers, err := n.serverService.GetConnectedServers(serverIP)
 	if err != nil {

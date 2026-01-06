@@ -10,14 +10,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// MiningService handles mining operations
+// MiningService handles cryptocurrency mining operations on exploited servers.
 type MiningService struct {
 	db            *database.Database
 	toolService   *ToolService
 	serverService *ServerService
 }
 
-// NewMiningService creates a new mining service
+// NewMiningService creates a new MiningService with the provided dependencies.
 func NewMiningService(db *database.Database, toolService *ToolService, serverService *ServerService) *MiningService {
 	return &MiningService{
 		db:            db,
@@ -26,7 +26,8 @@ func NewMiningService(db *database.Database, toolService *ToolService, serverSer
 	}
 }
 
-// StartMining starts a mining operation on a server
+// StartMining starts a cryptocurrency mining operation on an exploited server.
+// Returns an error if the server is not exploited, lacks resources, or mining fails.
 func (s *MiningService) StartMining(userID uuid.UUID, serverIP string) error {
 	// Check if user has crypto_miner tool
 	if !s.toolService.UserHasTool(userID, "crypto_miner") {

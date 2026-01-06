@@ -9,13 +9,13 @@ import (
 	"terminal-sh/models"
 )
 
-// ServerService handles server-related operations
+// ServerService handles server-related operations including retrieval, creation, and management of game servers.
 type ServerService struct {
 	db  *database.Database
 	rng *rand.Rand
 }
 
-// NewServerService creates a new server service
+// NewServerService creates a new ServerService with the provided database.
 func NewServerService(db *database.Database) *ServerService {
 	return &ServerService{
 		db:  db,
@@ -23,7 +23,7 @@ func NewServerService(db *database.Database) *ServerService {
 	}
 }
 
-// GetServerByIP retrieves a server by its IP address (checks both IP and LocalIP fields)
+// GetServerByIP retrieves a server by its IP address, checking both IP and LocalIP fields.
 func (s *ServerService) GetServerByIP(ip string) (*models.Server, error) {
 	var server models.Server
 	// Try IP field first (hostname)
@@ -37,7 +37,7 @@ func (s *ServerService) GetServerByIP(ip string) (*models.Server, error) {
 	return &server, nil
 }
 
-// GetServerByPath retrieves a server by its path (supports nested paths)
+// GetServerByPath retrieves a server by its path, supporting nested paths (e.g., "1.1.1.1.localNetwork.10.0.0.5").
 func (s *ServerService) GetServerByPath(path string) (*models.Server, error) {
 	// Parse path: "1.1.1.1.localNetwork.10.0.0.5"
 	parts := parseServerPath(path)
@@ -76,7 +76,7 @@ func (s *ServerService) GetServerByPath(path string) (*models.Server, error) {
 	return server, nil
 }
 
-// GetAllTopLevelServers retrieves all top-level servers (not in localNetwork)
+// GetAllTopLevelServers retrieves all top-level servers (servers not nested in local networks).
 func (s *ServerService) GetAllTopLevelServers() ([]models.Server, error) {
 	var servers []models.Server
 	// For now, return all servers - we'll filter by checking if they're referenced in localNetwork later
@@ -86,7 +86,7 @@ func (s *ServerService) GetAllTopLevelServers() ([]models.Server, error) {
 	return servers, nil
 }
 
-// GetConnectedServers retrieves servers connected to a given server
+// GetConnectedServers retrieves all servers connected to a given server (from ConnectedIPs).
 func (s *ServerService) GetConnectedServers(serverIP string) ([]models.Server, error) {
 	server, err := s.GetServerByIP(serverIP)
 	if err != nil {

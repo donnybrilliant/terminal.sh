@@ -14,15 +14,10 @@ This will build all binaries and start the combined server (SSH on port 2222, We
 
 See the [Building](#building) and [Running](#running) sections below for more details.
 
-## Features
+## Documentation
 
-- **Dual Interface**: SSH server and WebSocket-based browser terminal
-- **Beautiful Terminal UI**: Built with Charm libraries (Bubble Tea, Lipgloss)
-- **Virtual Filesystem**: Navigate and interact with a simulated filesystem
-- **Network Exploration**: Scan and exploit servers in a virtual network
-- **Tool System**: Download and use hacking tools to progress
-- **Tutorial System**: Built-in tutorials to guide new players
-- **Session Management**: Track user progress and achievements
+- **[GAMEPLAY.md](GAMEPLAY.md)** - Complete gameplay guide with commands, strategies, and tips
+- **README.md** (this file) - Technical documentation for building, running, and deploying
 
 ## Architecture
 
@@ -280,33 +275,6 @@ DATABASE_URL=postgres://user:password@db.example.com:5432/terminal_sh?sslmode=re
 
 **Note:** The `data/` directory and all `.db` files are gitignored, so your SQLite database won't be committed to the repository.
 
-## Connecting
-
-### SSH Connection
-
-Connect using SSH client:
-
-```bash
-ssh -p 2222 <username>@your-server-ip
-```
-
-**Authentication:**
-
-- The server uses password authentication
-- **Auto-registration**: Any username/password combination will automatically create a new account on first login
-- After registration, use the same credentials to log in
-- Example: `ssh -p 2222 daniel@localhost` (password can be anything on first login)
-
-### Web Connection
-
-Open your browser and navigate to:
-
-```
-http://your-server-ip:8080
-```
-
-The browser will automatically connect via WebSocket and display the same terminal interface as SSH.
-
 ## Project Structure
 
 ```
@@ -328,10 +296,17 @@ terminal.sh/
 │   │   └── http.go
 │   ├── login.go             # Shared login model
 │   ├── shell.go             # Shared shell model
+│   ├── chat.go              # Chat UI model
 │   └── ...
 ├── cmd/                     # Command handlers
+│   ├── chat_commands.go     # Chat command handlers
+│   └── ...
 ├── services/                # Business logic
+│   ├── chat.go              # Chat service
+│   └── ...
 ├── models/                  # Data models
+│   ├── chat.go              # Chat data models
+│   └── ...
 ├── database/               # Database layer
 ├── config/                  # Configuration
 ├── filesystem/              # Virtual filesystem
@@ -559,21 +534,7 @@ This starts both servers. Connect via:
 
 ### Testing
 
-Both servers provide identical functionality. Test commands work the same in both interfaces:
-
-```bash
-# Basic commands
-help
-pwd
-ls
-cd
-
-# Game commands
-scan
-get <serverIP> <toolName>
-exploit <serverIP> <toolName> <service>
-ssh <serverIP>
-```
+Both servers provide identical functionality. For gameplay testing, see [GAMEPLAY.md](GAMEPLAY.md).
 
 ## License
 

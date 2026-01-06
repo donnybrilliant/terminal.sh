@@ -1,18 +1,20 @@
+// Package cmd provides command handlers for terminal commands executed in the game shell.
 package cmd
 
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"terminal-sh/database"
 	"terminal-sh/filesystem"
 	"terminal-sh/models"
 	"terminal-sh/services"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
 
+// CommandResult represents the result of executing a command, including output, errors, and optional filesystem nodes.
 type CommandResult struct {
 	Output     string
 	Error      error
@@ -20,6 +22,7 @@ type CommandResult struct {
 	LongFormat bool                // For ls -l format
 }
 
+// CommandHandler handles execution of terminal commands and manages game state.
 type CommandHandler struct {
 	db              *database.Database
 	vfs            *filesystem.VFS
@@ -36,13 +39,16 @@ type CommandHandler struct {
 	shopDiscovery  *services.ShopDiscovery
 	patchService   *services.PatchService
 	progressService *services.ProgressService
+	chatService    *services.ChatService
 	currentServerPath string // Current server path if in SSH mode
 	sessionID       *uuid.UUID // Current session ID
 	onSSHConnect    func(serverPath string) error // Callback for SSH connection
 	onSSHDisconnect func() error // Callback for SSH disconnection
 }
 
-func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.User, userService *services.UserService) *CommandHandler {
+// NewCommandHandler creates a new CommandHandler with the provided dependencies.
+// Initializes all required services for command execution.
+func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.User, userService *services.UserService, chatService *services.ChatService) *CommandHandler {
 	serverService := services.NewServerService(db)
 	toolService := services.NewToolService(db, serverService)
 	patchService := services.NewPatchService(db, toolService)
@@ -73,28 +79,61 @@ func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.
 		shopDiscovery: shopDiscovery,
 		patchService:  patchService,
 		progressService: progressService,
+		chatService:   chatService,
 	}
 }
 
-// SetSessionID sets the current session ID
+// SetSessionID sets the current session ID for this command handler.
 func (h *CommandHandler) SetSessionID(sessionID uuid.UUID) {
 	h.sessionID = &sessionID
 }
 
-// SetSSHCallbacks sets callbacks for SSH connect/disconnect
+// SetSSHCallbacks sets callbacks for SSH connect and disconnect events.
 func (h *CommandHandler) SetSSHCallbacks(onConnect func(serverPath string) error, onDisconnect func() error) {
 	h.onSSHConnect = onConnect
 	h.onSSHDisconnect = onDisconnect
 }
 
-// GetCurrentServerPath returns the current server path
+// GetCurrentServerPath returns the current server path (empty if on user's local system).
 func (h *CommandHandler) GetCurrentServerPath() string {
 	return h.currentServerPath
 }
 
-// SetCurrentServerPath sets the current server path (for restoring from stack)
+// SetCurrentServerPath sets the current server path (used for restoring from session stack).
 func (h *CommandHandler) SetCurrentServerPath(path string) {
 	h.currentServerPath = path
+}
+
+// SetVFS sets the VFS (Virtual FileSystem) for the command handler.
+func (h *CommandHandler) SetVFS(vfs *filesystem.VFS) {
+	h.vfs = vfs
+}
+
+// CreateServerVFS creates a VFS for a server by loading its filesystem from the database.
+// Returns the created VFS or an error if the server is not found.
+func (h *CommandHandler) CreateServerVFS(serverPath string) (*filesystem.VFS, error) {
+	// Get server by path
+	server, err := h.serverService.GetServerByPath(serverPath)
+	if err != nil {
+		return nil, fmt.Errorf("server not found: %w", err)
+	}
+	
+	// Create standard VFS (use "root" as username for server filesystems)
+	vfs, err := filesystem.NewVFSFromMap("root", server.FileSystem)
+	if err != nil {
+		// Fall back to standard VFS if merge fails
+		vfs = filesystem.NewVFS("root")
+	}
+	
+	// Set up save callback for server filesystem
+	vfs.SetServerID(serverPath)
+	vfs.SetSaveCallback(func(changes map[string]interface{}) error {
+		// Update server's filesystem in database
+		server.FileSystem = changes
+		return h.db.Model(&server).Update("file_system", changes).Error
+	})
+	
+	return vfs, nil
 }
 
 // SyncUserToolsToVFS syncs user's owned tools to /usr/bin in the VFS
@@ -146,6 +185,8 @@ func (h *CommandHandler) Execute(command string) *CommandResult {
 		return h.handleCLEAR()
 	case "help":
 		return h.handleHELP()
+	case "chat":
+		return h.handleChat(args)
 	case "tutorial":
 		return h.handleTUTORIAL(args)
 	case "login":
@@ -291,7 +332,7 @@ func (h *CommandHandler) handleCLEAR() *CommandResult {
 
 func (h *CommandHandler) handleHELP() *CommandResult {
 	// Read commands from filesystem
-	binCommands, usrBinCommands := h.vfs.ListCommands()
+	binCommands, _ := h.vfs.ListCommands()
 	
 	var output strings.Builder
 	output.WriteString("Available Commands\n\n")
@@ -311,20 +352,19 @@ func (h *CommandHandler) handleHELP() *CommandResult {
 		output.WriteString(fmt.Sprintf("  %s - %s\n", cmdPadded, desc))
 	}
 	
-	// User Tools (from /usr/bin)
-	if len(usrBinCommands) > 0 {
-		output.WriteString("\nUser Tools:\n")
-		for _, cmd := range usrBinCommands {
-			desc, err := h.vfs.GetCommandDescription(cmd)
-			if err != nil {
-				desc = "No description available"
+	// Tool Commands (only show tools the user owns)
+	if h.user != nil && h.toolService != nil {
+		tools, err := h.toolService.GetUserTools(h.user.ID)
+		if err == nil && len(tools) > 0 {
+			output.WriteString("\nTool Commands:\n")
+			for _, tool := range tools {
+				// Pad command name to 20 chars for alignment
+				cmdPadded := tool.Name
+				if len(cmdPadded) < 20 {
+					cmdPadded += strings.Repeat(" ", 20-len(cmdPadded))
+				}
+				output.WriteString(fmt.Sprintf("  %s - %s\n", cmdPadded, tool.Function))
 			}
-			// Pad command name to 20 chars for alignment
-			cmdPadded := cmd
-			if len(cmdPadded) < 20 {
-				cmdPadded += strings.Repeat(" ", 20-len(cmdPadded))
-			}
-			output.WriteString(fmt.Sprintf("  %s - %s\n", cmdPadded, desc))
 		}
 	}
 	
@@ -1080,6 +1120,45 @@ func (h *CommandHandler) handleTUTORIAL(args []string) *CommandResult {
 	output.WriteString("Edit this file to modify tutorials.\n")
 
 	return &CommandResult{Output: output.String()}
+}
+
+// GetTutorialNames returns tutorial IDs that start with the given prefix (for autocomplete)
+func (h *CommandHandler) GetTutorialNames(prefix string) []string {
+	if h.tutorialService == nil {
+		return []string{}
+	}
+	
+	// Reload tutorials to get latest
+	if err := h.tutorialService.ReloadTutorials(); err != nil {
+		return []string{}
+	}
+	
+	tutorials := h.tutorialService.GetAllTutorials()
+	var matches []string
+	for _, tutorial := range tutorials {
+		if strings.HasPrefix(tutorial.ID, prefix) {
+			matches = append(matches, tutorial.ID)
+		}
+	}
+	return matches
+}
+
+// GetUserToolNames returns the names of all tools owned by the current user (for autocomplete)
+func (h *CommandHandler) GetUserToolNames() ([]string, error) {
+	if h.user == nil || h.toolService == nil {
+		return []string{}, nil
+	}
+	
+	tools, err := h.toolService.GetUserTools(h.user.ID)
+	if err != nil {
+		return []string{}, err
+	}
+	
+	var toolNames []string
+	for _, tool := range tools {
+		toolNames = append(toolNames, tool.Name)
+	}
+	return toolNames, nil
 }
 
 func parseCommand(input string) []string {
