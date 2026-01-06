@@ -598,7 +598,7 @@ func (h *CommandHandler) handleSERVER() *CommandResult {
 	return &CommandResult{Output: output}
 }
 
-func (h *CommandHandler) handleCREATESERVER(args []string) *CommandResult {
+func (h *CommandHandler) handleCREATESERVER(_ []string) *CommandResult {
 	if h.user == nil {
 		return &CommandResult{Error: fmt.Errorf("not authenticated")}
 	}
@@ -612,14 +612,14 @@ func (h *CommandHandler) handleCREATESERVER(args []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 
-	output := fmt.Sprintf("Server created successfully!\n")
+	output := "Server created successfully!\n"
 	output += fmt.Sprintf("IP: %s\n", server.IP)
 	output += fmt.Sprintf("Local IP: %s\n", server.LocalIP)
 
 	return &CommandResult{Output: output}
 }
 
-func (h *CommandHandler) handleCREATELOCALSERVER(args []string) *CommandResult {
+func (h *CommandHandler) handleCREATELOCALSERVER(_ []string) *CommandResult {
 	if h.user == nil {
 		return &CommandResult{Error: fmt.Errorf("not authenticated")}
 	}
@@ -643,7 +643,7 @@ func (h *CommandHandler) handleCREATELOCALSERVER(args []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 
-	output := fmt.Sprintf("Local server created successfully!\n")
+	output := "Local server created successfully!\n"
 	output += fmt.Sprintf("IP: %s\n", server.IP)
 	output += fmt.Sprintf("Local IP: %s\n", server.LocalIP)
 
@@ -955,7 +955,7 @@ func (h *CommandHandler) handleWALLET() *CommandResult {
 		return &CommandResult{Error: err}
 	}
 
-	output := fmt.Sprintf("Wallet Balance:\n")
+	output := "Wallet Balance:\n"
 	output += fmt.Sprintf("  Crypto: %.2f\n", user.Wallet.Crypto)
 	output += fmt.Sprintf("  Data: %.2f\n", user.Wallet.Data)
 
@@ -1085,9 +1085,9 @@ func (h *CommandHandler) handleTUTORIAL(args []string) *CommandResult {
 
 	// Display tutorial
 	var output strings.Builder
-	output.WriteString(fmt.Sprintf("╔═══════════════════════════════════════╗\n"))
+	output.WriteString("╔═══════════════════════════════════════╗\n")
 	output.WriteString(fmt.Sprintf("║   Tutorial: %s\n", tutorial.Name))
-	output.WriteString(fmt.Sprintf("╚═══════════════════════════════════════╝\n\n"))
+	output.WriteString("╚═══════════════════════════════════════╝\n\n")
 	output.WriteString(fmt.Sprintf("%s\n\n", tutorial.Description))
 	
 	if len(tutorial.Prerequisites) > 0 {

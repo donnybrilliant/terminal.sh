@@ -89,9 +89,9 @@ func (h *CommandHandler) handleShopBrowse(shopID string) *CommandResult {
 	}
 
 	var output strings.Builder
-	output.WriteString(fmt.Sprintf("╔═══════════════════════════════════════╗\n"))
+	output.WriteString("╔═══════════════════════════════════════╗\n")
 	output.WriteString(fmt.Sprintf("║   %s\n", shop.Name))
-	output.WriteString(fmt.Sprintf("╚═══════════════════════════════════════╝\n\n"))
+	output.WriteString("╚═══════════════════════════════════════╝\n\n")
 	output.WriteString(fmt.Sprintf("%s\n\n", shop.Description))
 	output.WriteString("Items for sale:\n\n")
 
@@ -187,7 +187,7 @@ func (h *CommandHandler) handleBUY(args []string) *CommandResult {
 			}
 		}
 	case models.ItemTypeResource:
-		output += fmt.Sprintf("Resource upgrade has been applied.\n")
+		output += "Resource upgrade has been applied.\n"
 	}
 
 	return &CommandResult{Output: output}

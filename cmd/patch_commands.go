@@ -140,9 +140,9 @@ func (h *CommandHandler) handlePatchInfo(patchName string) *CommandResult {
 	}
 
 	var output strings.Builder
-	output.WriteString(fmt.Sprintf("╔═══════════════════════════════════════╗\n"))
+	output.WriteString("╔═══════════════════════════════════════╗\n")
 	output.WriteString(fmt.Sprintf("║   Patch: %s\n", patch.Name))
-	output.WriteString(fmt.Sprintf("╚═══════════════════════════════════════╝\n\n"))
+	output.WriteString("╚═══════════════════════════════════════╝\n\n")
 	output.WriteString(fmt.Sprintf("Target Tool: %s\n", patch.TargetTool))
 	output.WriteString(fmt.Sprintf("Description: %s\n\n", patch.Description))
 
