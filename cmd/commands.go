@@ -4,13 +4,16 @@ package cmd
 import (
 	"fmt"
 	"math/rand"
+	"net"
 	"strings"
 	"terminal-sh/database"
 	"terminal-sh/filesystem"
 	"terminal-sh/models"
 	"terminal-sh/services"
+	"terminal-sh/ui"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 )
 
@@ -261,7 +264,7 @@ func (h *CommandHandler) Execute(command string) *CommandResult {
 func (h *CommandHandler) handlePWD() *CommandResult {
 	path := h.vfs.GetCurrentPath()
 	if path != "" {
-		path += "\n"
+		path = ui.ListStyle.Render(path) + "\n"
 	}
 	return &CommandResult{Output: path}
 }
@@ -334,11 +337,39 @@ func (h *CommandHandler) handleHELP() *CommandResult {
 	// Read commands from filesystem
 	binCommands, _ := h.vfs.ListCommands()
 	
-	var output strings.Builder
-	output.WriteString("Available Commands\n\n")
+	// Emoji constants (can't import terminal due to import cycle)
+	const (
+		emojiFolder   = "📁"
+		emojiTools    = "🛠️"
+		emojiUser     = "👤"
+		emojiNetwork  = "🌐"
+		emojiScan     = "🔍"
+		emojiSSH      = "🔌"
+		emojiServer   = "🖥️"
+		emojiTool     = "🛠️"
+		emojiExploit  = "⚡"
+		emojiMoney    = "💰"
+		emojiTutorial = "📚"
+		emojiShop     = "🛒"
+		emojiBuy      = "🛍️"
+		emojiPatch    = "🔧"
+		emojiHelp     = "❓"
+	)
 	
-	// System Commands
-	output.WriteString("System Commands:\n")
+	var output strings.Builder
+	
+	// Title
+	output.WriteString(ui.HeaderStyle.Render("Available Commands") + "\n\n")
+	
+	// Helper function to format list items
+	formatListItem := func(text, emoji string) string {
+		return ui.FormatListItem(text, emoji)
+	}
+	
+	// System Commands (Filesystem commands from VFS)
+	if len(binCommands) > 0 {
+		output.WriteString(ui.SectionStyle.Render(emojiFolder + " Filesystem:") + "\n")
+		
 	for _, cmd := range binCommands {
 		desc, err := h.vfs.GetCommandDescription(cmd)
 		if err != nil {
@@ -349,41 +380,80 @@ func (h *CommandHandler) handleHELP() *CommandResult {
 		if len(cmdPadded) < 20 {
 			cmdPadded += strings.Repeat(" ", 20-len(cmdPadded))
 		}
-		output.WriteString(fmt.Sprintf("  %s - %s\n", cmdPadded, desc))
+			// Use color for command name
+			output.WriteString("  " + ui.FilesystemCommandStyle.Render(cmdPadded) + " - " + desc + "\n")
+		}
+		output.WriteString("\n")
 	}
 	
 	// Tool Commands (only show tools the user owns)
 	if h.user != nil && h.toolService != nil {
 		tools, err := h.toolService.GetUserTools(h.user.ID)
 		if err == nil && len(tools) > 0 {
-			output.WriteString("\nTool Commands:\n")
+			output.WriteString(ui.AccentBoldStyle.Render(emojiTools + " Tool Commands:") + "\n")
 			for _, tool := range tools {
 				// Pad command name to 20 chars for alignment
 				cmdPadded := tool.Name
 				if len(cmdPadded) < 20 {
 					cmdPadded += strings.Repeat(" ", 20-len(cmdPadded))
 				}
-				output.WriteString(fmt.Sprintf("  %s - %s\n", cmdPadded, tool.Function))
+				// Use color for command name
+				output.WriteString("  " + ui.ToolCommandStyle.Render(cmdPadded) + " - " + tool.Function + "\n")
 			}
+			output.WriteString("\n")
 		}
 	}
 	
-	// Tutorial command
-	output.WriteString("\nLearning:\n")
-	output.WriteString("  tutorial            - Show available tutorials\n")
-	output.WriteString("  tutorial <id>       - Start a tutorial\n")
+	// User commands
+	output.WriteString(ui.SuccessStyle.Render(emojiUser + " User:") + "\n")
+	output.WriteString(formatListItem("userinfo            - Show user information", ""))
+	output.WriteString(formatListItem("whoami              - Display current username", ""))
+	output.WriteString(formatListItem("name <newName>      - Change username", ""))
+	output.WriteString("\n")
 	
-	// Shop commands
-	output.WriteString("\nShopping:\n")
-	output.WriteString("  shop                - List discovered shops\n")
-	output.WriteString("  shop <shopID>       - Browse shop inventory\n")
-	output.WriteString("  buy <shopID> <item> - Purchase item from shop\n")
+	// Network commands
+	output.WriteString(ui.InfoStyle.Render(emojiNetwork + " Network:") + "\n")
+	output.WriteString(formatListItem("ifconfig            - Show network interfaces", ""))
+	output.WriteString(formatListItem("scan [targetIP]     - Scan internet or IP", ""))
+	output.WriteString(formatListItem("ssh <targetIP>      - Connect to a server", ""))
+	output.WriteString(formatListItem("exit                - Disconnect from server", ""))
+	output.WriteString(formatListItem("server              - Show current server info", ""))
+	output.WriteString(formatListItem("createServer        - Create a new server", ""))
+	output.WriteString(formatListItem("createLocalServer   - Create local server", ""))
+	output.WriteString("\n")
 	
-	// Patch commands
-	output.WriteString("\nTool Upgrades:\n")
-	output.WriteString("  patches             - List available patches\n")
-	output.WriteString("  patch <name> <tool> - Apply patch to tool\n")
-	output.WriteString("  patch info <name>   - Show patch details\n")
+	// Tools/Game commands
+	output.WriteString(ui.AccentBoldStyle.Render(emojiTool + " Tools:") + "\n")
+	output.WriteString(formatListItem("get <targetIP> <tool> - Download tool from server", ""))
+	output.WriteString(formatListItem("tools                - List owned tools", ""))
+	output.WriteString(formatListItem("exploited            - List exploited servers", ""))
+	output.WriteString(formatListItem("wallet               - Show wallet balance", ""))
+	output.WriteString("\n")
+	
+	// Learning
+	output.WriteString(ui.InfoStyle.Render(emojiTutorial + " Learning:") + "\n")
+	output.WriteString(formatListItem("tutorial             - Show available tutorials", ""))
+	output.WriteString(formatListItem("tutorial <id>        - Start a tutorial", ""))
+	output.WriteString("\n")
+	
+	// Shopping
+	output.WriteString(ui.AccentBoldStyle.Render(emojiShop + " Shopping:") + "\n")
+	output.WriteString(formatListItem("shop                 - List discovered shops", ""))
+	output.WriteString(formatListItem("shop <shopID>        - Browse shop inventory", ""))
+	output.WriteString(formatListItem("buy <shopID> <item>  - Purchase item from shop", ""))
+	output.WriteString("\n")
+	
+	// Tool Upgrades
+	output.WriteString(ui.AccentBoldStyle.Render(emojiPatch + " Tool Upgrades:") + "\n")
+	output.WriteString(formatListItem("patches              - List available patches", ""))
+	output.WriteString(formatListItem("patch <name> <tool>  - Apply patch to tool", ""))
+	output.WriteString(formatListItem("patch info <name>    - Show patch details", ""))
+	output.WriteString("\n")
+	
+	// System
+	output.WriteString(ui.ValueStyle.Render("⚙️ System:") + "\n")
+	output.WriteString(formatListItem("clear                - Clear the screen", ""))
+	output.WriteString(formatListItem("help                 - Show this help message", ""))
 	
 	// Ensure trailing newline
 	helpText := output.String()
@@ -398,18 +468,18 @@ func (h *CommandHandler) handleLOGIN(args []string) *CommandResult {
 	if len(args) != 2 {
 		return &CommandResult{Error: fmt.Errorf("usage: login <username> <password>")}
 	}
-	return &CommandResult{Output: "Please authenticate via SSH password authentication\n"}
+	return &CommandResult{Output: ui.InfoStyle.Render("🔐 Please authenticate via SSH password authentication") + "\n"}
 }
 
 func (h *CommandHandler) handleLOGOUT() *CommandResult {
-	return &CommandResult{Output: "Logout successful. Goodbye!\n"}
+	return &CommandResult{Output: ui.FormatSuccessMessage("Logout successful. Goodbye!", "✅")}
 }
 
 func (h *CommandHandler) handleREGISTER(args []string) *CommandResult {
 	if len(args) != 2 {
 		return &CommandResult{Error: fmt.Errorf("usage: register <username> <password>")}
 	}
-	return &CommandResult{Output: "Please register via SSH password authentication (login with new credentials)\n"}
+	return &CommandResult{Output: ui.InfoStyle.Render("📝 Please register via SSH password authentication (login with new credentials)") + "\n"}
 }
 
 func (h *CommandHandler) handleUSERINFO() *CommandResult {
@@ -417,42 +487,51 @@ func (h *CommandHandler) handleUSERINFO() *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("not authenticated")}
 	}
 	
-	output := fmt.Sprintf("Username: %s\n", h.user.Username)
-	output += fmt.Sprintf("IP: %s\n", h.user.IP)
-	output += fmt.Sprintf("Local IP: %s\n", h.user.LocalIP)
-	output += fmt.Sprintf("MAC: %s\n", h.user.MAC)
-	output += fmt.Sprintf("Level: %d\n", h.user.Level)
-	output += fmt.Sprintf("Experience: %d\n", h.user.Experience)
-	output += fmt.Sprintf("Resources: CPU=%d, Bandwidth=%.1f, RAM=%d\n", 
-		h.user.Resources.CPU, h.user.Resources.Bandwidth, h.user.Resources.RAM)
-	output += fmt.Sprintf("Wallet: Crypto=%.2f, Data=%.2f\n", 
-		h.user.Wallet.Crypto, h.user.Wallet.Data)
+	var output strings.Builder
 	
-	return &CommandResult{Output: output}
+	// Header
+	output.WriteString(ui.FormatSectionHeader("User Information", "👤"))
+	
+	// Labels and values
+	output.WriteString(ui.FormatKeyValuePair("Username:", h.user.Username) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("IP:", ui.FormatIP(h.user.IP)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Local IP:", ui.FormatIP(h.user.LocalIP)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("MAC:", h.user.MAC) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Level:", fmt.Sprintf("%d", h.user.Level)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Experience:", fmt.Sprintf("%d", h.user.Experience)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Resources:", fmt.Sprintf("CPU=%d, Bandwidth=%.1f, RAM=%d", 
+		h.user.Resources.CPU, h.user.Resources.Bandwidth, h.user.Resources.RAM)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Wallet:", fmt.Sprintf("Crypto=%.2f, Data=%.2f", 
+		h.user.Wallet.Crypto, h.user.Wallet.Data)) + "\n")
+	
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleINFO() *CommandResult {
 	// Display browser/client information (SSH session info)
-	output := "Client Information:\n"
-	output += "  Connection: SSH\n"
-	output += "  Protocol: SSH2\n"
+	var output strings.Builder
+	
+	output.WriteString(ui.FormatSectionHeader("Client Information", "ℹ️"))
+	
+	output.WriteString(ui.FormatKeyValuePair("  Connection:", "SSH") + "\n")
+	output.WriteString(ui.FormatKeyValuePair("  Protocol:", "SSH2") + "\n")
 	if h.user != nil {
-		output += fmt.Sprintf("  Username: %s\n", h.user.Username)
-		output += fmt.Sprintf("  IP Address: %s\n", h.user.IP)
+		output.WriteString(ui.FormatKeyValuePair("  Username:", h.user.Username) + "\n")
+		output.WriteString(ui.FormatKeyValuePair("  IP Address:", ui.FormatIP(h.user.IP)) + "\n")
 	}
 	if h.sessionID != nil {
-		output += fmt.Sprintf("  Session ID: %s\n", h.sessionID.String())
+		output.WriteString(ui.FormatKeyValuePair("  Session ID:", h.sessionID.String()) + "\n")
 	}
-	output += "  Terminal: ANSI compatible\n"
+	output.WriteString(ui.FormatKeyValuePair("  Terminal:", "ANSI compatible") + "\n")
 	
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleWHOAMI() *CommandResult {
 	if h.user == nil {
-		return &CommandResult{Output: "guest\n"}
+		return &CommandResult{Output: ui.GrayStyle.Render("guest") + "\n"}
 	}
-	username := h.user.Username
+	username := ui.SuccessStyle.Render(h.user.Username)
 	if username != "" {
 		username += "\n"
 	}
@@ -481,7 +560,8 @@ func (h *CommandHandler) handleNAME(args []string) *CommandResult {
 	
 	// Update local user object
 	h.user.Username = newUsername
-	return &CommandResult{Output: fmt.Sprintf("Username changed to %s\n", newUsername)}
+	
+	return &CommandResult{Output: ui.SuccessStyle.Render("✅ Username changed to ") + ui.AccentBoldStyle.Render(newUsername) + "\n"}
 }
 
 func (h *CommandHandler) handleIFCONFIG() *CommandResult {
@@ -489,11 +569,15 @@ func (h *CommandHandler) handleIFCONFIG() *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("not authenticated")}
 	}
 	
-	output := fmt.Sprintf("IP: %s\n", h.user.IP)
-	output += fmt.Sprintf("Local IP: %s\n", h.user.LocalIP)
-	output += fmt.Sprintf("MAC: %s\n", h.user.MAC)
+	var output strings.Builder
 	
-	return &CommandResult{Output: output}
+	output.WriteString(ui.FormatSectionHeader("Network Configuration", "🌐"))
+	
+	output.WriteString(ui.FormatKeyValuePair("IP:", ui.FormatIP(h.user.IP)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Local IP:", ui.FormatIP(h.user.LocalIP)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("MAC:", h.user.MAC) + "\n")
+	
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleSCAN(args []string) *CommandResult {
@@ -512,17 +596,19 @@ func (h *CommandHandler) handleSCAN(args []string) *CommandResult {
 			return &CommandResult{Output: "No servers found\n"}
 		}
 		
-		output := "Found servers:\n"
+		var output strings.Builder
+		output.WriteString(ui.FormatSectionHeader("Found servers:", "🔍"))
+		
 		for _, server := range servers {
 			shopIndicator := ""
 			if h.shopService != nil {
 				if shop, err := h.shopService.GetShopByServerIP(server.IP); err == nil {
-					shopIndicator = fmt.Sprintf(" [SHOP: %s]", shop.ShopType)
+					shopIndicator = ui.AccentStyle.Render(fmt.Sprintf(" [SHOP: %s]", shop.ShopType))
 				}
 			}
-			output += fmt.Sprintf("  - %s (%s)%s\n", server.IP, server.LocalIP, shopIndicator)
+			output.WriteString(ui.FormatListBullet(formatIP(server.IP) + " (" + formatIP(server.LocalIP) + ")" + shopIndicator))
 		}
-		return &CommandResult{Output: output}
+		return &CommandResult{Output: output.String()}
 	}
 
 	// If in SSH mode (currentServerPath is set), scan local network
@@ -542,17 +628,19 @@ func (h *CommandHandler) handleSCAN(args []string) *CommandResult {
 			return &CommandResult{Output: "No connected servers found\n"}
 		}
 		
-		output := "Connected servers:\n"
+		var output strings.Builder
+		output.WriteString(ui.FormatSectionHeader("Connected servers:", "🔍"))
+		
 		for _, server := range servers {
 			shopIndicator := ""
 			if h.shopService != nil {
 				if shop, err := h.shopService.GetShopByServerIP(server.IP); err == nil {
-					shopIndicator = fmt.Sprintf(" [SHOP: %s]", shop.ShopType)
+					shopIndicator = ui.AccentStyle.Render(fmt.Sprintf(" [SHOP: %s]", shop.ShopType))
 				}
 			}
-			output += fmt.Sprintf("  - %s (%s)%s\n", server.IP, server.LocalIP, shopIndicator)
+			output.WriteString(ui.FormatListBullet(formatIP(server.IP) + " (" + formatIP(server.LocalIP) + ")" + shopIndicator))
 		}
-		return &CommandResult{Output: output}
+		return &CommandResult{Output: output.String()}
 	}
 
 	// Scan specific IP
@@ -562,12 +650,70 @@ func (h *CommandHandler) handleSCAN(args []string) *CommandResult {
 			return &CommandResult{Error: err}
 		}
 		
-		output := h.networkService.FormatScanResult(server)
-		// Ensure output ends with newline
-		if output != "" && !strings.HasSuffix(output, "\n") {
-			output += "\n"
+		// Format with colors and emojis
+		var output strings.Builder
+		output.WriteString(ui.FormatSectionHeader("Scan Results:", "🔍"))
+		
+		// IP addresses
+		output.WriteString(ui.LabelStyle.Bold(true).Render("📍 IP:") + " " + formatIP(server.IP) + "\n")
+		output.WriteString(ui.LabelStyle.Bold(true).Render("📍 Local IP:") + " " + formatIP(server.LocalIP) + "\n")
+		
+		// Security level with color
+		secLevelStyle := ui.GetSecurityStyle(server.SecurityLevel)
+		output.WriteString(ui.LabelStyle.Bold(true).Render("🔒 Security Level:") + " " + secLevelStyle.Render(fmt.Sprintf("%d", server.SecurityLevel)) + "\n")
+		
+		// Resources
+		output.WriteString(ui.LabelStyle.Bold(true).Render("💻 Resources:") + " ")
+		output.WriteString(ui.AccentStyle.Render(fmt.Sprintf("CPU=%d", server.Resources.CPU)) + ", ")
+		output.WriteString(ui.AccentStyle.Render(fmt.Sprintf("Bandwidth=%.1f", server.Resources.Bandwidth)) + ", ")
+		output.WriteString(ui.AccentStyle.Render(fmt.Sprintf("RAM=%d", server.Resources.RAM)) + "\n")
+		
+		// Wallet
+		output.WriteString(ui.LabelStyle.Bold(true).Render("💰 Wallet:") + " ")
+		output.WriteString(ui.PriceStyle.Render(fmt.Sprintf("Crypto=%.2f", server.Wallet.Crypto)) + ", ")
+		output.WriteString(ui.PriceStyle.Render(fmt.Sprintf("Data=%.2f", server.Wallet.Data)) + "\n")
+		
+		// Tools
+		if len(server.Tools) > 0 {
+			output.WriteString("\n" + ui.LabelStyle.Bold(true).Render("🛠️ Available Tools:") + "\n")
+			output.WriteString(ui.ValueStyle.Render(fmt.Sprintf("  Use 'get %s <toolName>' to download\n", server.IP)))
+			for _, tool := range server.Tools {
+				output.WriteString(ui.FormatListBulletWithStyle("• "+tool, ui.AccentStyle))
+			}
 		}
-		return &CommandResult{Output: output}
+		
+		// Services
+		if len(server.Services) > 0 {
+			output.WriteString("\n" + ui.SectionStyle.Render("🌐 Services:") + "\n")
+			for _, service := range server.Services {
+				output.WriteString("  " + ui.InfoStyle.Render(fmt.Sprintf("• %s (port %d): %s\n", service.Name, service.Port, service.Description)))
+				if service.Vulnerable && len(service.Vulnerabilities) > 0 {
+					output.WriteString("    " + ui.ErrorStyle.Render("⚠️ Vulnerabilities:") + "\n")
+					for _, vuln := range service.Vulnerabilities {
+						output.WriteString("      " + ui.ErrorStyle.Render(fmt.Sprintf("- %s (level %d)\n", vuln.Type, vuln.Level)))
+					}
+				}
+			}
+		}
+		
+		// Connected IPs
+		if len(server.ConnectedIPs) > 0 {
+			output.WriteString("\n" + ui.LabelStyle.Bold(true).Render("🔗 Connected IPs:") + "\n")
+			for _, ip := range server.ConnectedIPs {
+				output.WriteString(ui.FormatListBulletWithStyle("• "+formatIP(ip), ui.ListStyle))
+			}
+		}
+		
+		// Shop
+		if h.shopService != nil {
+			if shop, err := h.shopService.GetShopByServerIP(server.IP); err == nil {
+				output.WriteString("\n" + ui.AccentStyle.Render("🛒 Shop:") + " ")
+				output.WriteString(ui.AccentStyle.Render(fmt.Sprintf("[%s] %s", shop.ShopType, shop.Name)) + "\n")
+				output.WriteString(ui.ValueStyle.Render(fmt.Sprintf("  %s\n", shop.Description)))
+			}
+		}
+		
+		return &CommandResult{Output: output.String()}
 	}
 
 	return &CommandResult{Error: fmt.Errorf("usage: scan [targetIP]")}
@@ -587,15 +733,19 @@ func (h *CommandHandler) handleSERVER() *CommandResult {
 		return &CommandResult{Error: err}
 	}
 
-	output := fmt.Sprintf("Server: %s\n", server.IP)
-	output += fmt.Sprintf("Local IP: %s\n", server.LocalIP)
-	output += fmt.Sprintf("Security Level: %d\n", server.SecurityLevel)
-	output += fmt.Sprintf("Resources: CPU=%d, Bandwidth=%.1f, RAM=%d\n",
-		server.Resources.CPU, server.Resources.Bandwidth, server.Resources.RAM)
-	output += fmt.Sprintf("Wallet: Crypto=%.2f, Data=%.2f\n",
-		server.Wallet.Crypto, server.Wallet.Data)
+	var output strings.Builder
+	
+	output.WriteString(ui.FormatSectionHeader("Server Information", "🖥️"))
+	
+	output.WriteString(ui.FormatKeyValuePair("Server:", formatIP(server.IP)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Local IP:", formatIP(server.LocalIP)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Security Level:", fmt.Sprintf("%d", server.SecurityLevel)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Resources:", fmt.Sprintf("CPU=%d, Bandwidth=%.1f, RAM=%d",
+		server.Resources.CPU, server.Resources.Bandwidth, server.Resources.RAM)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Wallet:", fmt.Sprintf("Crypto=%.2f, Data=%.2f",
+		server.Wallet.Crypto, server.Wallet.Data)) + "\n")
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleCREATESERVER(_ []string) *CommandResult {
@@ -612,11 +762,13 @@ func (h *CommandHandler) handleCREATESERVER(_ []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 
-	output := "Server created successfully!\n"
-	output += fmt.Sprintf("IP: %s\n", server.IP)
-	output += fmt.Sprintf("Local IP: %s\n", server.LocalIP)
+	var output strings.Builder
+	output.WriteString(ui.FormatSuccessMessage("Server created successfully!", "✅"))
+	
+	output.WriteString(ui.FormatKeyValuePair("IP:", formatIP(server.IP)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Local IP:", formatIP(server.LocalIP)) + "\n")
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleCREATELOCALSERVER(_ []string) *CommandResult {
@@ -643,11 +795,13 @@ func (h *CommandHandler) handleCREATELOCALSERVER(_ []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 
-	output := "Local server created successfully!\n"
-	output += fmt.Sprintf("IP: %s\n", server.IP)
-	output += fmt.Sprintf("Local IP: %s\n", server.LocalIP)
+	var output strings.Builder
+	output.WriteString(ui.FormatSuccessMessage("Local server created successfully!", "✅"))
+	
+	output.WriteString(ui.FormatKeyValuePair("IP:", formatIP(server.IP)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Local IP:", formatIP(server.LocalIP)) + "\n")
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func generateRandomIP() string {
@@ -731,6 +885,43 @@ func (h *CommandHandler) handleEXIT() *CommandResult {
 	return &CommandResult{Output: "__EXIT_SSH__"}
 }
 
+// isPrivateIP checks if the given IP address is in a private network range
+// Note: Duplicated from terminal/renderer.go due to import cycle
+func isPrivateIP(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	
+	// Check private IPv4 ranges:
+	// 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8
+	privateBlocks := []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"127.0.0.0/8",
+	}
+	
+	for _, block := range privateBlocks {
+		_, ipNet, err := net.ParseCIDR(block)
+		if err != nil {
+			continue
+		}
+		if ipNet.Contains(ip) {
+			return true
+		}
+	}
+	
+	return false
+}
+
+// formatIP formats an IP address for display with color
+// Local IPs (private network) are styled in yellow/orange, internet IPs in cyan
+// Uses ui.FormatIP to avoid duplication
+func formatIP(ip string) string {
+	return ui.FormatIP(ip)
+}
+
 func parseServerPathParts(path string) []string {
 	parts := []string{}
 	current := ""
@@ -781,7 +972,7 @@ func (h *CommandHandler) handleGET(args []string) *CommandResult {
 	// Sync tools to VFS so the new tool appears in help
 	h.SyncUserToolsToVFS()
 
-	output := fmt.Sprintf("Tool %s downloaded successfully from %s\n", toolName, targetIP)
+	output := ui.SuccessStyle.Render("✅ Tool ") + ui.AccentBoldStyle.Render(toolName) + ui.SuccessStyle.Render(" downloaded successfully from ") + formatIP(targetIP) + "\n"
 	return &CommandResult{Output: output}
 }
 
@@ -799,54 +990,56 @@ func (h *CommandHandler) handleTOOLS() *CommandResult {
 			return &CommandResult{Error: err}
 		}
 
-		if len(tools) == 0 {
-			return &CommandResult{Output: "No tools owned\n"}
-		}
+	if len(tools) == 0 {
+		return &CommandResult{Output: ui.WarningStyle.Render("ℹ️  No tools owned") + "\n"}
+	}
 
-		output := "Owned tools:\n"
-		for _, tool := range tools {
-			output += fmt.Sprintf("  - %s: %s\n", tool.Name, tool.Function)
-			if len(tool.Exploits) > 0 {
-				output += "    Exploits: "
-				for i, exploit := range tool.Exploits {
-					if i > 0 {
-						output += ", "
-					}
-					output += fmt.Sprintf("%s (level %d)", exploit.Type, exploit.Level)
+	var output strings.Builder
+	output.WriteString(ui.FormatSectionHeader("Owned tools:", "🛠️"))
+	for _, tool := range tools {
+		output.WriteString(ui.FormatListBulletWithStyle("• "+tool.Name+": "+tool.Function, ui.AccentStyle))
+		if len(tool.Exploits) > 0 {
+			output.WriteString("    " + ui.ErrorStyle.Render("⚡ Exploits: "))
+			for i, exploit := range tool.Exploits {
+				if i > 0 {
+					output.WriteString(", ")
 				}
-				output += "\n"
+				output.WriteString(ui.ErrorStyle.Render(fmt.Sprintf("%s (level %d)", exploit.Type, exploit.Level)))
 			}
+			output.WriteString("\n")
 		}
-		return &CommandResult{Output: output}
+	}
+	return &CommandResult{Output: output.String()}
 	}
 
 	if len(toolStates) == 0 {
-		return &CommandResult{Output: "No tools owned\n"}
+		return &CommandResult{Output: ui.WarningStyle.Render("ℹ️  No tools owned") + "\n"}
 	}
 
-	output := "Owned tools:\n"
+	var output strings.Builder
+	output.WriteString(ui.FormatSectionHeader("Owned tools:", "🛠️"))
 	for _, toolState := range toolStates {
 		tool := toolState.Tool
-		output += fmt.Sprintf("  - %s: %s\n", tool.Name, tool.Function)
-		output += fmt.Sprintf("    Version: %d\n", toolState.Version)
+		output.WriteString(ui.FormatListBulletWithStyle("• "+tool.Name+": "+tool.Function, ui.AccentStyle))
+		output.WriteString("    " + ui.InfoStyle.Render("📦 Version:") + " " + ui.InfoStyle.Render(fmt.Sprintf("%d", toolState.Version)) + "\n")
 		
 		if len(toolState.AppliedPatches) > 0 {
-			output += fmt.Sprintf("    Patches: %s\n", strings.Join(toolState.AppliedPatches, ", "))
+			output.WriteString("    " + ui.AccentBoldStyle.Render("🔧 Patches:") + " " + ui.AccentBoldStyle.Render(strings.Join(toolState.AppliedPatches, ", ")) + "\n")
 		}
 		
 		if len(toolState.EffectiveExploits) > 0 {
-			output += "    Effective Exploits: "
+			output.WriteString("    " + ui.ErrorStyle.Render("⚡ Effective Exploits: "))
 			for i, exploit := range toolState.EffectiveExploits {
 				if i > 0 {
-					output += ", "
+					output.WriteString(", ")
 				}
-				output += fmt.Sprintf("%s (level %d)", exploit.Type, exploit.Level)
+				output.WriteString(ui.ErrorStyle.Render(fmt.Sprintf("%s (level %d)", exploit.Type, exploit.Level)))
 			}
-			output += "\n"
+			output.WriteString("\n")
 		}
 	}
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleEXPLOITED() *CommandResult {
@@ -860,25 +1053,26 @@ func (h *CommandHandler) handleEXPLOITED() *CommandResult {
 	}
 
 	if len(exploited) == 0 {
-		return &CommandResult{Output: "No exploited servers\n"}
+		return &CommandResult{Output: ui.WarningStyle.Render("ℹ️  No exploited servers") + "\n"}
 	}
 
-	output := "Exploited servers:\n"
+	var output strings.Builder
+	output.WriteString(ui.ErrorStyle.Render("⚡ Exploited servers:") + "\n")
 	for _, exp := range exploited {
-		output += fmt.Sprintf("  - %s (%s)\n", exp.ServerPath, exp.ServiceName)
+		output.WriteString(ui.FormatListBullet(ui.AccentStyle.Render("• "+exp.ServerPath) + " (" + ui.InfoStyle.Render(exp.ServiceName) + ")"))
 		if len(exp.Exploits) > 0 {
-			output += "    Exploits: "
+			output.WriteString("    " + ui.ErrorStyle.Render("⚡ Exploits: "))
 			for i, exploit := range exp.Exploits {
 				if i > 0 {
-					output += ", "
+					output.WriteString(", ")
 				}
-				output += fmt.Sprintf("%s (level %d)", exploit.Type, exploit.Level)
+				output.WriteString(ui.ErrorStyle.Render(fmt.Sprintf("%s (level %d)", exploit.Type, exploit.Level)))
 			}
-			output += "\n"
+			output.WriteString("\n")
 		}
 	}
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleCRYPTOMINER(args []string) *CommandResult {
@@ -915,7 +1109,7 @@ func (h *CommandHandler) handleSTOPMINING(args []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 
-	output := fmt.Sprintf("Mining stopped on server %s\n", serverIP)
+	output := ui.SuccessStyle.Render("✅ Mining stopped on server ") + formatIP(serverIP) + "\n"
 	return &CommandResult{Output: output}
 }
 
@@ -930,18 +1124,21 @@ func (h *CommandHandler) handleMINERS() *CommandResult {
 	}
 
 	if len(miners) == 0 {
-		return &CommandResult{Output: "No active miners\n"}
+		return &CommandResult{Output: ui.WarningStyle.Render("ℹ️  No active miners") + "\n"}
 	}
 
-	output := "Active miners:\n"
+	var output strings.Builder
+	output.WriteString(ui.WarningStyle.Render("⛏️  Active miners:") + "\n")
 	for _, miner := range miners {
 		duration := time.Since(miner.StartTime)
-		output += fmt.Sprintf("  - Server: %s (running for %s)\n", miner.ServerIP, duration.Round(time.Second))
-		output += fmt.Sprintf("    Resources: CPU=%.1f, Bandwidth=%.1f, RAM=%d\n",
-			miner.ResourceUsage.CPU, miner.ResourceUsage.Bandwidth, miner.ResourceUsage.RAM)
+		output.WriteString(ui.FormatListBullet(ui.AccentStyle.Render("• Server:") + " " + formatIP(miner.ServerIP) + " " + ui.ValueStyle.Render("(running for "+duration.Round(time.Second).String()+")")))
+		output.WriteString("    " + ui.InfoStyle.Render("💻 Resources:") + " ")
+		output.WriteString(ui.InfoStyle.Render(fmt.Sprintf("CPU=%.1f", miner.ResourceUsage.CPU)) + ", ")
+		output.WriteString(ui.InfoStyle.Render(fmt.Sprintf("Bandwidth=%.1f", miner.ResourceUsage.Bandwidth)) + ", ")
+		output.WriteString(ui.InfoStyle.Render(fmt.Sprintf("RAM=%d", miner.ResourceUsage.RAM)) + "\n")
 	}
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleWALLET() *CommandResult {
@@ -955,11 +1152,12 @@ func (h *CommandHandler) handleWALLET() *CommandResult {
 		return &CommandResult{Error: err}
 	}
 
-	output := "Wallet Balance:\n"
-	output += fmt.Sprintf("  Crypto: %.2f\n", user.Wallet.Crypto)
-	output += fmt.Sprintf("  Data: %.2f\n", user.Wallet.Data)
+	var output strings.Builder
+	output.WriteString(ui.FormatSectionHeader("Wallet Balance:", "💰"))
+	output.WriteString("  " + ui.FormatKeyValuePair("₿ Crypto:", fmt.Sprintf("%.2f", user.Wallet.Crypto)) + "\n")
+	output.WriteString("  " + ui.FormatKeyValuePair("💾 Data:", fmt.Sprintf("%.2f", user.Wallet.Data)) + "\n")
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleTOUCH(args []string) *CommandResult {
@@ -971,7 +1169,7 @@ func (h *CommandHandler) handleTOUCH(args []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 	
-	return &CommandResult{Output: ""}
+	return &CommandResult{Output: ui.SuccessStyle.Render("📄 Created file: ") + ui.ValueStyle.Render(args[0]) + "\n"}
 }
 
 func (h *CommandHandler) handleMKDIR(args []string) *CommandResult {
@@ -983,7 +1181,7 @@ func (h *CommandHandler) handleMKDIR(args []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 	
-	return &CommandResult{Output: ""}
+	return &CommandResult{Output: ui.SuccessStyle.Render("📁 Created directory: ") + ui.ListStyle.Render(args[0]) + "\n"}
 }
 
 func (h *CommandHandler) handleRM(args []string) *CommandResult {
@@ -1003,7 +1201,7 @@ func (h *CommandHandler) handleRM(args []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 	
-	return &CommandResult{Output: ""}
+	return &CommandResult{Output: ui.SuccessStyle.Render("🗑️  Deleted: ") + ui.ValueStyle.Render(filename) + "\n"}
 }
 
 func (h *CommandHandler) handleCP(args []string) *CommandResult {
@@ -1015,7 +1213,7 @@ func (h *CommandHandler) handleCP(args []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 	
-	return &CommandResult{Output: ""}
+	return &CommandResult{Output: ui.SuccessStyle.Render("📋 Copied: ") + ui.ValueStyle.Render(args[0]) + " → " + ui.ValueStyle.Render(args[1]) + "\n"}
 }
 
 func (h *CommandHandler) handleMV(args []string) *CommandResult {
@@ -1027,7 +1225,7 @@ func (h *CommandHandler) handleMV(args []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 	
-	return &CommandResult{Output: ""}
+	return &CommandResult{Output: ui.SuccessStyle.Render("✂️  Moved: ") + ui.ValueStyle.Render(args[0]) + " → " + ui.ValueStyle.Render(args[1]) + "\n"}
 }
 
 func (h *CommandHandler) handleEDIT(args []string) *CommandResult {
@@ -1050,27 +1248,57 @@ func (h *CommandHandler) handleTUTORIAL(args []string) *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("failed to reload tutorials: %w", err)}
 	}
 
+	// Emoji constants for tutorials
+	const (
+		emojiTutorial   = "📚"
+		emojiBook       = "📖"
+		emojiStar       = "⭐"
+		emojiRocket     = "🚀"
+		emojiLightbulb  = "💡"
+		emojiCheck      = "✅"
+		emojiArrow      = "➡️"
+		emojiSparkles   = "✨"
+		emojiGraduation = "🎓"
+		emojiSteps      = "👣"
+		emojiCode       = "💻"
+		emojiTarget     = "🎯"
+	)
+
 	// If no args, list all tutorials
 	if len(args) == 0 {
 		tutorials := h.tutorialService.GetAllTutorials()
 		
 		var output strings.Builder
-		output.WriteString("Available Tutorials\n\n")
+		
+		// Title with lots of emojis and colors
+		output.WriteString(ui.HeaderStyle.Render(emojiSparkles + " " + emojiTutorial + " Available Tutorials " + emojiTutorial + " " + emojiSparkles) + "\n\n")
 		
 		if len(tutorials) == 0 {
-			output.WriteString("No tutorials available.\n")
-			output.WriteString("Edit tutorials.json to add tutorials.\n")
+			output.WriteString(ui.WarningStyle.Render(emojiLightbulb + " No tutorials available yet.\n"))
+			output.WriteString(ui.WarningStyle.Render("Edit tutorials.json to add tutorials.\n"))
 		} else {
-			for _, tutorial := range tutorials {
-				output.WriteString(fmt.Sprintf("  %s - %s\n", tutorial.ID, tutorial.Name))
-				output.WriteString(fmt.Sprintf("    %s\n", tutorial.Description))
+			for i, tutorial := range tutorials {
+				// Tutorial ID with emoji and color
+				output.WriteString(fmt.Sprintf("  %s %s %s\n", emojiStar, ui.AccentBoldStyle.Render(tutorial.ID), ui.InfoStyle.Bold(true).Render("- "+tutorial.Name)))
+				
+				// Description with emoji
+				output.WriteString(fmt.Sprintf("    %s %s\n", emojiBook, ui.ValueStyle.Render(tutorial.Description)))
+				
 				if len(tutorial.Prerequisites) > 0 {
-					output.WriteString(fmt.Sprintf("    Prerequisites: %s\n", strings.Join(tutorial.Prerequisites, ", ")))
+					prereqText := strings.Join(tutorial.Prerequisites, ", ")
+					output.WriteString(fmt.Sprintf("    %s %s\n", emojiTarget, ui.WarningStyle.Render("Prerequisites: "+prereqText)))
 				}
-				output.WriteString(fmt.Sprintf("    Steps: %d\n\n", len(tutorial.Steps)))
+				
+				output.WriteString(fmt.Sprintf("    %s %s\n", emojiSteps, ui.SuccessStyle.Render(fmt.Sprintf("Steps: %d", len(tutorial.Steps)))))
+				
+				if i < len(tutorials)-1 {
+					output.WriteString("\n")
+				}
 			}
-			output.WriteString("Usage: tutorial <tutorial_id>\n")
-			output.WriteString("Example: tutorial getting_started\n")
+			
+			output.WriteString("\n")
+			output.WriteString(ui.SectionStyle.Render(emojiArrow + " Usage: ") + "tutorial <tutorial_id>\n")
+			output.WriteString(ui.AccentBoldStyle.Render(emojiRocket + " Example: ") + "tutorial getting_started\n")
 		}
 		
 		return &CommandResult{Output: output.String()}
@@ -1083,30 +1311,44 @@ func (h *CommandHandler) handleTUTORIAL(args []string) *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("tutorial not found: %s. Use 'tutorial' to list available tutorials", tutorialID)}
 	}
 
-	// Display tutorial
+	// Display tutorial with lots of emojis and colors
 	var output strings.Builder
-	output.WriteString("╔═══════════════════════════════════════╗\n")
-	output.WriteString(fmt.Sprintf("║   Tutorial: %s\n", tutorial.Name))
-	output.WriteString("╚═══════════════════════════════════════╝\n\n")
-	output.WriteString(fmt.Sprintf("%s\n\n", tutorial.Description))
 	
+	// Boxed title with emojis
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(ui.DefaultTheme.Primary)).
+		Padding(0, 1).
+		Width(50)
+	
+	titleContent := ui.HeaderStyle.Render(emojiGraduation + " Tutorial: " + tutorial.Name + " " + emojiGraduation)
+	boxedTitle := boxStyle.Render(titleContent)
+	output.WriteString(boxedTitle + "\n\n")
+	
+	// Description with emoji
+	output.WriteString(ui.InfoStyle.Bold(true).Render(emojiBook + " " + tutorial.Description) + "\n\n")
+	
+	// Prerequisites section
 	if len(tutorial.Prerequisites) > 0 {
-		output.WriteString("Prerequisites:\n")
+		output.WriteString(ui.WarningStyle.Render(emojiTarget + " Prerequisites:") + "\n")
 		for _, prereq := range tutorial.Prerequisites {
-			output.WriteString(fmt.Sprintf("  - %s\n", prereq))
+			output.WriteString(fmt.Sprintf("  %s %s\n", emojiCheck, ui.ValueStyle.Render(prereq)))
 		}
 		output.WriteString("\n")
 	}
 
-	output.WriteString("Steps:\n\n")
+	// Steps section
+	output.WriteString(ui.SuccessStyle.Render(emojiSparkles + " Steps:") + "\n\n")
+	
 	for i, step := range tutorial.Steps {
-		output.WriteString(fmt.Sprintf("Step %d: %s\n", step.ID, step.Title))
-		output.WriteString(fmt.Sprintf("%s\n", step.Description))
+		output.WriteString(ui.AccentBoldStyle.Render(fmt.Sprintf("%s Step %d:", emojiSteps, step.ID)))
+		output.WriteString(" " + ui.InfoStyle.Bold(true).Render(step.Title) + "\n")
+		output.WriteString(ui.ValueStyle.Render(step.Description) + "\n")
 		
 		if len(step.Commands) > 0 {
-			output.WriteString("Example commands:\n")
+			output.WriteString(ui.SectionStyle.Render("  " + emojiCode + " Example commands:") + "\n")
 			for _, cmd := range step.Commands {
-				output.WriteString(fmt.Sprintf("  $ %s\n", cmd))
+				output.WriteString(fmt.Sprintf("    $ %s\n", ui.SuccessStyleNoBold.Render(cmd)))
 			}
 		}
 		
@@ -1116,8 +1358,8 @@ func (h *CommandHandler) handleTUTORIAL(args []string) *CommandResult {
 	}
 	
 	output.WriteString("\n")
-	output.WriteString(fmt.Sprintf("Tutorial file location: %s\n", h.tutorialService.GetTutorialPath()))
-	output.WriteString("Edit this file to modify tutorials.\n")
+	output.WriteString(ui.GrayStyle.Render(emojiLightbulb + " Tutorial file location: " + h.tutorialService.GetTutorialPath() + "\n"))
+	output.WriteString(ui.GrayStyle.Render("Edit this file to modify tutorials.\n"))
 
 	return &CommandResult{Output: output.String()}
 }

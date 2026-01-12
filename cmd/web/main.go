@@ -35,7 +35,7 @@ func main() {
 	cfg := config.Load()
 
 	// Header
-	header := "╔═══════════════════════════════════════╗\n║   terminal.sh Web Server - Initializing   ║\n╚═══════════════════════════════════════╝"
+	header := "╔═══════════════════════════════════════╗\n║   ui.sh Web Server - Initializing   ║\n╚═══════════════════════════════════════╝"
 	fmt.Println(boxStyle.Render(header))
 	fmt.Println()
 

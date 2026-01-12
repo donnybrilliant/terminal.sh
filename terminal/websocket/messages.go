@@ -7,6 +7,7 @@ const (
 	MessageTypeOutput  = "output"
 	MessageTypeClose   = "close"
 	MessageTypeMouse   = "mouse"
+	MessageTypePaste   = "paste"
 )
 
 // InputMessage represents keyboard input from the browser client.
@@ -41,4 +42,10 @@ type MouseMessage struct {
 	Button string `json:"button"` // "wheelUp", "wheelDown"
 	X      int    `json:"x"`
 	Y      int    `json:"y"`
+}
+
+// PasteMessage represents a paste event from the browser client.
+type PasteMessage struct {
+	Type string `json:"type"`
+	Text string `json:"text"` // The text to paste
 }

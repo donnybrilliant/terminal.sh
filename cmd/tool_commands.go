@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 	"terminal-sh/models"
 	"terminal-sh/services"
-	"strings"
+	"terminal-sh/ui"
 	"time"
 )
 
@@ -100,8 +101,9 @@ func (h *CommandHandler) handlePasswordCracker(args []string) *CommandResult {
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 10)
 
-	output := fmt.Sprintf("Successfully exploited SSH service on %s using password_cracker\n", targetIP)
-	return &CommandResult{Output: output}
+	var output strings.Builder
+	output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited SSH service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using password_cracker") + "\n")
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleSSHExploit(args []string) *CommandResult {
@@ -145,8 +147,9 @@ func (h *CommandHandler) handleSSHExploit(args []string) *CommandResult {
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 15)
 
-	output := fmt.Sprintf("Successfully exploited SSH service on %s using ssh_exploit\n", targetIP)
-	return &CommandResult{Output: output}
+	var output strings.Builder
+	output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited SSH service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using ssh_exploit") + "\n")
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleUserEnum(args []string) *CommandResult {
@@ -162,24 +165,22 @@ func (h *CommandHandler) handleUserEnum(args []string) *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
 	}
 
-	output := "Users and roles:\n"
+	var output strings.Builder
+	output.WriteString(ui.FormatSectionHeader("Users and roles:", "👥"))
+	
 	for _, role := range server.Roles {
-		output += fmt.Sprintf("  - %s (level %d)\n", role.Role, role.Level)
+		output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render(role.Role) + " " + ui.ValueStyle.Render(fmt.Sprintf("(level %d)", role.Level))))
 	}
 
 	if len(server.Roles) == 0 {
-		output = "No users found\n"
-	} else {
-		// Ensure output ends with newline
-		if !strings.HasSuffix(output, "\n") {
-			output += "\n"
-		}
+		output.Reset()
+		output.WriteString("No users found\n")
 	}
 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 5)
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleLanSniffer(args []string) *CommandResult {
@@ -200,24 +201,22 @@ func (h *CommandHandler) handleLanSniffer(args []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 
-	output := "Local network connections:\n"
+	var output strings.Builder
+	output.WriteString(ui.FormatSectionHeader("Local network connections:", "🔍"))
+	
 	for _, connServer := range connectedServers {
-		output += fmt.Sprintf("  - %s (%s)\n", connServer.IP, connServer.LocalIP)
+		output.WriteString(ui.FormatListBullet(formatIP(connServer.IP) + " (" + formatIP(connServer.LocalIP) + ")"))
 	}
 
 	if len(connectedServers) == 0 {
-		output = "No local network connections found\n"
-	} else {
-		// Ensure output ends with newline
-		if !strings.HasSuffix(output, "\n") {
-			output += "\n"
-		}
+		output.Reset()
+		output.WriteString("No local network connections found\n")
 	}
 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 5)
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleRootkit(args []string) *CommandResult {
@@ -242,12 +241,13 @@ func (h *CommandHandler) handleRootkit(args []string) *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("server must be exploited before installing rootkit")}
 	}
 
-	output := fmt.Sprintf("Rootkit installed on %s. Hidden backdoor access established.\n", targetIP)
+	var output strings.Builder
+	output.WriteString(ui.SuccessStyle.Render("✅ Rootkit installed on ") + formatIP(targetIP) + ui.SuccessStyle.Render(". Hidden backdoor access established.") + "\n")
 	
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 20)
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleExploitKit(args []string) *CommandResult {
@@ -287,8 +287,9 @@ func (h *CommandHandler) handleExploitKit(args []string) *CommandResult {
 	// Add experience
 	h.userService.AddExperience(h.user.ID, exploitedCount*10)
 
-	output := fmt.Sprintf("Successfully exploited %d service(s) on %s using exploit_kit\n", exploitedCount, targetIP)
-	return &CommandResult{Output: output}
+	var output strings.Builder
+	output.WriteString(ui.SuccessStyle.Render(fmt.Sprintf("✅ Successfully exploited %d service(s) on ", exploitedCount)) + formatIP(targetIP) + ui.SuccessStyle.Render(" using exploit_kit") + "\n")
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handlePasswordSniffer(args []string) *CommandResult {
@@ -305,24 +306,22 @@ func (h *CommandHandler) handlePasswordSniffer(args []string) *CommandResult {
 	}
 
 	// Sniff passwords from roles
-	output := "Sniffed passwords from user roles:\n"
+	var output strings.Builder
+	output.WriteString(ui.FormatSectionHeader("Sniffed passwords from user roles:", "🔓"))
+	
 	for _, role := range server.Roles {
-		output += fmt.Sprintf("  - %s: password123 (cracked)\n", role.Role)
+		output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render(role.Role+": password123") + " " + ui.SuccessStyleNoBold.Render("(cracked)")))
 	}
 
 	if len(server.Roles) == 0 {
-		output = "No user roles found to sniff\n"
-	} else {
-		// Ensure output ends with newline
-		if !strings.HasSuffix(output, "\n") {
-			output += "\n"
-		}
+		output.Reset()
+		output.WriteString("No user roles found to sniff\n")
 	}
 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 12)
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleAdvancedExploitKit(args []string) *CommandResult {
@@ -362,8 +361,9 @@ func (h *CommandHandler) handleAdvancedExploitKit(args []string) *CommandResult 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, exploitedCount*15)
 
-	output := fmt.Sprintf("Successfully exploited %d service(s) on %s using advanced_exploit_kit\n", exploitedCount, targetIP)
-	return &CommandResult{Output: output}
+	var output strings.Builder
+	output.WriteString(ui.SuccessStyle.Render(fmt.Sprintf("✅ Successfully exploited %d service(s) on ", exploitedCount)) + formatIP(targetIP) + ui.SuccessStyle.Render(" using advanced_exploit_kit") + "\n")
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleSQLInjector(args []string) *CommandResult {
@@ -406,8 +406,9 @@ func (h *CommandHandler) handleSQLInjector(args []string) *CommandResult {
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 18)
 
-	output := fmt.Sprintf("Successfully exploited HTTP service on %s using sql_injector\n", targetIP)
-	return &CommandResult{Output: output}
+	var output strings.Builder
+	output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited HTTP service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using sql_injector") + "\n")
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleXSSExploit(args []string) *CommandResult {
@@ -450,8 +451,9 @@ func (h *CommandHandler) handleXSSExploit(args []string) *CommandResult {
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 12)
 
-	output := fmt.Sprintf("Successfully exploited HTTP service on %s using xss_exploit\n", targetIP)
-	return &CommandResult{Output: output}
+	var output strings.Builder
+	output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited HTTP service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using xss_exploit") + "\n")
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handlePacketCapture(args []string) *CommandResult {
@@ -467,14 +469,15 @@ func (h *CommandHandler) handlePacketCapture(args []string) *CommandResult {
 	}
 
 	// Simulate packet capture
-	output := fmt.Sprintf("Capturing packets on %s...\n", targetIP)
-	output += "Packets captured: 42\n"
-	output += "Saved to: /tmp/captured_packets.pcap\n"
+	var output strings.Builder
+	output.WriteString(ui.HeaderStyle.Render("📡 Capturing packets on ") + formatIP(targetIP) + "...\n")
+	output.WriteString(ui.FormatKeyValuePair("Packets captured:", "42") + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Saved to:", "/tmp/captured_packets.pcap") + "\n")
 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 8)
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handlePacketDecoder(args []string) *CommandResult {
@@ -490,16 +493,17 @@ func (h *CommandHandler) handlePacketDecoder(args []string) *CommandResult {
 	}
 
 	// Simulate packet decoding
-	output := fmt.Sprintf("Decoding packets from %s...\n", targetIP)
-	output += "Decoded information:\n"
-	output += "  - Protocol: TCP\n"
-	output += "  - Source: 192.168.1.100:443\n"
-	output += "  - Destination: 10.0.0.5:8080\n"
-	output += "  - Payload: [encrypted data]\n"
+	var output strings.Builder
+	output.WriteString(ui.HeaderStyle.Render("🔓 Decoding packets from ") + formatIP(targetIP) + "...\n")
+	output.WriteString(ui.FormatSectionHeader("Decoded information:", ""))
+	output.WriteString(ui.FormatListBullet(ui.FormatKeyValuePair("Protocol:", "TCP")))
+	output.WriteString(ui.FormatListBullet(ui.FormatKeyValuePair("Source:", "192.168.1.100:443")))
+	output.WriteString(ui.FormatListBullet(ui.FormatKeyValuePair("Destination:", "10.0.0.5:8080")))
+	output.WriteString(ui.FormatListBullet(ui.FormatKeyValuePair("Payload:", "[encrypted data]")))
 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 6)
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 

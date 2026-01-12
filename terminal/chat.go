@@ -246,7 +246,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		// Handle special keys
 		switch msg.String() {
-		case "ctrl+c", "esc":
+		case "ctrl+q", "esc":
 			// Exit chat mode
 			m.chatService.UnregisterSession(m.sessionID)
 			return m.parent, nil

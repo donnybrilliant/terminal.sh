@@ -37,7 +37,7 @@ func main() {
 	cfg := config.Load()
 
 	// Header
-	header := "╔═══════════════════════════════════════╗\n║   terminal.sh SSH Server - Initializing    ║\n╚═══════════════════════════════════════╝"
+	header := "╔═══════════════════════════════════════╗\n║   ui.sh SSH Server - Initializing    ║\n╚═══════════════════════════════════════╝"
 	fmt.Println(boxStyle.Render(header))
 	fmt.Println()
 
