@@ -38,7 +38,7 @@ func main() {
 	cfg := config.Load()
 
 	// Header
-	header := "╔═══════════════════════════════════════╗\n║   terminal.sh Server - Initializing   ║\n║   (SSH + WebSocket)                    ║\n╚═══════════════════════════════════════╝"
+	header := "╔═══════════════════════════════════════╗\n║   ui.sh Server - Initializing   ║\n║   (SSH + WebSocket)                    ║\n╚═══════════════════════════════════════╝"
 	fmt.Println(boxStyle.Render(header))
 	fmt.Println()
 

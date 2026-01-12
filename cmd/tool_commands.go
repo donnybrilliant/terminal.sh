@@ -5,9 +5,8 @@ import (
 	"strings"
 	"terminal-sh/models"
 	"terminal-sh/services"
+	"terminal-sh/ui"
 	"time"
-
-	"github.com/charmbracelet/lipgloss"
 )
 
 // showExploitProgress shows a progress bar for exploitation
@@ -103,10 +102,7 @@ func (h *CommandHandler) handlePasswordCracker(args []string) *CommandResult {
 	h.userService.AddExperience(h.user.ID, 10)
 
 	var output strings.Builder
-	successStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("46")).
-		Bold(true)
-	output.WriteString(successStyle.Render("✅ Successfully exploited SSH service on ") + formatIP(targetIP) + successStyle.Render(" using password_cracker") + "\n")
+	output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited SSH service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using password_cracker") + "\n")
 	return &CommandResult{Output: output.String()}
 }
 
@@ -152,10 +148,7 @@ func (h *CommandHandler) handleSSHExploit(args []string) *CommandResult {
 	h.userService.AddExperience(h.user.ID, 15)
 
 	var output strings.Builder
-	successStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("46")).
-		Bold(true)
-	output.WriteString(successStyle.Render("✅ Successfully exploited SSH service on ") + formatIP(targetIP) + successStyle.Render(" using ssh_exploit") + "\n")
+	output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited SSH service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using ssh_exploit") + "\n")
 	return &CommandResult{Output: output.String()}
 }
 
@@ -173,16 +166,10 @@ func (h *CommandHandler) handleUserEnum(args []string) *CommandResult {
 	}
 
 	var output strings.Builder
-	headerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("205")).
-		Bold(true)
-	output.WriteString(headerStyle.Render("👥 Users and roles:") + "\n")
-	
-	listStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Blue
-	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")) // Light gray
+	output.WriteString(ui.FormatSectionHeader("Users and roles:", "👥"))
 	
 	for _, role := range server.Roles {
-		output.WriteString(listStyle.Render("  - ") + valueStyle.Render(role.Role) + " " + valueStyle.Render(fmt.Sprintf("(level %d)", role.Level)) + "\n")
+		output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render(role.Role) + " " + ui.ValueStyle.Render(fmt.Sprintf("(level %d)", role.Level))))
 	}
 
 	if len(server.Roles) == 0 {
@@ -215,15 +202,10 @@ func (h *CommandHandler) handleLanSniffer(args []string) *CommandResult {
 	}
 
 	var output strings.Builder
-	headerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("205")).
-		Bold(true)
-	output.WriteString(headerStyle.Render("🔍 Local network connections:") + "\n")
-	
-	listStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Blue
+	output.WriteString(ui.FormatSectionHeader("Local network connections:", "🔍"))
 	
 	for _, connServer := range connectedServers {
-		output.WriteString(listStyle.Render("  - ") + formatIP(connServer.IP) + " (" + formatIP(connServer.LocalIP) + ")\n")
+		output.WriteString(ui.FormatListBullet(formatIP(connServer.IP) + " (" + formatIP(connServer.LocalIP) + ")"))
 	}
 
 	if len(connectedServers) == 0 {
@@ -260,10 +242,7 @@ func (h *CommandHandler) handleRootkit(args []string) *CommandResult {
 	}
 
 	var output strings.Builder
-	successStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("46")).
-		Bold(true)
-	output.WriteString(successStyle.Render("✅ Rootkit installed on ") + formatIP(targetIP) + successStyle.Render(". Hidden backdoor access established.") + "\n")
+	output.WriteString(ui.SuccessStyle.Render("✅ Rootkit installed on ") + formatIP(targetIP) + ui.SuccessStyle.Render(". Hidden backdoor access established.") + "\n")
 	
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 20)
@@ -309,10 +288,7 @@ func (h *CommandHandler) handleExploitKit(args []string) *CommandResult {
 	h.userService.AddExperience(h.user.ID, exploitedCount*10)
 
 	var output strings.Builder
-	successStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("46")).
-		Bold(true)
-	output.WriteString(successStyle.Render(fmt.Sprintf("✅ Successfully exploited %d service(s) on ", exploitedCount)) + formatIP(targetIP) + successStyle.Render(" using exploit_kit") + "\n")
+	output.WriteString(ui.SuccessStyle.Render(fmt.Sprintf("✅ Successfully exploited %d service(s) on ", exploitedCount)) + formatIP(targetIP) + ui.SuccessStyle.Render(" using exploit_kit") + "\n")
 	return &CommandResult{Output: output.String()}
 }
 
@@ -331,17 +307,10 @@ func (h *CommandHandler) handlePasswordSniffer(args []string) *CommandResult {
 
 	// Sniff passwords from roles
 	var output strings.Builder
-	headerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("205")).
-		Bold(true)
-	output.WriteString(headerStyle.Render("🔓 Sniffed passwords from user roles:") + "\n")
-	
-	listStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Blue
-	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")) // Light gray
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("46")) // Green
+	output.WriteString(ui.FormatSectionHeader("Sniffed passwords from user roles:", "🔓"))
 	
 	for _, role := range server.Roles {
-		output.WriteString(listStyle.Render("  - ") + valueStyle.Render(role.Role+": password123") + " " + successStyle.Render("(cracked)") + "\n")
+		output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render(role.Role+": password123") + " " + ui.SuccessStyleNoBold.Render("(cracked)")))
 	}
 
 	if len(server.Roles) == 0 {
@@ -393,10 +362,7 @@ func (h *CommandHandler) handleAdvancedExploitKit(args []string) *CommandResult 
 	h.userService.AddExperience(h.user.ID, exploitedCount*15)
 
 	var output strings.Builder
-	successStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("46")).
-		Bold(true)
-	output.WriteString(successStyle.Render(fmt.Sprintf("✅ Successfully exploited %d service(s) on ", exploitedCount)) + formatIP(targetIP) + successStyle.Render(" using advanced_exploit_kit") + "\n")
+	output.WriteString(ui.SuccessStyle.Render(fmt.Sprintf("✅ Successfully exploited %d service(s) on ", exploitedCount)) + formatIP(targetIP) + ui.SuccessStyle.Render(" using advanced_exploit_kit") + "\n")
 	return &CommandResult{Output: output.String()}
 }
 
@@ -441,10 +407,7 @@ func (h *CommandHandler) handleSQLInjector(args []string) *CommandResult {
 	h.userService.AddExperience(h.user.ID, 18)
 
 	var output strings.Builder
-	successStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("46")).
-		Bold(true)
-	output.WriteString(successStyle.Render("✅ Successfully exploited HTTP service on ") + formatIP(targetIP) + successStyle.Render(" using sql_injector") + "\n")
+	output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited HTTP service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using sql_injector") + "\n")
 	return &CommandResult{Output: output.String()}
 }
 
@@ -489,10 +452,7 @@ func (h *CommandHandler) handleXSSExploit(args []string) *CommandResult {
 	h.userService.AddExperience(h.user.ID, 12)
 
 	var output strings.Builder
-	successStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("46")).
-		Bold(true)
-	output.WriteString(successStyle.Render("✅ Successfully exploited HTTP service on ") + formatIP(targetIP) + successStyle.Render(" using xss_exploit") + "\n")
+	output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited HTTP service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using xss_exploit") + "\n")
 	return &CommandResult{Output: output.String()}
 }
 
@@ -510,15 +470,9 @@ func (h *CommandHandler) handlePacketCapture(args []string) *CommandResult {
 
 	// Simulate packet capture
 	var output strings.Builder
-	headerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("205")).
-		Bold(true)
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("51")) // Cyan
-	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")) // Light gray
-	
-	output.WriteString(headerStyle.Render("📡 Capturing packets on ") + formatIP(targetIP) + "...\n")
-	output.WriteString(labelStyle.Render("Packets captured:") + " " + valueStyle.Render("42") + "\n")
-	output.WriteString(labelStyle.Render("Saved to:") + " " + valueStyle.Render("/tmp/captured_packets.pcap") + "\n")
+	output.WriteString(ui.HeaderStyle.Render("📡 Capturing packets on ") + formatIP(targetIP) + "...\n")
+	output.WriteString(ui.FormatKeyValuePair("Packets captured:", "42") + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Saved to:", "/tmp/captured_packets.pcap") + "\n")
 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 8)
@@ -540,19 +494,12 @@ func (h *CommandHandler) handlePacketDecoder(args []string) *CommandResult {
 
 	// Simulate packet decoding
 	var output strings.Builder
-	headerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("205")).
-		Bold(true)
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("51")) // Cyan
-	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")) // Light gray
-	listStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Blue
-	
-	output.WriteString(headerStyle.Render("🔓 Decoding packets from ") + formatIP(targetIP) + "...\n")
-	output.WriteString(headerStyle.Render("Decoded information:") + "\n")
-	output.WriteString(listStyle.Render("  - ") + labelStyle.Render("Protocol:") + " " + valueStyle.Render("TCP") + "\n")
-	output.WriteString(listStyle.Render("  - ") + labelStyle.Render("Source:") + " " + valueStyle.Render("192.168.1.100:443") + "\n")
-	output.WriteString(listStyle.Render("  - ") + labelStyle.Render("Destination:") + " " + valueStyle.Render("10.0.0.5:8080") + "\n")
-	output.WriteString(listStyle.Render("  - ") + labelStyle.Render("Payload:") + " " + valueStyle.Render("[encrypted data]") + "\n")
+	output.WriteString(ui.HeaderStyle.Render("🔓 Decoding packets from ") + formatIP(targetIP) + "...\n")
+	output.WriteString(ui.FormatSectionHeader("Decoded information:", ""))
+	output.WriteString(ui.FormatListBullet(ui.FormatKeyValuePair("Protocol:", "TCP")))
+	output.WriteString(ui.FormatListBullet(ui.FormatKeyValuePair("Source:", "192.168.1.100:443")))
+	output.WriteString(ui.FormatListBullet(ui.FormatKeyValuePair("Destination:", "10.0.0.5:8080")))
+	output.WriteString(ui.FormatListBullet(ui.FormatKeyValuePair("Payload:", "[encrypted data]")))
 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 6)

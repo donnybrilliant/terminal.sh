@@ -110,7 +110,7 @@ const (
 )
 
 var (
-	// Styles using current theme
+	// Internal styles (for use within terminal package)
 	promptStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(currentTheme.Primary)).
 			Bold(true)
@@ -128,7 +128,6 @@ var (
 	successStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(currentTheme.Success))
 	
-	// New style variables
 	headerStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(currentTheme.Primary)).
 		Bold(true)
@@ -148,6 +147,82 @@ var (
 	
 	listItemStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(currentTheme.Secondary))
+)
+
+// Exported style variables for use across the codebase
+var (
+	// Header styles
+	HeaderStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Primary)).
+		Bold(true)
+	
+	SectionStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Secondary)).
+		Bold(true)
+	
+	// Text styles
+	LabelStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Info))
+	
+	ValueStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.LightGray))
+	
+	ListStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Secondary))
+	
+	// Semantic styles
+	SuccessStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Success)).
+		Bold(true)
+	
+	SuccessStyleNoBold = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Success))
+	
+	InfoStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Info))
+	
+	WarningStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Warning)).
+		Bold(true)
+	
+	ErrorStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Error)).
+		Bold(true)
+	
+	// Accent styles
+	AccentStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Pink))
+	
+	AccentBoldStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Pink)).
+		Bold(true)
+	
+	PriceStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Success))
+	
+	// Gray styles
+	GrayStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Gray))
+	
+	// Security level styles (for dynamic use)
+	SecurityLowStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Success))
+	
+	SecurityMediumStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Warning))
+	
+	SecurityHighStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Error))
+	
+	// Command-specific styles
+	CommandStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Success))
+	
+	ToolCommandStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Pink))
+	
+	FilesystemCommandStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Success))
 )
 
 // RenderPrompt renders the shell prompt with styled user, hostname, and path.
@@ -452,6 +527,80 @@ func FormatBox(title, content string) string {
 	sb.WriteString(content)
 	
 	return sb.String()
+}
+
+// GetSecurityStyle returns the appropriate style for a security level
+func GetSecurityStyle(level int) lipgloss.Style {
+	if level <= 3 {
+		return SecurityLowStyle
+	} else if level <= 6 {
+		return SecurityMediumStyle
+	}
+	return SecurityHighStyle
+}
+
+// FormatSectionHeader formats a section header with optional emoji
+func FormatSectionHeader(title, emoji string) string {
+	if emoji != "" {
+		title = emoji + " " + title
+	}
+	return HeaderStyle.Render(title) + "\n"
+}
+
+// FormatKeyValuePair formats a key-value pair (simplified version)
+func FormatKeyValuePair(key, value string) string {
+	return LabelStyle.Render(key) + ": " + ValueStyle.Render(value)
+}
+
+// FormatKeyValuePairWithColor formats a key-value pair with custom value color
+func FormatKeyValuePairWithColor(key, value, valueColor string) string {
+	valStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(valueColor))
+	return LabelStyle.Render(key) + ": " + valStyle.Render(value)
+}
+
+// FormatSuccessMessage formats a success message with optional emoji
+func FormatSuccessMessage(message, emoji string) string {
+	prefix := ""
+	if emoji != "" {
+		prefix = emoji + " "
+	}
+	result := SuccessStyle.Render(prefix + message)
+	if !strings.HasSuffix(result, "\n") {
+		result += "\n"
+	}
+	return result
+}
+
+// FormatInfoMessage formats an info message
+func FormatInfoMessage(message string) string {
+	result := InfoStyle.Render(message)
+	if !strings.HasSuffix(result, "\n") {
+		result += "\n"
+	}
+	return result
+}
+
+// FormatUsage formats usage information in gray
+func FormatUsage(message string) string {
+	return GrayStyle.Render(message) + "\n"
+}
+
+// FormatListBullet formats a bullet list item
+func FormatListBullet(text string) string {
+	return ListStyle.Render("  - ") + text + "\n"
+}
+
+// FormatListBulletWithStyle formats a bullet list item with custom style
+func FormatListBulletWithStyle(text string, style lipgloss.Style) string {
+	return ListStyle.Render("  - ") + style.Render(text) + "\n"
+}
+
+// FormatCommand formats a command name with appropriate style
+func FormatCommand(cmd string, isTool bool) string {
+	if isTool {
+		return ToolCommandStyle.Render(cmd)
+	}
+	return FilesystemCommandStyle.Render(cmd)
 }
 
 // AnimatedWelcome returns an animated "TERMINAL.SH" ASCII art welcome message
