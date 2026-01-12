@@ -2,13 +2,17 @@ package services
 
 import (
 	"fmt"
+	"terminal-sh/config"
 	"terminal-sh/models"
+
+	"github.com/google/uuid"
 )
 
 // NetworkService handles network scanning operations including internet and local network scans.
 type NetworkService struct {
-	serverService *ServerService
-	shopService   *ShopService // Will be set if available
+	serverService            *ServerService
+	shopService              *ShopService // Will be set if available
+	serverGenerator *ServerGenerator // Optional server generator
 }
 
 // NewNetworkService creates a new NetworkService with the provided server service.
@@ -23,12 +27,35 @@ func (n *NetworkService) SetShopService(shopService *ShopService) {
 	n.shopService = shopService
 }
 
+// SetServerGenerator sets the server generator for this network service.
+func (n *NetworkService) SetServerGenerator(generator *ServerGenerator) {
+	n.serverGenerator = generator
+}
+
 // ScanInternet scans the internet for top-level servers (servers not in local networks).
+// If procedural server generator is available and server count is low, generates new servers.
 func (n *NetworkService) ScanInternet() ([]models.Server, error) {
 	servers, err := n.serverService.GetAllTopLevelServers()
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan internet: %w", err)
 	}
+	
+	// Check if we need to generate more servers
+	if n.serverGenerator != nil && len(servers) < config.MinServersOnline {
+		// Try to get user ID from context if available
+		// For now, we'll generate servers without user context
+		// In production, this would be passed from the command handler
+		if err := n.serverGenerator.CheckAndGenerateServers(uuid.Nil); err != nil {
+			// Log error but continue - return existing servers
+		} else {
+			// Re-fetch servers after generation
+			servers, err = n.serverService.GetAllTopLevelServers()
+			if err != nil {
+				return nil, fmt.Errorf("failed to scan internet: %w", err)
+			}
+		}
+	}
+	
 	return servers, nil
 }
 

@@ -13,10 +13,11 @@ import (
 
 // MissionService handles mission-related operations
 type MissionService struct {
-	db       *database.Database
-	missions []models.Mission
-	dataPath string
-	rewardService *RewardService
+	db                *database.Database
+	missions          []models.Mission
+	dataPath          string
+	rewardService     *RewardService
+	missionGenerator *MissionGenerator // Optional mission generator
 }
 
 // NewMissionService creates a new MissionService and loads missions from JSON
@@ -67,13 +68,24 @@ func (s *MissionService) GetAllMissions() []models.Mission {
 	return s.missions
 }
 
-// GetMissionByID returns a mission by its ID
+// GetMissionByID returns a mission by its ID (checks both static and procedurally generated missions)
 func (s *MissionService) GetMissionByID(id string) (*models.Mission, error) {
+	// Check static missions first
 	for _, mission := range s.missions {
 		if mission.ID == id {
 			return &mission, nil
 		}
 	}
+	
+	// Check procedurally generated missions
+	var generatedMission models.GeneratedMission
+	if err := s.db.Where("mission_id = ?", id).First(&generatedMission).Error; err == nil {
+		var mission models.Mission
+		if err := json.Unmarshal([]byte(generatedMission.MissionData), &mission); err == nil {
+			return &mission, nil
+		}
+	}
+	
 	return nil, fmt.Errorf("mission not found: %s", id)
 }
 
@@ -240,6 +252,11 @@ func (s *MissionService) UpdateMissionProgress(userID uuid.UUID, missionID strin
 	return nil
 }
 
+// SetMissionGenerator sets the mission generator for this service
+func (s *MissionService) SetMissionGenerator(generator *MissionGenerator) {
+	s.missionGenerator = generator
+}
+
 // GetAvailableMissions returns missions available to a user (prerequisites met, level met)
 func (s *MissionService) GetAvailableMissions(userID uuid.UUID, userLevel int) []models.Mission {
 	userMissions, _ := s.GetUserMissions(userID)
@@ -268,6 +285,40 @@ func (s *MissionService) GetAvailableMissions(userID uuid.UUID, userLevel int) [
 		
 		if prereqsMet {
 			available = append(available, mission)
+		}
+	}
+	
+	// If we have less than 3 available missions and generator is available, generate some
+	if len(available) < 3 && s.missionGenerator != nil {
+		// Check if we've already generated missions for this user recently
+		var existingGeneratedMissions []models.GeneratedMission
+		s.db.Where("user_id = ?", userID).Find(&existingGeneratedMissions)
+		
+		// Generate missions if we don't have enough
+		needed := 3 - len(available)
+		if len(existingGeneratedMissions) < needed {
+			for i := 0; i < needed; i++ {
+				generatedMission, err := s.missionGenerator.GenerateMission(userID)
+				if err == nil {
+					// Add to available missions if level requirement is met
+					if generatedMission.RequiredLevel <= userLevel {
+						available = append(available, *generatedMission)
+					}
+				}
+			}
+		} else {
+			// Load existing procedurally generated missions
+			for _, generatedMissionRecord := range existingGeneratedMissions {
+				var generatedMission models.Mission
+				if err := json.Unmarshal([]byte(generatedMissionRecord.MissionData), &generatedMission); err == nil {
+					if generatedMission.RequiredLevel <= userLevel {
+						// Check if not already completed
+						if !completedMissionIDs[generatedMission.ID] {
+							available = append(available, generatedMission)
+						}
+					}
+				}
+			}
 		}
 	}
 	

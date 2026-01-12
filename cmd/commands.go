@@ -58,6 +58,8 @@ type CommandHandler struct {
 	missionService *services.MissionService
 	achievementService *services.AchievementService
 	rewardService  *services.RewardService
+	missionGenerator *services.MissionGenerator
+	serverGenerator *services.ServerGenerator
 	currentServerPath string // Current server path if in SSH mode
 	sessionID       *uuid.UUID // Current session ID
 	onSSHConnect    func(serverPath string) error // Callback for SSH connection
@@ -84,6 +86,14 @@ func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.
 	rewardService := services.NewRewardService(db, userService, toolService, patchService, achievementService)
 	missionService, _ := services.NewMissionService(db, "", rewardService) // Initialize mission service
 	
+	// Initialize mission generator
+	missionGenerator := services.NewMissionGenerator(db, missionService, serverService, toolService, userService)
+	missionService.SetMissionGenerator(missionGenerator)
+	
+	// Initialize server generator
+	serverGenerator := services.NewServerGenerator(db, serverService)
+	networkService.SetServerGenerator(serverGenerator)
+	
 	return &CommandHandler{
 		db:              db,
 		vfs:            vfs,
@@ -104,6 +114,8 @@ func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.
 		missionService: missionService,
 		achievementService: achievementService,
 		rewardService: rewardService,
+		missionGenerator: missionGenerator,
+		serverGenerator: serverGenerator,
 	}
 }
 
@@ -235,10 +247,6 @@ func (h *CommandHandler) Execute(command string) *CommandResult {
 		return h.handleSCAN(args)
 	case "server":
 		return h.handleSERVER()
-	case "createServer":
-		return h.handleCREATESERVER(args)
-	case "createLocalServer":
-		return h.handleCREATELOCALSERVER(args)
 	case "ssh":
 		return h.handleSSH(args)
 	case "exit":
@@ -443,8 +451,6 @@ func (h *CommandHandler) handleHELP() *CommandResult {
 	output.WriteString(formatListItem("ssh <targetIP>      - Connect to a server", ""))
 	output.WriteString(formatListItem("exit                - Disconnect from server", ""))
 	output.WriteString(formatListItem("server              - Show current server info", ""))
-	output.WriteString(formatListItem("createServer        - Create a new server", ""))
-	output.WriteString(formatListItem("createLocalServer   - Create local server", ""))
 	output.WriteString("\n")
 	
 	// Tools/Game commands
@@ -488,7 +494,6 @@ func (h *CommandHandler) handleHELP() *CommandResult {
 	output.WriteString(ui.ValueStyle.Render("⚙️ System:") + "\n")
 	output.WriteString(formatListItem("clear                - Clear the screen", ""))
 	output.WriteString(formatListItem("help                 - Show this help message", ""))
-	output.WriteString(formatListItem("ascii <text> [flags] - Convert text to ASCII art", "✨"))
 	
 	// Ensure trailing newline
 	helpText := output.String()
@@ -990,62 +995,6 @@ func (h *CommandHandler) handleSERVER() *CommandResult {
 		server.Resources.CPU, server.Resources.Bandwidth, server.Resources.RAM)) + "\n")
 	output.WriteString(ui.FormatKeyValuePair("Wallet:", fmt.Sprintf("Crypto=%.2f, Data=%.2f",
 		server.Wallet.Crypto, server.Wallet.Data)) + "\n")
-
-	return &CommandResult{Output: output.String()}
-}
-
-func (h *CommandHandler) handleCREATESERVER(_ []string) *CommandResult {
-	if h.user == nil {
-		return &CommandResult{Error: fmt.Errorf("not authenticated")}
-	}
-
-	// Generate random IPs
-	ip := generateRandomIP()
-	localIP := generateRandomLocalIP()
-
-	server, err := h.serverService.CreateServer(ip, localIP)
-	if err != nil {
-		return &CommandResult{Error: err}
-	}
-
-	var output strings.Builder
-	output.WriteString(ui.FormatSuccessMessage("Server created successfully!", "✅"))
-	
-	output.WriteString(ui.FormatKeyValuePair("IP:", formatIP(server.IP)) + "\n")
-	output.WriteString(ui.FormatKeyValuePair("Local IP:", formatIP(server.LocalIP)) + "\n")
-
-	return &CommandResult{Output: output.String()}
-}
-
-func (h *CommandHandler) handleCREATELOCALSERVER(_ []string) *CommandResult {
-	if h.user == nil {
-		return &CommandResult{Error: fmt.Errorf("not authenticated")}
-	}
-
-	if h.currentServerPath == "" {
-		return &CommandResult{Error: fmt.Errorf("must be connected to a server to create local server")}
-	}
-
-	// Get parent server
-	parentServer, err := h.serverService.GetServerByPath(h.currentServerPath)
-	if err != nil {
-		return &CommandResult{Error: err}
-	}
-
-	// Generate random IPs
-	ip := generateRandomIP()
-	localIP := generateRandomLocalIP()
-
-	server, err := h.serverService.CreateLocalServer(parentServer.IP, ip, localIP)
-	if err != nil {
-		return &CommandResult{Error: err}
-	}
-
-	var output strings.Builder
-	output.WriteString(ui.FormatSuccessMessage("Local server created successfully!", "✅"))
-	
-	output.WriteString(ui.FormatKeyValuePair("IP:", formatIP(server.IP)) + "\n")
-	output.WriteString(ui.FormatKeyValuePair("Local IP:", formatIP(server.LocalIP)) + "\n")
 
 	return &CommandResult{Output: output.String()}
 }

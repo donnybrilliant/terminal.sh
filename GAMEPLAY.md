@@ -916,6 +916,45 @@ tools                   # Verify upgrade
 - Check `mission status` to see completed missions
 - Move on to the next mission in the arc
 
+## Infinite Gameplay
+
+terminal.sh features a **procedural generation system** that ensures you never run out of content to explore.
+
+### How It Works
+
+When you complete all available static missions or exhaust the available servers, the game automatically generates new content tailored to your skill level:
+
+- **Procedurally Generated Missions**: When you have fewer than 3 available missions, the system automatically creates new missions based on:
+  - Your current level
+  - Tools you own
+  - Your playstyle and progress
+  - Available servers to target
+
+- **Procedural Servers**: When the number of available servers drops below 10, new servers are automatically generated with:
+  - Difficulty scaled to your level
+  - Appropriate vulnerabilities for your tools
+  - Local network connections for exploration depth
+
+### Mission Types
+
+Procedurally generated missions include various types:
+- **Exploitation**: "Exploit N servers with security level < X"
+- **Data Extraction**: "Extract X GB of data from servers"
+- **Tool Mastery**: "Use [tool] to exploit N servers"
+- **Network Exploration**: "Discover N servers on local networks"
+- **Resource Gathering**: "Mine X cryptocurrency"
+- **Stealth Operations**: "Cover your tracks on N servers"
+
+### Seamless Experience
+
+The generation happens automatically and transparently - you'll simply see new missions appear in your mission list and new servers when you scan the network. The system ensures:
+- Content is always level-appropriate
+- Missions require tools you have access to
+- Difficulty scales with your progress
+- Generated content feels hand-crafted, not repetitive
+
+For technical details, see [PROCEDURAL_GENERATION.md](PROCEDURAL_GENERATION.md).
+
 ## Getting Help
 
 - Type `help` in-game for command list
