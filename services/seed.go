@@ -48,18 +48,33 @@ func seedServersFromJSON(db *database.Database) error {
 		return fmt.Errorf("failed to parse servers.json: %w", err)
 	}
 
-	for _, server := range serverData.Servers {
+		for _, server := range serverData.Servers {
 		// Check if server already exists
 		var existing models.Server
 		err := db.Where("ip = ?", server.IP).First(&existing).Error
 		if err != nil && err == gorm.ErrRecordNotFound {
-			// For repo server, populate tools list with all available tools
+			// For repo server, populate tools list with free tools only (exclude mission-exclusive tools)
 			if server.IP == "repo" {
 				var tools []models.Tool
 				if err := db.Find(&tools).Error; err == nil {
-					toolNames := make([]string, len(tools))
-					for i, tool := range tools {
-						toolNames[i] = tool.Name
+					// Mission-exclusive tools that should NOT be in repo
+					missionExclusiveTools := map[string]bool{
+						"phishing_kit":      true,
+						"database_dumper":   true,
+						"log_cleaner":       true,
+						"timestomper":       true,
+						"audit_disable":     true,
+						"hash_cracker":      true,
+						"log_analyzer":      true,
+						"backup_destroyer":  true,
+					}
+					
+					var toolNames []string
+					for _, tool := range tools {
+						// Skip patches and mission-exclusive tools
+						if !tool.IsPatch && !missionExclusiveTools[tool.Name] {
+							toolNames = append(toolNames, tool.Name)
+						}
 					}
 					server.Tools = toolNames
 				}
@@ -95,10 +110,24 @@ func createRepoServer(db *database.Database) (*models.Server, error) {
 		return nil, err
 	}
 	
-	// Create tool names list
-	toolNames := make([]string, len(tools))
-	for i, tool := range tools {
-		toolNames[i] = tool.Name
+	// Mission-exclusive tools that should NOT be in repo
+	missionExclusiveTools := map[string]bool{
+		"phishing_kit":      true,
+		"database_dumper":   true,
+		"log_cleaner":       true,
+		"timestomper":       true,
+		"audit_disable":     true,
+		"hash_cracker":      true,
+		"log_analyzer":      true,
+		"backup_destroyer":  true,
+	}
+	
+	// Create tool names list (exclude patches and mission-exclusive tools)
+	var toolNames []string
+	for _, tool := range tools {
+		if !tool.IsPatch && !missionExclusiveTools[tool.Name] {
+			toolNames = append(toolNames, tool.Name)
+		}
 	}
 	
 	// Create repo server

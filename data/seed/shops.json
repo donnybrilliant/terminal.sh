@@ -55,6 +55,24 @@
           "stock": -1
         },
         {
+          "item_type": "tool",
+          "item_id": "rootkit",
+          "name": "rootkit",
+          "description": "Install hidden backdoor for persistent access",
+          "crypto_price": 500,
+          "data_price": 0,
+          "stock": -1
+        },
+        {
+          "item_type": "tool",
+          "item_id": "password_sniffer",
+          "name": "password_sniffer",
+          "description": "Sniff and crack passwords from user roles - more effective than basic password cracking",
+          "crypto_price": 300,
+          "data_price": 0,
+          "stock": -1
+        },
+        {
           "item_type": "patch",
           "item_id": "pass_patch_v2",
           "name": "pass_patch_v2",

@@ -132,6 +132,38 @@ func (s *MissionService) StartMission(userID uuid.UUID, missionID string) error 
 		return nil
 	}
 	
+	// Grant tools at mission start if mission requires using those tools
+	// This allows players to complete objectives that require tools they don't have yet
+	if s.rewardService != nil && len(mission.Rewards.Tools) > 0 {
+		// Check if any objective requires a tool that's in the rewards
+		needsToolAtStart := false
+		for _, obj := range mission.Objectives {
+			if obj.Type == "use_tool" && obj.Tool != "" {
+				for _, rewardTool := range mission.Rewards.Tools {
+					if obj.Tool == rewardTool {
+						needsToolAtStart = true
+						break
+					}
+				}
+			}
+			if needsToolAtStart {
+				break
+			}
+		}
+		
+		// Grant tools early if needed for objectives
+		if needsToolAtStart {
+			// Create a temporary rewards struct with just the tools
+			toolRewards := models.MissionRewards{
+				Tools: mission.Rewards.Tools,
+			}
+			if err := s.rewardService.GrantRewards(userID, toolRewards); err != nil {
+				// Log error but continue - mission can still start
+				// Tools will be granted again on completion (which is idempotent)
+			}
+		}
+	}
+	
 	// Create new user mission
 	userMission := &models.UserMission{
 		UserID:    userID,
@@ -287,7 +319,7 @@ func (s *MissionService) createDefaultMissions(path string) error {
 						Type:        "use_tool",
 						Description: "Use phishing_kit on target server",
 						Tool:        "phishing_kit",
-						Hint:        "First, exploit a server with HTTP services. Then use `phishing_kit <targetIP>` to create a phishing campaign. This tool generates realistic-looking emails and sites to gather credentials. You'll receive this tool as a reward when you complete this mission!",
+						Hint:        "The `phishing_kit` tool will be granted to you when you start this mission. First, scan for servers and exploit one with HTTP services (look for port 80 in scan results). Then use `phishing_kit <targetIP>` to create a phishing campaign. This tool generates realistic-looking emails and sites to gather credentials.",
 					},
 				},
 				Rewards: models.MissionRewards{
@@ -314,7 +346,7 @@ func (s *MissionService) createDefaultMissions(path string) error {
 						Type:        "use_tool",
 						Description: "Use database_dumper to extract data",
 						Tool:        "database_dumper",
-						Hint:        "First, find a server with HTTP services and SQL injection vulnerabilities. Use `sql_injector <targetIP>` to exploit it. Then use `database_dumper <targetIP>` to extract all database contents. This tool dumps entire databases - perfect for data heists! You'll receive this tool as a reward.",
+						Hint:        "The `database_dumper` tool will be granted to you when you start this mission. First, scan for servers and find one with HTTP services and SQL injection vulnerabilities. Use `sql_injector <targetIP>` to exploit it first (you should have sql_injector from the repo). Then use `database_dumper <targetIP>` to extract all database contents. This tool dumps entire databases - perfect for data heists!",
 					},
 				},
 				Rewards: models.MissionRewards{
@@ -342,14 +374,14 @@ func (s *MissionService) createDefaultMissions(path string) error {
 						Type:        "use_tool",
 						Description: "Use log_cleaner on audit server",
 						Tool:        "log_cleaner",
-						Hint:        "Find and exploit the audit server first. Then use `log_cleaner <targetIP>` to delete and clear all system logs. This removes evidence of your activities. You'll receive this tool as a reward!",
+						Hint:        "The `log_cleaner` and `timestomper` tools will be granted to you when you start this mission. First, scan for servers and find the audit server (look for servers with 'audit' in scan results, or any server you've previously exploited). Then use `log_cleaner <targetIP>` to delete and clear all system logs. This removes evidence of your activities.",
 					},
 					{
 						ID:          2,
 						Type:        "use_tool",
 						Description: "Use timestomper to modify file timestamps",
 						Tool:        "timestomper",
-						Hint:        "After clearing logs, use `timestomper <targetIP>` on the same audit server. This modifies file timestamps to make forensic analysis harder. Combined with log_cleaner, you'll be nearly untraceable! You'll receive this tool as a reward.",
+						Hint:        "After clearing logs with log_cleaner, use `timestomper <targetIP>` on the same audit server. This modifies file timestamps to make forensic analysis harder. Combined with log_cleaner, you'll be nearly untraceable!",
 					},
 				},
 				Rewards: models.MissionRewards{
