@@ -10,6 +10,7 @@ import (
 	"terminal-sh/filesystem"
 	"terminal-sh/models"
 	"terminal-sh/services"
+	"terminal-sh/ui"
 	"time"
 
 	"github.com/charmbracelet/bubbles/textarea"
@@ -54,6 +55,9 @@ type ShellModel struct {
 	gradientFrameIdx  int
 	gradientAnimating bool
 	gradientSeed      int64
+
+	// ASCII animation state (for ascii command)
+	asciiAnimation *ui.ASCIIAnimationState
 
 	// Incremental rendering state
 	pendingOutput      string // New output to append (command results)
@@ -221,6 +225,9 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.textarea.SetHeight(msg.Height - 2) // Reserve space for status line and prompt
 		if m.gradientAnimating {
 			m.refreshGradientFrames()
+		}
+		if m.asciiAnimation != nil {
+			m.asciiAnimation.UpdateDimensions(msg.Width, msg.Height)
 		}
 		return m, nil
 	case GradientTickMsg:
@@ -452,6 +459,57 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.inputHistory.Reset()
 		return m, nil
+	case StartASCIIAnimationMsg:
+		// Start ASCII animation
+		// Recalculate character dimensions based on actual viewport size if sizeScale is provided
+		charWidth := msg.CharWidth
+		charHeight := msg.CharHeight
+		if msg.SizeScale > 0 {
+			// Recalculate with actual viewport dimensions (though scale is viewport-independent)
+			var err error
+			charWidth, charHeight, err = cmd.GetASCIISize(msg.SizeScale, m.width, m.height)
+			if err == nil {
+				// Use calculated dimensions
+			}
+		}
+		m.asciiAnimation = ui.StringToAnimatedASCIIArt(msg.Text, m.width, m.height, msg.Colors, charWidth, charHeight)
+		m.asciiAnimation.BuildGradientFrames()
+		// Start the animation ticker
+		return m, m.nextASCIIAnimationTick()
+	case ASCIIAnimationTickMsg:
+		if m.asciiAnimation != nil && m.asciiAnimation.IsAnimating() {
+			oldPhase := m.asciiAnimation.GetPhase()
+			// Advance animation frame
+			m.asciiAnimation.AdvanceFrame()
+			newPhase := m.asciiAnimation.GetPhase()
+			
+			// If we just transitioned to ASCII phase, set completion timer
+			if oldPhase == "gradient" && newPhase == "ascii" {
+				// Transitioned to ASCII phase - set timer for completion after showing ASCII for 2 seconds
+				return m, tea.Batch(
+					m.nextASCIIAnimationTick(), // Continue animation
+					tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+						return ASCIIAnimationCompleteMsg{}
+					}),
+				)
+			}
+			
+			// Continue animation
+			if m.asciiAnimation.GetPhase() == "ascii" || m.asciiAnimation.GetPhase() == "gradient" {
+				return m, m.nextASCIIAnimationTick()
+			}
+		}
+		return m, nil
+	case ASCIIAnimationCompleteMsg:
+		// Animation complete - fall away
+		if m.asciiAnimation != nil {
+			m.asciiAnimation.Complete()
+			m.asciiAnimation = nil
+			m.pendingClearScrollback = true
+			// Force view update by clearing lastView in web mode
+			// This ensures the animation disappears immediately
+		}
+		return m, nil
 	case WelcomeMsg:
 		m.showWelcome = true
 		// Don't set pendingOutput here - initialRender handles it
@@ -460,6 +518,25 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Return to login screen
 		return m.handleLogout()
 	case CommandResultMsg:
+		// Handle ASCII animation trigger
+		if msg.Result.StartASCIIAnimation != nil {
+			req := msg.Result.StartASCIIAnimation
+			// Clear input and command state
+			m.textInput.SetValue("")
+			m.commandPending = false
+			m.commandJustDone = false
+			m.pendingOutput = ""
+			// Return the animation start message
+			return m, func() tea.Msg {
+				return StartASCIIAnimationMsg{
+					Text:      req.Text,
+					Colors:    req.Colors,
+					CharWidth: req.CharWidth,
+					CharHeight: req.CharHeight,
+				}
+			}
+		}
+
 		// Handle clear command - clear history and terminal
 		if len(m.history) > 0 {
 			lastCommand := m.history[len(m.history)-1].command
@@ -641,7 +718,7 @@ func (m *ShellModel) GetIncrementalOutput() (output string, isClear bool, prompt
 		promptLine := m.getPromptLine(username)
 
 		if m.showWelcome {
-			ascii := AnimatedWelcome()
+			ascii := AnimatedWelcome(0) // 0 means don't stretch, keep original size
 			help := strings.TrimSuffix(WelcomeHelpText(m.user, m.db), "\n")
 
 			centered := lipgloss.Place(
@@ -735,6 +812,11 @@ func (m *ShellModel) IsGradientAnimating() bool {
 	return m.gradientAnimating
 }
 
+// IsASCIIAnimating reports whether an ASCII animation is currently running.
+func (m *ShellModel) IsASCIIAnimating() bool {
+	return m.asciiAnimation != nil && m.asciiAnimation.IsAnimating()
+}
+
 // scrollUp scrolls the view up by n lines
 func (m *ShellModel) scrollUp(n int) {
 	// Calculate total content lines to determine max scroll
@@ -818,9 +900,8 @@ func (m *ShellModel) renderScrollIndicator(totalLines, startLine, viewportHeight
 		endLine = totalLines
 	}
 	
-	// Style the indicator
-	indicatorStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("243")).
+	// Style the indicator using ui package
+	indicatorStyle := ui.GrayStyle.
 		Background(lipgloss.Color("235")).
 		Padding(0, 1)
 	
@@ -856,6 +937,36 @@ func (m *ShellModel) GetViewContent() string {
 		availableLines = 1
 	}
 
+	// ASCII animation (from ascii command) takes priority
+	if m.asciiAnimation != nil {
+		if m.asciiAnimation.IsAnimating() {
+			frame := m.asciiAnimation.GetCurrentFrame()
+			frameLines := strings.Split(frame, "\n")
+
+			// Ensure frame height matches available lines
+			if len(frameLines) < availableLines {
+				padding := availableLines - len(frameLines)
+				for i := 0; i < padding; i++ {
+					frameLines = append(frameLines, "")
+				}
+			} else if len(frameLines) > availableLines {
+				frameLines = frameLines[:availableLines]
+			}
+
+			var output strings.Builder
+			for _, line := range frameLines {
+				output.WriteString(line)
+				output.WriteString("\n")
+			}
+			// Note: GetViewContent doesn't include prompt, but View() will add it
+			return output.String()
+		} else {
+			// Animation completed - clear it and continue to normal rendering
+			m.asciiAnimation = nil
+			m.pendingClearScrollback = true
+		}
+	}
+
 	// Animated gradient welcome fills the screen, then disappears
 	if m.gradientAnimating && len(m.history) == 0 {
 		frame := m.getCurrentGradientFrame()
@@ -885,7 +996,8 @@ func (m *ShellModel) GetViewContent() string {
 
 	// Add welcome message as first entry if shown
 	if m.showWelcome && len(m.history) == 0 {
-		ascii := AnimatedWelcome()
+		// Get ASCII art without stretching (preserve aspect ratio), then center it
+		ascii := AnimatedWelcome(0) // 0 means don't stretch, keep original size
 		centered := lipgloss.Place(
 			width,
 			availableLines-3, // leave room for help + spacer
@@ -1079,6 +1191,18 @@ type LogoutMsg struct{}
 
 type GradientTickMsg struct{}
 
+type ASCIIAnimationTickMsg struct{}
+
+type ASCIIAnimationCompleteMsg struct{}
+
+type StartASCIIAnimationMsg struct {
+	Text       string
+	Colors     []string
+	CharWidth  int
+	CharHeight int
+	SizeScale  int
+}
+
 type PasteTextMsg struct {
 	Text string
 }
@@ -1246,6 +1370,16 @@ func (m *ShellModel) nextGradientTick() tea.Cmd {
 	})
 }
 
+// nextASCIIAnimationTick schedules the next ASCII animation frame
+func (m *ShellModel) nextASCIIAnimationTick() tea.Cmd {
+	if m.asciiAnimation == nil || !m.asciiAnimation.IsAnimating() {
+		return nil
+	}
+	return tea.Tick(ui.ASCIIGradientFrameDelay, func(time.Time) tea.Msg {
+		return ASCIIAnimationTickMsg{}
+	})
+}
+
 // refreshGradientFrames rebuilds the gradient frames for the current viewport.
 func (m *ShellModel) refreshGradientFrames() {
 	if !m.gradientAnimating {
@@ -1271,9 +1405,8 @@ func (m *ShellModel) buildGradientFrames() []string {
 	if height <= 0 {
 		height = 24
 	}
-	if width > gradientWidthCap {
-		width = gradientWidthCap
-	}
+	// Don't cap width - use full terminal width for proper stretching
+	// Only cap height to prevent excessive rendering
 	if height > gradientHeightCap {
 		height = gradientHeightCap
 	}

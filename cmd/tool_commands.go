@@ -55,6 +55,22 @@ func (h *CommandHandler) handleToolCommand(toolName string, args []string) *Comm
 		return h.handlePacketCapture(args)
 	case "packet_decoder":
 		return h.handlePacketDecoder(args)
+	case "log_cleaner":
+		return h.handleLogCleaner(args)
+	case "timestomper":
+		return h.handleTimestomper(args)
+	case "database_dumper":
+		return h.handleDatabaseDumper(args)
+	case "phishing_kit":
+		return h.handlePhishingKit(args)
+	case "audit_disable":
+		return h.handleAuditDisable(args)
+	case "hash_cracker":
+		return h.handleHashCracker(args)
+	case "log_analyzer":
+		return h.handleLogAnalyzer(args)
+	case "backup_destroyer":
+		return h.handleBackupDestroyer(args)
 	default:
 		return &CommandResult{Error: fmt.Errorf("unknown tool command: %s", toolName)}
 	}
@@ -507,3 +523,254 @@ func (h *CommandHandler) handlePacketDecoder(args []string) *CommandResult {
 	return &CommandResult{Output: output.String()}
 }
 
+func (h *CommandHandler) handleLogCleaner(args []string) *CommandResult {
+	if len(args) != 1 {
+		return &CommandResult{Error: fmt.Errorf("usage: log_cleaner <targetIP>")}
+	}
+
+	targetIP := args[0]
+	
+	// Check if server exists
+	if _, err := h.serverService.GetServerByIP(targetIP); err != nil {
+		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
+	}
+
+	// Check if server is exploited
+	serverPath := targetIP
+	if h.currentServerPath != "" {
+		serverPath = h.currentServerPath + ".localNetwork." + targetIP
+	}
+
+	if !h.exploitationService.IsServerExploited(h.user.ID, serverPath) {
+		return &CommandResult{Error: fmt.Errorf("server must be exploited before cleaning logs")}
+	}
+
+	var output strings.Builder
+	output.WriteString(ui.SuccessStyle.Render("✅ System logs cleared on ") + formatIP(targetIP) + ui.SuccessStyle.Render(". All traces removed.") + "\n")
+	
+	// Add experience
+	h.userService.AddExperience(h.user.ID, 15)
+
+	return &CommandResult{Output: output.String()}
+}
+
+func (h *CommandHandler) handleTimestomper(args []string) *CommandResult {
+	if len(args) != 1 {
+		return &CommandResult{Error: fmt.Errorf("usage: timestomper <targetIP>")}
+	}
+
+	targetIP := args[0]
+	
+	// Check if server exists
+	if _, err := h.serverService.GetServerByIP(targetIP); err != nil {
+		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
+	}
+
+	// Check if server is exploited
+	serverPath := targetIP
+	if h.currentServerPath != "" {
+		serverPath = h.currentServerPath + ".localNetwork." + targetIP
+	}
+
+	if !h.exploitationService.IsServerExploited(h.user.ID, serverPath) {
+		return &CommandResult{Error: fmt.Errorf("server must be exploited before modifying timestamps")}
+	}
+
+	var output strings.Builder
+	output.WriteString(ui.SuccessStyle.Render("✅ File timestamps modified on ") + formatIP(targetIP) + ui.SuccessStyle.Render(". Tracks covered.") + "\n")
+	
+	// Add experience
+	h.userService.AddExperience(h.user.ID, 12)
+
+	return &CommandResult{Output: output.String()}
+}
+
+func (h *CommandHandler) handleDatabaseDumper(args []string) *CommandResult {
+	if len(args) != 1 {
+		return &CommandResult{Error: fmt.Errorf("usage: database_dumper <targetIP>")}
+	}
+
+	targetIP := args[0]
+	
+	// Get server
+	server, err := h.serverService.GetServerByIP(targetIP)
+	if err != nil {
+		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
+	}
+
+	// Find HTTP service
+	var httpService *models.Service
+	for i := range server.Services {
+		if server.Services[i].Name == "http" {
+			httpService = &server.Services[i]
+			break
+		}
+	}
+
+	if httpService == nil {
+		return &CommandResult{Error: fmt.Errorf("HTTP service not found on server")}
+	}
+
+	serverPath := targetIP
+	if h.currentServerPath != "" {
+		serverPath = h.currentServerPath + ".localNetwork." + targetIP
+	}
+
+	// Check if server is exploited
+	if !h.exploitationService.IsServerExploited(h.user.ID, serverPath) {
+		return &CommandResult{Error: fmt.Errorf("server must be exploited before dumping database")}
+	}
+
+	h.showExploitProgress("database_dumper", targetIP)
+
+	var output strings.Builder
+	output.WriteString(ui.SuccessStyle.Render("✅ Database contents extracted from ") + formatIP(targetIP) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Tables dumped:", "12") + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Records extracted:", "1,234") + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Data size:", "45.2 MB") + "\n")
+	
+	// Add experience
+	h.userService.AddExperience(h.user.ID, 25)
+
+	return &CommandResult{Output: output.String()}
+}
+
+func (h *CommandHandler) handlePhishingKit(args []string) *CommandResult {
+	if len(args) != 1 {
+		return &CommandResult{Error: fmt.Errorf("usage: phishing_kit <targetIP>")}
+	}
+
+	targetIP := args[0]
+	
+	// Check if server exists
+	if _, err := h.serverService.GetServerByIP(targetIP); err != nil {
+		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
+	}
+
+	var output strings.Builder
+	output.WriteString(ui.HeaderStyle.Render("📧 Phishing campaign launched against ") + formatIP(targetIP) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Emails sent:", "150") + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Responses:", "23") + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Credentials captured:", "8") + "\n")
+	
+	// Add experience
+	h.userService.AddExperience(h.user.ID, 20)
+
+	return &CommandResult{Output: output.String()}
+}
+
+func (h *CommandHandler) handleAuditDisable(args []string) *CommandResult {
+	if len(args) != 1 {
+		return &CommandResult{Error: fmt.Errorf("usage: audit_disable <targetIP>")}
+	}
+
+	targetIP := args[0]
+	
+	// Check if server exists
+	if _, err := h.serverService.GetServerByIP(targetIP); err != nil {
+		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
+	}
+
+	// Check if server is exploited
+	serverPath := targetIP
+	if h.currentServerPath != "" {
+		serverPath = h.currentServerPath + ".localNetwork." + targetIP
+	}
+
+	if !h.exploitationService.IsServerExploited(h.user.ID, serverPath) {
+		return &CommandResult{Error: fmt.Errorf("server must be exploited before disabling audit")}
+	}
+
+	var output strings.Builder
+	output.WriteString(ui.SuccessStyle.Render("✅ System auditing disabled on ") + formatIP(targetIP) + ui.SuccessStyle.Render(". Future logs prevented.") + "\n")
+	
+	// Add experience
+	h.userService.AddExperience(h.user.ID, 18)
+
+	return &CommandResult{Output: output.String()}
+}
+
+func (h *CommandHandler) handleHashCracker(args []string) *CommandResult {
+	if len(args) != 1 {
+		return &CommandResult{Error: fmt.Errorf("usage: hash_cracker <targetIP>")}
+	}
+
+	targetIP := args[0]
+	
+	// Check if server exists
+	if _, err := h.serverService.GetServerByIP(targetIP); err != nil {
+		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
+	}
+
+	h.showExploitProgress("hash_cracker", targetIP)
+
+	var output strings.Builder
+	output.WriteString(ui.HeaderStyle.Render("🔓 Cracking hashes on ") + formatIP(targetIP) + "...\n")
+	output.WriteString(ui.FormatSectionHeader("Cracked hashes:", ""))
+	output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render("admin:") + " " + ui.SuccessStyleNoBold.Render("password123") + " " + ui.FormatKeyValuePair("(MD5)", "")))
+	output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render("user1:") + " " + ui.SuccessStyleNoBold.Render("qwerty") + " " + ui.FormatKeyValuePair("(SHA256)", "")))
+	output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render("user2:") + " " + ui.SuccessStyleNoBold.Render("admin123") + " " + ui.FormatKeyValuePair("(bcrypt)", "")))
+	
+	// Add experience
+	h.userService.AddExperience(h.user.ID, 22)
+
+	return &CommandResult{Output: output.String()}
+}
+
+func (h *CommandHandler) handleLogAnalyzer(args []string) *CommandResult {
+	if len(args) != 1 {
+		return &CommandResult{Error: fmt.Errorf("usage: log_analyzer <targetIP>")}
+	}
+
+	targetIP := args[0]
+	
+	// Check if server exists
+	if _, err := h.serverService.GetServerByIP(targetIP); err != nil {
+		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
+	}
+
+	var output strings.Builder
+	output.WriteString(ui.HeaderStyle.Render("📊 Analyzing logs on ") + formatIP(targetIP) + "...\n")
+	output.WriteString(ui.FormatSectionHeader("Intelligence gathered:", ""))
+	output.WriteString(ui.FormatListBullet(ui.FormatKeyValuePair("Failed login attempts:", "47")))
+	output.WriteString(ui.FormatListBullet(ui.FormatKeyValuePair("Successful logins:", "12")))
+	output.WriteString(ui.FormatListBullet(ui.FormatKeyValuePair("Suspicious IPs:", "3")))
+	output.WriteString(ui.FormatListBullet(ui.FormatKeyValuePair("Admin access times:", "02:00-04:00")))
+	
+	// Add experience
+	h.userService.AddExperience(h.user.ID, 10)
+
+	return &CommandResult{Output: output.String()}
+}
+
+func (h *CommandHandler) handleBackupDestroyer(args []string) *CommandResult {
+	if len(args) != 1 {
+		return &CommandResult{Error: fmt.Errorf("usage: backup_destroyer <targetIP>")}
+	}
+
+	targetIP := args[0]
+	
+	// Check if server exists
+	if _, err := h.serverService.GetServerByIP(targetIP); err != nil {
+		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
+	}
+
+	// Check if server is exploited
+	serverPath := targetIP
+	if h.currentServerPath != "" {
+		serverPath = h.currentServerPath + ".localNetwork." + targetIP
+	}
+
+	if !h.exploitationService.IsServerExploited(h.user.ID, serverPath) {
+		return &CommandResult{Error: fmt.Errorf("server must be exploited before destroying backups")}
+	}
+
+	var output strings.Builder
+	output.WriteString(ui.SuccessStyle.Render("✅ Backups destroyed on ") + formatIP(targetIP) + ui.SuccessStyle.Render(". Recovery prevented.") + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Backup files deleted:", "8") + "\n")
+	
+	// Add experience
+	h.userService.AddExperience(h.user.ID, 20)
+
+	return &CommandResult{Output: output.String()}
+}

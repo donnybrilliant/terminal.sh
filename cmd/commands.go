@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strconv"
 	"strings"
 	"terminal-sh/database"
 	"terminal-sh/filesystem"
@@ -23,6 +24,17 @@ type CommandResult struct {
 	Error      error
 	Nodes      []*filesystem.Node // For ls command
 	LongFormat bool                // For ls -l format
+	// ASCII animation trigger (for ascii -a command)
+	StartASCIIAnimation *ASCIIAnimationRequest
+}
+
+// ASCIIAnimationRequest contains parameters for starting an ASCII animation
+type ASCIIAnimationRequest struct {
+	Text       string
+	Colors     []string
+	CharWidth  int
+	CharHeight int
+	SizeScale  int // Size as integer multiplier (1-10), 0 means use CharWidth/CharHeight directly
 }
 
 // CommandHandler handles execution of terminal commands and manages game state.
@@ -43,6 +55,9 @@ type CommandHandler struct {
 	patchService   *services.PatchService
 	progressService *services.ProgressService
 	chatService    *services.ChatService
+	missionService *services.MissionService
+	achievementService *services.AchievementService
+	rewardService  *services.RewardService
 	currentServerPath string // Current server path if in SSH mode
 	sessionID       *uuid.UUID // Current session ID
 	onSSHConnect    func(serverPath string) error // Callback for SSH connection
@@ -65,6 +80,9 @@ func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.
 	exploitationService := services.NewExploitationService(db, toolService, serverService)
 	miningService := services.NewMiningService(db, toolService, serverService)
 	tutorialService, _ := services.NewTutorialService("") // Initialize tutorial service with default path (data/seed/tutorials.json), ignore error for now
+	achievementService, _ := services.NewAchievementService(db, "") // Initialize achievement service
+	rewardService := services.NewRewardService(db, userService, toolService, patchService, achievementService)
+	missionService, _ := services.NewMissionService(db, "", rewardService) // Initialize mission service
 	
 	return &CommandHandler{
 		db:              db,
@@ -83,6 +101,9 @@ func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.
 		patchService:  patchService,
 		progressService: progressService,
 		chatService:   chatService,
+		missionService: missionService,
+		achievementService: achievementService,
+		rewardService: rewardService,
 	}
 }
 
@@ -192,6 +213,8 @@ func (h *CommandHandler) Execute(command string) *CommandResult {
 		return h.handleChat(args)
 	case "tutorial":
 		return h.handleTUTORIAL(args)
+	case "mission":
+		return h.handleMISSION(args)
 	case "login":
 		return h.handleLOGIN(args)
 	case "logout":
@@ -236,13 +259,15 @@ func (h *CommandHandler) Execute(command string) *CommandResult {
 		return h.handlePATCH(args)
 	case "crypto_miner":
 		return h.handleCRYPTOMINER(args)
+	case "ascii":
+		return h.handleASCII(args)
 	case "stop_mining":
 		return h.handleSTOPMINING(args)
 	case "miners":
 		return h.handleMINERS()
 	case "wallet":
 		return h.handleWALLET()
-	case "password_cracker", "password_sniffer", "ssh_exploit", "user_enum", "lan_sniffer", "rootkit", "exploit_kit", "advanced_exploit_kit", "sql_injector", "xss_exploit", "packet_capture", "packet_decoder":
+	case "password_cracker", "password_sniffer", "ssh_exploit", "user_enum", "lan_sniffer", "rootkit", "exploit_kit", "advanced_exploit_kit", "sql_injector", "xss_exploit", "packet_capture", "packet_decoder", "log_cleaner", "timestomper", "database_dumper", "phishing_kit", "audit_disable", "hash_cracker", "log_analyzer", "backup_destroyer":
 		return h.handleToolCommand(cmd, args)
 	case "touch":
 		return h.handleTOUCH(args)
@@ -436,6 +461,15 @@ func (h *CommandHandler) handleHELP() *CommandResult {
 	output.WriteString(formatListItem("tutorial <id>        - Start a tutorial", ""))
 	output.WriteString("\n")
 	
+	// Story Missions
+	output.WriteString(ui.AccentBoldStyle.Render("🎯 Story Missions:") + "\n")
+	output.WriteString(formatListItem("mission              - List available missions", ""))
+	output.WriteString(formatListItem("mission <id>         - View mission details", ""))
+	output.WriteString(formatListItem("mission start <id>   - Start a mission", ""))
+	output.WriteString(formatListItem("mission complete <id> - Complete a mission", ""))
+	output.WriteString(formatListItem("mission status       - View your mission progress", ""))
+	output.WriteString("\n")
+	
 	// Shopping
 	output.WriteString(ui.AccentBoldStyle.Render(emojiShop + " Shopping:") + "\n")
 	output.WriteString(formatListItem("shop                 - List discovered shops", ""))
@@ -454,6 +488,7 @@ func (h *CommandHandler) handleHELP() *CommandResult {
 	output.WriteString(ui.ValueStyle.Render("⚙️ System:") + "\n")
 	output.WriteString(formatListItem("clear                - Clear the screen", ""))
 	output.WriteString(formatListItem("help                 - Show this help message", ""))
+	output.WriteString(formatListItem("ascii <text> [flags] - Convert text to ASCII art", "✨"))
 	
 	// Ensure trailing newline
 	helpText := output.String()
@@ -482,6 +517,200 @@ func (h *CommandHandler) handleREGISTER(args []string) *CommandResult {
 	return &CommandResult{Output: ui.InfoStyle.Render("📝 Please register via SSH password authentication (login with new credentials)") + "\n"}
 }
 
+// GetASCIISize calculates charWidth and charHeight based on integer multiplier
+// scale: 1-10 (multiplier for base pattern dimensions)
+// viewportWidth, viewportHeight: terminal dimensions (unused but kept for API compatibility)
+// Returns: charWidth, charHeight based on base pattern (5x7) multiplied by scale
+func GetASCIISize(scale, viewportWidth, viewportHeight int) (int, int, error) {
+	if scale < 1 || scale > 10 {
+		return 0, 0, fmt.Errorf("size must be between 1 and 10 (got: %d)", scale)
+	}
+	
+	// Base pattern dimensions (typical ASCII art pattern size)
+	baseWidth := 5
+	baseHeight := 7
+	
+	// Simply multiply by scale factor
+	charWidth := baseWidth * scale
+	charHeight := baseHeight * scale
+	
+	return charWidth, charHeight, nil
+}
+
+// getASCIIColorPalette returns color codes for a predefined palette
+func getASCIIColorPalette(palette string) ([]string, error) {
+	switch strings.ToLower(palette) {
+	case "white":
+		return []string{"255", "252", "248", "244", "248", "252", "255"}, nil
+	case "orange":
+		return []string{"208", "214", "220", "226", "220", "214", "208"}, nil
+	case "green":
+		return []string{"46", "82", "118", "154", "118", "82", "46"}, nil
+	case "purple":
+		return []string{"129", "135", "141", "147", "141", "135", "129"}, nil
+	case "blue":
+		return []string{"33", "39", "45", "51", "45", "39", "33"}, nil
+	case "red":
+		return []string{"196", "202", "208", "214", "208", "202", "196"}, nil
+	case "cyan":
+		return []string{"51", "87", "123", "159", "123", "87", "51"}, nil
+	case "yellow":
+		return []string{"226", "227", "228", "229", "228", "227", "226"}, nil
+	case "pink", "magenta":
+		return []string{"205", "213", "207", "219", "218", "212", "205"}, nil
+	default:
+		return nil, fmt.Errorf("unknown color palette: %s (use: white, orange, green, purple, blue, red, cyan, yellow, pink/magenta)", palette)
+	}
+}
+
+// handleASCII handles the ascii command for testing ASCII art functionality
+func (h *CommandHandler) handleASCII(args []string) *CommandResult {
+	if len(args) == 0 {
+		return h.handleASCIIHelp()
+	}
+
+	var text string
+	var colors []string
+	var sizeScale int = 1 // Default: 1x (base size)
+	var charWidth, charHeight int = 5, 7 // Will be calculated from sizeScale
+	var animate bool
+	var showHelp bool
+
+	// Parse flags and arguments
+	i := 0
+	for i < len(args) {
+		arg := args[i]
+		
+		switch arg {
+		case "-h", "--help":
+			showHelp = true
+		case "-a", "--animate":
+			animate = true
+		case "-c", "--color", "--colors":
+			if i+1 < len(args) {
+				paletteName := args[i+1]
+				palette, err := getASCIIColorPalette(paletteName)
+				if err != nil {
+					return &CommandResult{Error: err}
+				}
+				colors = palette
+				i++
+			} else {
+				return &CommandResult{Error: fmt.Errorf("color flag requires a palette name (white, orange, green, purple, blue, red, cyan, yellow, pink)")}
+			}
+		case "-s", "--size":
+			if i+1 < len(args) {
+				sizeStr := args[i+1]
+				var err error
+				sizeScale, err = strconv.Atoi(sizeStr)
+				if err != nil || sizeScale < 1 || sizeScale > 10 {
+					return &CommandResult{Error: fmt.Errorf("size must be a number between 1 and 10 (got: %s)", sizeStr)}
+				}
+				i++
+			} else {
+				return &CommandResult{Error: fmt.Errorf("size flag requires a number between 1 and 10")}
+			}
+		default:
+			// Treat as text to convert
+			if text == "" && !strings.HasPrefix(arg, "-") {
+				text = arg
+			} else if text != "" {
+				// Multiple words - join them
+				text += " " + arg
+			}
+		}
+		i++
+	}
+
+	if showHelp {
+		return h.handleASCIIHelp()
+	}
+
+	if text == "" {
+		return &CommandResult{Error: fmt.Errorf("no text provided. Usage: ascii <text> [flags]")}
+	}
+
+	// Calculate character dimensions from size scale
+	// Use default viewport size for static version (will be recalculated for animated version with actual viewport)
+	defaultWidth, defaultHeight := 80, 24
+	calculatedWidth, calculatedHeight, err := GetASCIISize(sizeScale, defaultWidth, defaultHeight)
+	if err != nil {
+		return &CommandResult{Error: err}
+	}
+	charWidth = calculatedWidth
+	charHeight = calculatedHeight
+
+	var output strings.Builder
+
+	if animate {
+		// Trigger ASCII animation in terminal UI
+		// Return a special result that will start the full animation sequence
+		// The actual dimensions will be recalculated when animation starts with real viewport size
+		return &CommandResult{
+			StartASCIIAnimation: &ASCIIAnimationRequest{
+				Text:       text,
+				Colors:     colors,
+				CharWidth:  charWidth,
+				CharHeight: charHeight,
+				SizeScale:  sizeScale,
+			},
+		}
+	} else {
+		// Static version
+		output.WriteString(ui.FormatSectionHeader("ASCII Art", "✨"))
+		output.WriteString(ui.FormatKeyValuePair("Text", text) + "\n")
+		output.WriteString(ui.FormatKeyValuePair("Size", fmt.Sprintf("%dx%d (scale: %dx)", charWidth, charHeight, sizeScale)) + "\n")
+		if len(colors) > 0 {
+			output.WriteString(ui.FormatKeyValuePair("Color Palette", "custom") + "\n")
+		}
+		output.WriteString("\n")
+		
+		// Generate and display ASCII art
+		asciiArt := ui.StringToASCIIArt(text, charWidth, charHeight)
+		styledArt := ui.RenderASCIIArtWithGradient(asciiArt, 0, colors)
+		output.WriteString(styledArt)
+		output.WriteString("\n")
+	}
+
+	return &CommandResult{Output: output.String()}
+}
+
+// handleASCIIHelp shows help for the ascii command
+func (h *CommandHandler) handleASCIIHelp() *CommandResult {
+	var output strings.Builder
+	
+	output.WriteString(ui.FormatSectionHeader("ASCII Art Command", "✨"))
+	output.WriteString("\n")
+	output.WriteString(ui.FormatKeyValuePair("Usage", "ascii <text> [flags]") + "\n")
+	output.WriteString("\n")
+	output.WriteString(ui.FormatSectionHeader("Flags:", ""))
+	output.WriteString(ui.FormatListBullet("-h, --help - Show this help message"))
+	output.WriteString(ui.FormatListBullet("-a, --animate - Create animated welcome animation (gradient → ASCII → fall away)"))
+	output.WriteString(ui.FormatListBullet("-c, --color <palette> - Color palette: white, orange, green, purple, blue, red, cyan, yellow, pink"))
+	output.WriteString(ui.FormatListBullet("-s, --size <percent> - Size as percentage of viewport: 10-100 (default: 50)"))
+	output.WriteString("\n")
+	output.WriteString(ui.FormatSectionHeader("Size:", ""))
+	output.WriteString(ui.FormatListBullet("Size is a percentage (10-100) of the viewport width/height"))
+	output.WriteString(ui.FormatListBullet("Larger percentages = bigger ASCII characters (more blocks per character)"))
+	output.WriteString(ui.FormatListBullet("Minimum size is enforced to ensure text is readable"))
+	output.WriteString(ui.FormatListBullet("Examples: 10 (small), 30 (medium-small), 50 (medium), 70 (large), 100 (extra large)"))
+	output.WriteString("\n")
+	output.WriteString(ui.FormatSectionHeader("Color Palettes:", ""))
+	output.WriteString(ui.FormatListBullet("white, orange, green, purple, blue, red, cyan, yellow, pink/magenta"))
+	output.WriteString("\n")
+	output.WriteString(ui.FormatSectionHeader("Examples:", ""))
+	output.WriteString(ui.FormatListBullet("ascii HELLO - Convert \"HELLO\" to ASCII art"))
+	output.WriteString(ui.FormatListBullet("ascii WELCOME -a - Create animated welcome with \"WELCOME\" centered"))
+	output.WriteString(ui.FormatListBullet("ascii TEST -c green - Use green color palette"))
+	output.WriteString(ui.FormatListBullet("ascii \"HELLO WORLD\" -s 80 - Large size (80% of viewport)"))
+	output.WriteString(ui.FormatListBullet("ascii TERMINAL -a -c purple -s 60 - Animated with purple palette, 60% size"))
+	output.WriteString("\n")
+	output.WriteString(ui.InfoStyle.Render("Note: Text is automatically converted to uppercase for better rendering.\n"))
+	output.WriteString(ui.InfoStyle.Render("The -a flag creates a full-screen animation: gradient fills screen → ASCII art appears centered → everything falls away.\n"))
+	
+	return &CommandResult{Output: output.String()}
+}
+
 func (h *CommandHandler) handleUSERINFO() *CommandResult {
 	if h.user == nil {
 		return &CommandResult{Error: fmt.Errorf("not authenticated")}
@@ -503,6 +732,23 @@ func (h *CommandHandler) handleUSERINFO() *CommandResult {
 		h.user.Resources.CPU, h.user.Resources.Bandwidth, h.user.Resources.RAM)) + "\n")
 	output.WriteString(ui.FormatKeyValuePair("Wallet:", fmt.Sprintf("Crypto=%.2f, Data=%.2f", 
 		h.user.Wallet.Crypto, h.user.Wallet.Data)) + "\n")
+	
+	// Show achievements if available
+	if h.achievementService != nil {
+		achievements, err := h.achievementService.GetUserAchievements(h.user.ID)
+		if err == nil && len(achievements) > 0 {
+			output.WriteString("\n")
+			output.WriteString(ui.FormatSectionHeader("Achievements", "🏆"))
+			for _, ach := range achievements {
+				achDef := h.achievementService.GetAchievementByName(ach.AchievementName)
+				icon := "🏆"
+				if achDef != nil && achDef.Icon != "" {
+					icon = achDef.Icon
+				}
+				output.WriteString(ui.FormatListBullet(fmt.Sprintf("%s %s", icon, ach.AchievementName)))
+			}
+		}
+	}
 	
 	return &CommandResult{Output: output.String()}
 }
@@ -990,26 +1236,26 @@ func (h *CommandHandler) handleTOOLS() *CommandResult {
 			return &CommandResult{Error: err}
 		}
 
-	if len(tools) == 0 {
+		if len(tools) == 0 {
 		return &CommandResult{Output: ui.WarningStyle.Render("ℹ️  No tools owned") + "\n"}
-	}
-
-	var output strings.Builder
-	output.WriteString(ui.FormatSectionHeader("Owned tools:", "🛠️"))
-	for _, tool := range tools {
-		output.WriteString(ui.FormatListBulletWithStyle("• "+tool.Name+": "+tool.Function, ui.AccentStyle))
-		if len(tool.Exploits) > 0 {
-			output.WriteString("    " + ui.ErrorStyle.Render("⚡ Exploits: "))
-			for i, exploit := range tool.Exploits {
-				if i > 0 {
-					output.WriteString(", ")
-				}
-				output.WriteString(ui.ErrorStyle.Render(fmt.Sprintf("%s (level %d)", exploit.Type, exploit.Level)))
-			}
-			output.WriteString("\n")
 		}
-	}
-	return &CommandResult{Output: output.String()}
+
+		var output strings.Builder
+	output.WriteString(ui.FormatSectionHeader("Owned tools:", "🛠️"))
+		for _, tool := range tools {
+		output.WriteString(ui.FormatListBulletWithStyle("• "+tool.Name+": "+tool.Function, ui.AccentStyle))
+			if len(tool.Exploits) > 0 {
+			output.WriteString("    " + ui.ErrorStyle.Render("⚡ Exploits: "))
+				for i, exploit := range tool.Exploits {
+					if i > 0 {
+						output.WriteString(", ")
+					}
+				output.WriteString(ui.ErrorStyle.Render(fmt.Sprintf("%s (level %d)", exploit.Type, exploit.Level)))
+				}
+				output.WriteString("\n")
+			}
+		}
+		return &CommandResult{Output: output.String()}
 	}
 
 	if len(toolStates) == 0 {
@@ -1320,6 +1566,7 @@ func (h *CommandHandler) handleTUTORIAL(args []string) *CommandResult {
 		BorderForeground(lipgloss.Color(ui.DefaultTheme.Primary)).
 		Padding(0, 1).
 		Width(50)
+	// Note: boxStyle is kept inline as it's a specific layout style, not a reusable semantic style
 	
 	titleContent := ui.HeaderStyle.Render(emojiGraduation + " Tutorial: " + tutorial.Name + " " + emojiGraduation)
 	boxedTitle := boxStyle.Render(titleContent)

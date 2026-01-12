@@ -1,0 +1,160 @@
+{
+  "missions": [
+    {
+      "id": "corp_espionage_01",
+      "arc_id": "corp_espionage",
+      "arc_name": "Corporate Espionage",
+      "mission_number": 1,
+      "name": "The Coffee Shop WiFi",
+      "description": "Hack public WiFi to find employee credentials",
+      "prerequisites": [],
+      "required_tools": [
+        "packet_capture",
+        "password_sniffer"
+      ],
+      "required_level": 1,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "exploit_server",
+          "description": "Exploit the coffee shop WiFi server",
+          "hint": "First, scan the internet with `scan` to find the coffee shop server. Then use `packet_capture` to capture network traffic, and `password_sniffer` to extract credentials from the captured packets."
+        }
+      ],
+      "rewards": {
+        "experience": 100,
+        "crypto": 20,
+        "achievements": [
+          "wifi_warrior"
+        ]
+      },
+      "unlocks": [
+        "corp_espionage_02"
+      ]
+    },
+    {
+      "id": "corp_espionage_02",
+      "arc_id": "corp_espionage",
+      "arc_name": "Corporate Espionage",
+      "mission_number": 2,
+      "name": "Phishing for Answers",
+      "description": "Create phishing campaign targeting corporate email",
+      "prerequisites": [
+        "corp_espionage_01"
+      ],
+      "required_tools": [],
+      "required_level": 2,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "use_tool",
+          "description": "Use phishing_kit on target server",
+          "tool": "phishing_kit",
+          "hint": "First, exploit a server with HTTP services. Then use `phishing_kit \u003ctargetIP\u003e` to create a phishing campaign. This tool generates realistic-looking emails and sites to gather credentials. You'll receive this tool as a reward when you complete this mission!"
+        }
+      ],
+      "rewards": {
+        "experience": 300,
+        "crypto": 50,
+        "tools": [
+          "phishing_kit"
+        ],
+        "achievements": [
+          "social_engineer"
+        ]
+      },
+      "unlocks": [
+        "corp_espionage_03"
+      ]
+    },
+    {
+      "id": "corp_espionage_03",
+      "arc_id": "corp_espionage",
+      "arc_name": "Corporate Espionage",
+      "mission_number": 3,
+      "name": "The Database Heist",
+      "description": "Steal sensitive corporate data",
+      "prerequisites": [
+        "corp_espionage_02"
+      ],
+      "required_tools": [
+        "sql_injector"
+      ],
+      "required_level": 3,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "use_tool",
+          "description": "Use database_dumper to extract data",
+          "tool": "database_dumper",
+          "hint": "First, find a server with HTTP services and SQL injection vulnerabilities. Use `sql_injector \u003ctargetIP\u003e` to exploit it. Then use `database_dumper \u003ctargetIP\u003e` to extract all database contents. This tool dumps entire databases - perfect for data heists! You'll receive this tool as a reward."
+        }
+      ],
+      "rewards": {
+        "experience": 750,
+        "crypto": 150,
+        "tools": [
+          "database_dumper"
+        ],
+        "patches": [
+          "sql_injector_stealth"
+        ],
+        "achievements": [
+          "data_thief"
+        ]
+      },
+      "unlocks": [
+        "corp_espionage_04"
+      ]
+    },
+    {
+      "id": "corp_espionage_04",
+      "arc_id": "corp_espionage",
+      "arc_name": "Corporate Espionage",
+      "mission_number": 4,
+      "name": "Cover Your Tracks",
+      "description": "They're onto you. Cover your tracks before they trace your attacks back to you.",
+      "prerequisites": [
+        "corp_espionage_03"
+      ],
+      "required_tools": [
+        "sql_injector",
+        "database_dumper"
+      ],
+      "required_level": 5,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "use_tool",
+          "description": "Use log_cleaner on audit server",
+          "tool": "log_cleaner",
+          "hint": "Find and exploit the audit server first. Then use `log_cleaner \u003ctargetIP\u003e` to delete and clear all system logs. This removes evidence of your activities. You'll receive this tool as a reward!"
+        },
+        {
+          "id": 2,
+          "type": "use_tool",
+          "description": "Use timestomper to modify file timestamps",
+          "tool": "timestomper",
+          "hint": "After clearing logs, use `timestomper \u003ctargetIP\u003e` on the same audit server. This modifies file timestamps to make forensic analysis harder. Combined with log_cleaner, you'll be nearly untraceable! You'll receive this tool as a reward."
+        }
+      ],
+      "rewards": {
+        "experience": 500,
+        "crypto": 100,
+        "tools": [
+          "log_cleaner",
+          "timestomper"
+        ],
+        "patches": [
+          "stealth_patch_v1"
+        ],
+        "achievements": [
+          "ghost_in_the_machine"
+        ]
+      },
+      "unlocks": [
+        "academic_hacking_01"
+      ]
+    }
+  ]
+}

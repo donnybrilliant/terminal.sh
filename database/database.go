@@ -91,6 +91,7 @@ func (db *Database) Migrate() error {
 		&models.ChatRoom{},
 		&models.ChatMessage{},
 		&models.ChatRoomMember{},
+		&models.UserMission{},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to auto-migrate: %w", err)

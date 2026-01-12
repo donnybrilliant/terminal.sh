@@ -80,6 +80,156 @@
       ],
       "file_system": {},
       "local_network": {}
+    },
+    {
+      "ip": "172.16.0.10",
+      "local_ip": "192.168.0.50",
+      "security_level": 5,
+      "resources": {
+        "cpu": 2000,
+        "bandwidth": 5000,
+        "ram": 256
+      },
+      "wallet": {
+        "crypto": 0,
+        "data": 0
+      },
+      "tools": [],
+      "connected_ips": [],
+      "services": [
+        {
+          "name": "ssh",
+          "description": "Secure Shell",
+          "port": 22,
+          "vulnerable": true,
+          "level": 5,
+          "vulnerabilities": [
+            {
+              "type": "weak_password",
+              "level": 3
+            },
+            {
+              "type": "password_cracking",
+              "level": 5
+            }
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "role": "guest",
+          "level": 1
+        },
+        {
+          "role": "employee",
+          "level": 3
+        }
+      ],
+      "file_system": {},
+      "local_network": {}
+    },
+    {
+      "ip": "203.0.113.42",
+      "local_ip": "10.10.10.100",
+      "security_level": 25,
+      "resources": {
+        "cpu": 15000,
+        "bandwidth": 30000,
+        "ram": 1024
+      },
+      "wallet": {
+        "crypto": 500,
+        "data": 5000
+      },
+      "tools": [],
+      "connected_ips": [],
+      "services": [
+        {
+          "name": "http",
+          "description": "Web Server",
+          "port": 80,
+          "vulnerable": true,
+          "level": 20,
+          "vulnerabilities": [
+            {
+              "type": "sql_injection",
+              "level": 18
+            },
+            {
+              "type": "xss",
+              "level": 15
+            }
+          ]
+        },
+        {
+          "name": "ssh",
+          "description": "Secure Shell",
+          "port": 22,
+          "vulnerable": true,
+          "level": 25,
+          "vulnerabilities": [
+            {
+              "type": "remote_code_execution",
+              "level": 20
+            }
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "role": "admin",
+          "level": 25
+        },
+        {
+          "role": "user",
+          "level": 15
+        }
+      ],
+      "file_system": {},
+      "local_network": {}
+    },
+    {
+      "ip": "198.51.100.77",
+      "local_ip": "10.0.0.200",
+      "security_level": 30,
+      "resources": {
+        "cpu": 8000,
+        "bandwidth": 15000,
+        "ram": 512
+      },
+      "wallet": {
+        "crypto": 0,
+        "data": 0
+      },
+      "tools": [],
+      "connected_ips": [],
+      "services": [
+        {
+          "name": "ssh",
+          "description": "Secure Shell",
+          "port": 22,
+          "vulnerable": true,
+          "level": 25,
+          "vulnerabilities": [
+            {
+              "type": "remote_code_execution",
+              "level": 20
+            }
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "role": "auditor",
+          "level": 30
+        },
+        {
+          "role": "admin",
+          "level": 25
+        }
+      ],
+      "file_system": {},
+      "local_network": {}
     }
   ]
 }

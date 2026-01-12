@@ -348,3 +348,30 @@ func (s *PatchService) SeedPatches() error {
 	return nil
 }
 
+// GrantPatchToUser grants a patch to a user (for mission rewards)
+func (s *PatchService) GrantPatchToUser(userID uuid.UUID, patchID uuid.UUID) error {
+	// Check if user already owns this patch
+	var existing models.UserPatch
+	if err := s.db.Where("user_id = ? AND patch_id = ?", userID, patchID).First(&existing).Error; err == nil {
+		// Already owned
+		return nil
+	}
+	
+	// Get patch
+	var patch models.Patch
+	if err := s.db.First(&patch, "id = ?", patchID).Error; err != nil {
+		return fmt.Errorf("patch not found: %w", err)
+	}
+	
+	// Create user patch
+	userPatch := &models.UserPatch{
+		UserID:  userID,
+		PatchID: patchID,
+	}
+	
+	if err := s.db.Create(userPatch).Error; err != nil {
+		return fmt.Errorf("failed to grant patch: %w", err)
+	}
+	
+	return nil
+}

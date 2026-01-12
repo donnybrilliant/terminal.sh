@@ -5,21 +5,13 @@ import (
 	"strings"
 	"terminal-sh/models"
 	"terminal-sh/services"
+	"terminal-sh/ui"
 
 	"terminal-sh/database"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
-)
-
-var (
-	titleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("205")).
-			Bold(true)
-
-	welcomeStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39"))
 )
 
 // LoginModel handles the login/registration form
@@ -262,15 +254,13 @@ func (m *LoginModel) View() string {
 	title := `╔═══════════════════════════════════════╗
 ║   terminal.sh Server - Welcome!       ║
 ╚═══════════════════════════════════════╝`
-	content.WriteString(titleStyle.Render(title))
+	content.WriteString(ui.HeaderStyle.Render(title))
 	content.WriteString("\n\n")
-	content.WriteString(welcomeStyle.Render("Enter your credentials to continue"))
+	content.WriteString(ui.InfoStyle.Render("Enter your credentials to continue"))
 	content.WriteString("\n\n")
 
 	if m.err != nil {
-		errorStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196"))
-		content.WriteString(errorStyle.Render(fmt.Sprintf("Error: %v", m.err)))
+		content.WriteString(ui.ErrorStyle.Render(fmt.Sprintf("Error: %v", m.err)))
 		content.WriteString("\n\n")
 	}
 

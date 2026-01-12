@@ -57,6 +57,7 @@ type BubbleTeaBridge struct {
 	promptRow   int    // Track which row the prompt is on for updates
 
 	gradientTickerRunning bool
+	asciiTickerRunning    bool
 }
 
 // NewBubbleTeaBridge creates a new bridge between Bubble Tea and WebSocket
@@ -426,6 +427,11 @@ func (b *BubbleTeaBridge) processMessages() {
 					b.gradientTickerRunning = true
 					go b.runGradientTicker(shell)
 				}
+				// If ASCII animation is running, start a bridge-side ticker
+				if shell.IsASCIIAnimating() && !b.asciiTickerRunning {
+					b.asciiTickerRunning = true
+					go b.runASCIITicker(shell)
+				}
 			}
 			
 			// Render based on mode
@@ -606,6 +612,38 @@ func (b *BubbleTeaBridge) runGradientTicker(shell *terminal.ShellModel) {
 			}
 			select {
 			case b.msgChan <- terminal.GradientTickMsg{}:
+			case <-b.done:
+				return
+			default:
+				// Drop tick if channel is full; next tick will try again.
+			}
+		}
+	}
+}
+
+// runASCIITicker injects ASCII animation tick messages while an ASCII animation is active.
+// This ensures web sessions (which rely on bridge-driven redraws) animate like SSH.
+func (b *BubbleTeaBridge) runASCIITicker(shell *terminal.ShellModel) {
+	ticker := time.NewTicker(75 * time.Millisecond) // Use ASCII animation frame delay
+	defer ticker.Stop()
+	defer func() { b.asciiTickerRunning = false }()
+
+	for {
+		select {
+		case <-b.done:
+			return
+		case <-ticker.C:
+			// Check if we're still in shell mode
+			currentShell := b.getShellModel()
+			if currentShell == nil || currentShell != shell {
+				// Model changed, stop ticker
+				return
+			}
+			if !shell.IsASCIIAnimating() {
+				return
+			}
+			select {
+			case b.msgChan <- terminal.ASCIIAnimationTickMsg{}:
 			case <-b.done:
 				return
 			default:

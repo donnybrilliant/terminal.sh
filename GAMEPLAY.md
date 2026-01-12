@@ -89,6 +89,26 @@ The game features a virtual filesystem where you can create and manage files:
 - `info` - Display connection information
 - `userinfo` - Display detailed user information (level, experience, resources, wallet)
 - `wallet` - Show wallet balance (crypto and data)
+- `ascii <text> [flags]` - Convert text to ASCII art
+  - Flags:
+    - `-h, --help` - Show help message
+    - `-a, --animate` - Create animated welcome animation (gradient → ASCII art centered → falls away)
+    - `-c, --color <palette>` - Color palette: white, orange, green, purple, blue, red, cyan, yellow, pink
+    - `-s, --size <scale>` - Size multiplier: 1-10 (default: 1)
+  - Size:
+    - Size is an integer multiplier (1-10) that scales the base pattern dimensions
+    - Base pattern is 5x7 blocks, so scale 1 = 5x7, scale 2 = 10x14, scale 3 = 15x21, etc.
+    - Larger scales = bigger ASCII characters (more blocks per character)
+    - Examples: 1 (base), 2 (double), 3 (triple), 5 (5x larger)
+  - Color Palettes:
+    - `white`, `orange`, `green`, `purple`, `blue`, `red`, `cyan`, `yellow`, `pink`/`magenta`
+  - Examples:
+    - `ascii HELLO` - Convert "HELLO" to ASCII art
+    - `ascii WELCOME -a` - Create animated welcome with "WELCOME" centered
+    - `ascii TEST -c green` - Use green color palette
+    - `ascii "HELLO WORLD" -s 3` - Triple size (15x21 blocks per character)
+    - `ascii TERMINAL -a -c purple -s 2` - Animated with purple palette, double size
+    - `ascii -h` - Show detailed help
 
 ## Network Exploration
 
@@ -216,7 +236,51 @@ Target HTTP services specifically.
 packet_capture <targetIP>
 packet_decoder <targetIP>
 ```
-Analyze network traffic.
+Analyze network traffic. `packet_capture` captures packets, then use `packet_decoder` to decode and analyze them.
+
+**Stealth & Track Covering:**
+```bash
+log_cleaner <targetIP>
+```
+Deletes and clears system logs to cover your tracks. Must be used on an exploited server. Essential for stealth missions.
+
+```bash
+timestomper <targetIP>
+```
+Modifies file timestamps to cover tracks and make forensic analysis harder. Must be used on an exploited server.
+
+```bash
+audit_disable <targetIP>
+```
+Disables system auditing and logging to prevent future logs from being created. Must be used on an exploited server. Use this after covering existing tracks.
+
+```bash
+backup_destroyer <targetIP>
+```
+Deletes backups to prevent recovery. Must be used on an exploited server. Use this to ensure data cannot be restored after a heist.
+
+**Data Exfiltration:**
+```bash
+database_dumper <targetIP>
+```
+Extracts entire database contents. Requires SQL injection vulnerability (use `sql_injector` first). This tool dumps all database tables and data.
+
+```bash
+hash_cracker <targetIP>
+```
+Advanced hash cracking for MD5, SHA256, bcrypt, and other hash algorithms. Higher success rate than `password_cracker`. Useful for cracking hashed passwords found in databases.
+
+**Intelligence Gathering:**
+```bash
+log_analyzer <targetIP>
+```
+Parses and analyzes system logs for intelligence. Must be used on an exploited server. Reveals user activity, failed login attempts, and other valuable information.
+
+**Social Engineering:**
+```bash
+phishing_kit <targetIP>
+```
+Creates phishing emails and sites to gather credentials. Must be used on an exploited server. Generates realistic-looking phishing campaigns targeting specific users.
 
 ### Exploitation Workflow
 
@@ -555,8 +619,121 @@ tutorial <tutorialID>
 - `exploitation` - Learn how to exploit servers
 - `mining` - Learn cryptocurrency mining
 - `advanced_tools` - Learn about advanced exploitation tools
+- `story_missions` - Learn about story missions and exclusive rewards
 
 Tutorials have prerequisites, so complete them in order for the best learning experience.
+
+## Story Missions
+
+Story missions are narrative-driven challenges that unlock exclusive tools, patches, and achievements. Complete missions to progress through story arcs and build your hacking arsenal.
+
+### Viewing Missions
+
+**List all available missions:**
+```bash
+mission
+```
+
+This shows all missions organized by story arc, with status indicators:
+- ⭕ Not started
+- 🔄 In progress
+- ✅ Completed
+
+**View mission details:**
+```bash
+mission <missionID>
+```
+
+Shows complete information including:
+- Mission description and objectives
+- Required tools and level
+- Prerequisites (previous missions)
+- Rewards (experience, crypto, tools, patches, achievements)
+
+### Starting Missions
+
+**Start a mission:**
+```bash
+mission start <missionID>
+```
+
+Requirements:
+- All prerequisite missions must be completed
+- You must meet the required level
+- You must have the required tools (if any)
+
+**Check your progress:**
+```bash
+mission status
+```
+
+Shows all your started missions with completion percentage.
+
+### Completing Missions
+
+**Complete a mission:**
+```bash
+mission complete <missionID>
+```
+
+After completing all objectives, use this command to finish the mission and receive rewards:
+- Experience points
+- Cryptocurrency
+- **Exclusive tools** (unlocked only through missions)
+- **Exclusive patches** (cannot be purchased)
+- **Achievements** (displayed in `userinfo`)
+
+### Mission Rewards
+
+Missions unlock exclusive content that cannot be obtained elsewhere:
+
+**Mission-Locked Tools:**
+- `log_cleaner` - Delete system logs (from "Cover Your Tracks")
+- `timestomper` - Modify file timestamps (from "Cover Your Tracks")
+- `database_dumper` - Extract database contents (from "Database Heist")
+- `phishing_kit` - Create phishing campaigns (from "Phishing for Answers")
+- `hash_cracker` - Advanced hash cracking (from various missions)
+
+**Mission-Exclusive Patches:**
+- `stealth_patch_v1` - Reduces log generation
+- `sql_injector_stealth` - Stealth mode for SQL injection
+- `sql_injector_advanced` - Advanced SQL injection techniques
+
+**Achievements:**
+- Unlocked achievements appear in `userinfo`
+- Track your progress and accomplishments
+
+### Story Arcs
+
+Missions are organized into story arcs:
+
+**Corporate Espionage Arc:**
+1. "The Coffee Shop WiFi" - Hack public WiFi, find credentials
+2. "Phishing for Answers" - Create phishing campaign
+3. "The Database Heist" - Steal corporate data
+4. "Cover Your Tracks" - Cover your tracks before detection
+
+Complete each arc to unlock the next one. Each mission builds on the previous, creating an engaging narrative experience.
+
+### Mission Tips
+
+1. **Check prerequisites first:**
+   - Use `mission <id>` to see what's required
+   - Complete prerequisite missions before starting new ones
+
+2. **Prepare your tools:**
+   - Some missions require specific tools
+   - Download tools from `repo` server if needed
+   - Mission-locked tools are unlocked by completing missions
+
+3. **Track your progress:**
+   - Use `mission status` regularly
+   - Check `userinfo` to see unlocked achievements
+
+4. **Plan your strategy:**
+   - Missions often require exploiting servers
+   - Scan servers first to understand vulnerabilities
+   - Use the right tools for each objective
 
 ## Tips and Strategies
 
@@ -673,6 +850,8 @@ tools                   # Verify upgrade
 - `password_cracker`, `ssh_exploit`, `user_enum`, `lan_sniffer`
 - `password_sniffer`, `rootkit`, `exploit_kit`, `advanced_exploit_kit`
 - `sql_injector`, `xss_exploit`, `packet_capture`, `packet_decoder`
+- `log_cleaner`, `timestomper`, `database_dumper`, `phishing_kit`
+- `audit_disable`, `hash_cracker`, `log_analyzer`, `backup_destroyer`
 
 ### Mining
 - `crypto_miner <targetIP>`, `stop_mining <targetIP>`, `miners`
@@ -685,6 +864,13 @@ tools                   # Verify upgrade
 
 ### Learning
 - `tutorial [tutorialID]`
+
+### Story Missions
+- `mission` - List available missions
+- `mission <id>` - View mission details
+- `mission start <id>` - Start a mission
+- `mission complete <id>` - Complete a mission
+- `mission status` - View your mission progress
 
 ### Chat
 - `chat [--split]`
@@ -714,6 +900,21 @@ tools                   # Verify upgrade
 - Make sure you're in chat mode (type `chat`)
 - Check you're in a room (use `/rooms`)
 - Try leaving and rejoining the room
+
+**"Prerequisite mission not completed" error:**
+- Check mission prerequisites with `mission <missionID>`
+- Complete required missions first
+- Use `mission status` to see your progress
+
+**"Required level not met" error:**
+- Gain experience by using tools and exploiting servers
+- Check your level with `userinfo`
+- Level up by gaining experience points (100 XP per level)
+
+**"Mission already completed" error:**
+- You've already completed this mission
+- Check `mission status` to see completed missions
+- Move on to the next mission in the arc
 
 ## Getting Help
 

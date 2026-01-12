@@ -61,6 +61,55 @@
           "ram": -3
         }
       }
+    },
+    {
+      "name": "stealth_patch_v1",
+      "target_tool": "log_cleaner",
+      "description": "Reduces log generation and improves stealth",
+      "upgrades": {
+        "exploits": [],
+        "resources": {
+          "cpu": -3,
+          "bandwidth": -0.1,
+          "ram": -1
+        }
+      }
+    },
+    {
+      "name": "sql_injector_stealth",
+      "target_tool": "sql_injector",
+      "description": "Stealth mode for SQL injection attacks",
+      "upgrades": {
+        "exploits": [
+          {
+            "type": "sql_injection",
+            "level": 5
+          }
+        ],
+        "resources": {
+          "cpu": -2,
+          "bandwidth": 0,
+          "ram": -1
+        }
+      }
+    },
+    {
+      "name": "sql_injector_advanced",
+      "target_tool": "sql_injector",
+      "description": "Advanced SQL injection techniques",
+      "upgrades": {
+        "exploits": [
+          {
+            "type": "sql_injection",
+            "level": 10
+          }
+        ],
+        "resources": {
+          "cpu": -3,
+          "bandwidth": -0.1,
+          "ram": -2
+        }
+      }
     }
   ]
 }

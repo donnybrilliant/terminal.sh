@@ -13,46 +13,29 @@ import (
 	"terminal-sh/database"
 	"terminal-sh/services"
 	"terminal-sh/terminal/ssh"
-
-	"github.com/charmbracelet/lipgloss"
-)
-
-var (
-	headerStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("205")).
-			Bold(true)
-	successStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("46")).
-			Bold(true)
-	errorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196")).
-			Bold(true)
-	infoStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39"))
-	boxStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("205"))
+	"terminal-sh/ui"
 )
 
 func main() {
 	cfg := config.Load()
 
 	// Header
-	header := "╔═══════════════════════════════════════╗\n║   ui.sh SSH Server - Initializing    ║\n╚═══════════════════════════════════════╝"
-	fmt.Println(boxStyle.Render(header))
+	header := "╔═══════════════════════════════════════╗\n║   terminal.sh SSH Server - Initializing    ║\n╚═══════════════════════════════════════╝"
+	fmt.Println(ui.HeaderStyle.Render(header))
 	fmt.Println()
 
 	// Initialize database
-	fmt.Print(successStyle.Render("✓") + " Initializing database...")
+	fmt.Print(ui.SuccessStyle.Render("✓") + " Initializing database...")
 	db, err := database.NewDB(cfg.DatabasePath, cfg.DatabaseURL)
 	if err != nil {
-		fmt.Println(" " + errorStyle.Render("✗"))
-		log.Fatalf(errorStyle.Render("Failed to initialize database: %v"), err)
+		fmt.Println(" " + ui.ErrorStyle.Render("✗"))
+		log.Fatalf(ui.ErrorStyle.Render("Failed to initialize database: %v"), err)
 	}
 	defer func() {
 		fmt.Println()
-		fmt.Print(successStyle.Render("✓") + " Closing database connection...")
+		fmt.Print(ui.SuccessStyle.Render("✓") + " Closing database connection...")
 		if err := db.Close(); err != nil {
-			log.Printf(errorStyle.Render("Error closing database: %v"), err)
+			log.Printf(ui.ErrorStyle.Render("Error closing database: %v"), err)
 		} else {
 			fmt.Println()
 		}
@@ -60,38 +43,38 @@ func main() {
 	fmt.Println()
 
 	// Seed tools
-	fmt.Print(successStyle.Render("✓") + " Seeding tools...")
+	fmt.Print(ui.SuccessStyle.Render("✓") + " Seeding tools...")
 	serverService := services.NewServerService(db)
 	toolService := services.NewToolService(db, serverService)
 	if err := toolService.SeedTools(); err != nil {
-		fmt.Println(" " + errorStyle.Render("✗"))
-		log.Printf(errorStyle.Render("Failed to seed tools: %v"), err)
+		fmt.Println(" " + ui.ErrorStyle.Render("✗"))
+		log.Printf(ui.ErrorStyle.Render("Failed to seed tools: %v"), err)
 	} else {
 		fmt.Println()
 	}
 	
 	// Seed initial game data (servers, etc.)
-	fmt.Print(successStyle.Render("✓") + " Seeding game data...")
+	fmt.Print(ui.SuccessStyle.Render("✓") + " Seeding game data...")
 	if err := services.SeedInitialData(db); err != nil {
-		fmt.Println(" " + errorStyle.Render("✗"))
-		log.Printf(errorStyle.Render("Failed to seed initial data: %v"), err)
+		fmt.Println(" " + ui.ErrorStyle.Render("✗"))
+		log.Printf(ui.ErrorStyle.Render("Failed to seed initial data: %v"), err)
 	} else {
 		fmt.Println()
 	}
 
 	// Initialize chat service
-	fmt.Print(successStyle.Render("✓") + " Initializing chat service...")
+	fmt.Print(ui.SuccessStyle.Render("✓") + " Initializing chat service...")
 	chatService := services.NewChatService(db)
 	if err := chatService.InitializeDefaultRoom(); err != nil {
-		fmt.Println(" " + errorStyle.Render("✗"))
-		log.Printf(errorStyle.Render("Failed to initialize default room: %v"), err)
+		fmt.Println(" " + ui.ErrorStyle.Render("✗"))
+		log.Printf(ui.ErrorStyle.Render("Failed to initialize default room: %v"), err)
 	} else {
 		fmt.Println()
 	}
 
 	fmt.Println()
 	readyBox := fmt.Sprintf("╔═══════════════════════════════════════╗\n║   SSH Server ready on %s:%d        ║\n╚═══════════════════════════════════════╝", cfg.Host, cfg.Port)
-	fmt.Println(infoStyle.Render(readyBox))
+	fmt.Println(ui.InfoStyle.Render(readyBox))
 	fmt.Println()
 
 	// Set up signal handling for graceful shutdown
@@ -110,8 +93,8 @@ func main() {
 	select {
 	case sig := <-sigChan:
 		fmt.Printf("\n\n")
-		fmt.Println(infoStyle.Render(fmt.Sprintf("Received signal: %v", sig)))
-		fmt.Println(infoStyle.Render("Shutting down gracefully..."))
+		fmt.Println(ui.InfoStyle.Render(fmt.Sprintf("Received signal: %v", sig)))
+		fmt.Println(ui.InfoStyle.Render("Shutting down gracefully..."))
 		
 		// Give the server a moment to finish current operations
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -119,9 +102,9 @@ func main() {
 		
 		// Shutdown the server
 		if err := ssh.ShutdownServer(ctx); err != nil {
-			log.Printf(errorStyle.Render("Error during shutdown: %v"), err)
+			log.Printf(ui.ErrorStyle.Render("Error during shutdown: %v"), err)
 		} else {
-			fmt.Println(successStyle.Render("✓ Server shut down gracefully"))
+			fmt.Println(ui.SuccessStyle.Render("✓ Server shut down gracefully"))
 		}
 		
 	case err := <-serverErr:

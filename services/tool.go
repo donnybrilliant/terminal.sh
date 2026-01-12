@@ -189,6 +189,41 @@ func (s *ToolService) UserHasTool(userID uuid.UUID, toolName string) bool {
 	return err == nil
 }
 
+// GrantToolToUser grants a tool to a user (for mission rewards)
+func (s *ToolService) GrantToolToUser(userID uuid.UUID, toolID uuid.UUID) error {
+	// Check if user already has this tool
+	var toolState models.UserToolState
+	if err := s.db.Where("user_id = ? AND tool_id = ?", userID, toolID).First(&toolState).Error; err == nil {
+		// Already owned
+		return nil
+	}
+	
+	// Get tool
+	var tool models.Tool
+	if err := s.db.First(&tool, "id = ?", toolID).Error; err != nil {
+		return fmt.Errorf("tool not found: %w", err)
+	}
+	
+	// Add tool to user (many-to-many relationship)
+	var user models.User
+	if err := s.db.First(&user, "id = ?", userID).Error; err != nil {
+		return fmt.Errorf("user not found: %w", err)
+	}
+	
+	// Add tool to user's tools list
+	if err := s.db.Model(&user).Association("Tools").Append(&tool); err != nil {
+		return fmt.Errorf("failed to add tool: %w", err)
+	}
+	
+	// Create UserToolState
+	_, createErr := s.CreateUserToolState(userID, toolID)
+	if createErr != nil {
+		return fmt.Errorf("failed to create tool state: %w", createErr)
+	}
+	
+	return nil
+}
+
 // SeedTools seeds the database with default tools from JSON file
 func (s *ToolService) SeedTools() error {
 	// Load tools from JSON file
