@@ -115,6 +115,13 @@ func (s *WebSocketSession) handleMessages() error {
 					log.Printf("Error handling mouse: %v", err)
 				}
 			}
+		case MessageTypePaste:
+			var pasteMsg PasteMessage
+			if err := json.Unmarshal(message, &pasteMsg); err == nil {
+				if err := s.bridge.HandlePaste(pasteMsg); err != nil {
+					log.Printf("Error handling paste: %v", err)
+				}
+			}
 		case MessageTypeClose:
 			return nil // Client requested close
 		}

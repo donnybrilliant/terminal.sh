@@ -154,15 +154,17 @@ term.attachCustomKeyEventHandler((event) => {
   const isCopy = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c';
   const isPaste = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v';
   
-  // Handle paste - use term.paste() which will trigger onData
+  // Handle paste - send as single paste message
   if (isPaste) {
     event.preventDefault();
     if (navigator.clipboard && navigator.clipboard.readText) {
       navigator.clipboard.readText().then(text => {
-        if (text) {
-          // Use term.paste() - this will trigger onData for each character
-          // Characters appear in input field, but command only executes on Enter
-          term.paste(text);
+        if (text && ws && ws.readyState === WebSocket.OPEN) {
+          // Send paste as a single message with the full text
+          ws.send(JSON.stringify({
+            type: 'paste',
+            text: text
+          }));
         }
       }).catch(err => {
         console.error('Failed to read from clipboard:', err);
@@ -171,23 +173,38 @@ term.attachCustomKeyEventHandler((event) => {
     return false; // Prevent xterm.js from processing paste
   }
   
-  // Handle copy - let xterm.js handle copy when text is selected
+  // Handle copy - Ctrl+C (not Cmd+C on Mac)
   if (isCopy) {
-    // If text is selected, let xterm.js handle the copy
-    if (term.hasSelection()) {
-      return true; // Allow xterm.js default copy behavior
+    // Check if it's Ctrl+C (not Cmd+C) - Ctrl is for Windows/Linux, Cmd is for Mac
+    const isCtrlC = event.ctrlKey && !event.metaKey && event.key.toLowerCase() === 'c';
+    const isCmdC = event.metaKey && !event.ctrlKey && event.key.toLowerCase() === 'c';
+    
+    if (isCmdC) {
+      // Cmd+C on Mac - always allow native copy
+      if (term.hasSelection()) {
+        return true; // Allow xterm.js default copy behavior
+      }
+      return true; // Allow native copy even without selection
     }
-    // No selection - prevent xterm.js from processing, we'll send Ctrl+C to server
-    event.preventDefault();
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        type: 'input',
-        key: 'Ctrl+c',
-        char: '',
-        modifiers: event.ctrlKey ? ['Control'] : ['Meta']
-      }));
+    
+    if (isCtrlC) {
+      // Ctrl+C on Windows/Linux
+      if (term.hasSelection()) {
+        // Text selected - allow copy
+        return true; // Allow xterm.js default copy behavior
+      }
+      // No selection - send Ctrl+C to server to clear input
+      event.preventDefault();
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'input',
+          key: 'Ctrl+c',
+          char: '',
+          modifiers: ['Control']
+        }));
+      }
+      return false; // Prevent xterm.js from processing
     }
-    return false; // Prevent xterm.js from processing
   }
   
   // For all other keys (including Enter), allow xterm.js to process them
@@ -286,12 +303,12 @@ term.onKey((event) => {
       break;
     default:
       // Handle Ctrl+key combinations
-      if (domEvent.ctrlKey) {
+      if (domEvent.ctrlKey && !domEvent.metaKey) {
         const ctrlKey = domEvent.key.toLowerCase();
         if (ctrlKey === "c") {
-          keyName = "Ctrl+c";
-          char = "";
-          domEvent.preventDefault();
+          // Ctrl+C is handled by attachCustomKeyEventHandler
+          // It will send to server if no selection, or allow copy if selection exists
+          return; // Don't send here, let the handler deal with it
         } else if (ctrlKey === "s") {
           keyName = "Ctrl+s";
           char = "";
@@ -345,6 +362,30 @@ terminalContainer.addEventListener(
   },
   { passive: false }
 );
+
+// Handle right-click paste
+terminalContainer.addEventListener("contextmenu", (e) => {
+  // Allow default context menu for copy when text is selected
+  if (term.hasSelection()) {
+    return; // Let browser show context menu with copy option
+  }
+  
+  // If no selection, handle right-click paste
+  e.preventDefault();
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    navigator.clipboard.readText().then(text => {
+      if (text && ws && ws.readyState === WebSocket.OPEN) {
+        // Send paste as a single message with the full text
+        ws.send(JSON.stringify({
+          type: 'paste',
+          text: text
+        }));
+      }
+    }).catch(err => {
+      console.error('Failed to read from clipboard:', err);
+    });
+  }
+});
 
 // Connect when page loads
 document.addEventListener("DOMContentLoaded", () => {

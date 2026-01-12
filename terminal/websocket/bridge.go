@@ -556,6 +556,21 @@ func (b *BubbleTeaBridge) HandleMouse(msg MouseMessage) error {
 	return nil
 }
 
+// HandlePaste handles paste messages from the WebSocket client
+func (b *BubbleTeaBridge) HandlePaste(msg PasteMessage) error {
+	// Send paste as a special message type that the shell can handle
+	// Use terminal.PasteTextMsg which is defined in the terminal package
+	pasteMsg := terminal.PasteTextMsg{Text: msg.Text}
+	
+	select {
+	case b.msgChan <- pasteMsg:
+	default:
+		// Channel full, drop message
+	}
+	
+	return nil
+}
+
 // closeDone safely closes the done channel
 func (b *BubbleTeaBridge) closeDone() {
 	b.closeOnce.Do(func() {
@@ -625,6 +640,8 @@ func convertToKeyMsg(msg InputMessage) tea.KeyMsg {
 	case "Esc", "Escape":
 		keyType = tea.KeyEsc
 	case "Ctrl+c":
+		// Ctrl+C is now used for copy in terminals, not for exit
+		// We'll handle it as a regular key if needed, but typically it's handled client-side
 		keyType = tea.KeyCtrlC
 	case "Ctrl+s":
 		keyType = tea.KeyCtrlS

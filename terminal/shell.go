@@ -251,13 +251,20 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
-		case "ctrl+c":
+		case "ctrl+q":
 			// If in SSH session, exit SSH (same as exit command)
 			if m.handler.GetCurrentServerPath() != "" {
 				return m.handleExitSSH()
 			}
 			// In base shell, return to login
 			return m.handleLogout()
+		case "ctrl+c":
+			// Ctrl+C: clear input if no text selected (terminal default behavior)
+			// Text selection is handled by terminal emulator, so if we get here,
+			// it means no selection - clear the input
+			m.textInput.SetValue("")
+			m.inputHistory.Reset()
+			return m, nil
 		case "up":
 			// Navigate command history backward
 			if cmd, ok := m.inputHistory.Previous(); ok {
@@ -381,15 +388,69 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 	case tea.MouseMsg:
-		// Handle mouse wheel scrolling
-		switch msg.Button {
-		case tea.MouseButtonWheelUp:
-			m.scrollUp(3) // Scroll 3 lines at a time
-			return m, nil
-		case tea.MouseButtonWheelDown:
-			m.scrollDown(3) // Scroll 3 lines at a time
-			return m, nil
+		// Only handle mouse wheel scrolling - ignore all other mouse events
+		// This allows the terminal emulator to handle text selection (clicks/drags)
+		// We check both the button type and action to ensure we only handle wheel events
+		if msg.Action == tea.MouseActionPress {
+			switch msg.Button {
+			case tea.MouseButtonWheelUp:
+				m.scrollUp(3) // Scroll 3 lines at a time
+				return m, nil
+			case tea.MouseButtonWheelDown:
+				m.scrollDown(3) // Scroll 3 lines at a time
+				return m, nil
+			}
 		}
+		// For all other mouse events (clicks, drags, releases, etc.), ignore them
+		// This allows the terminal emulator to handle text selection
+		// Note: We still return m, nil to acknowledge the message, but we don't
+		// process it, which should allow the terminal emulator to handle it
+		return m, nil
+	case PasteTextMsg:
+		// Handle paste: append text to current input value
+		currentValue := m.textInput.Value()
+		// Filter out control characters, keep only printable ASCII and newlines
+		var filteredText strings.Builder
+		for _, r := range msg.Text {
+			if r >= 32 && r <= 126 {
+				// Printable ASCII
+				filteredText.WriteRune(r)
+			} else if r == '\n' || r == '\r' {
+				// Newlines - convert to Enter key press
+				// First append what we have so far
+				if filteredText.Len() > 0 {
+					m.textInput.SetValue(currentValue + filteredText.String())
+					currentValue = m.textInput.Value()
+					filteredText.Reset()
+				}
+				// Execute current line if it has content
+				if currentValue != "" {
+					// Scroll to bottom when executing command
+					m.scrollToBottom()
+					m.commandPending = true
+					// Add command to history immediately
+					m.history = append(m.history, struct {
+						command string
+						output  string
+					}{
+						command: currentValue,
+						output:  "",
+					})
+					m.inputHistory.Add(currentValue)
+					return m, m.executeCommand(currentValue)
+				}
+				// If empty, just continue (don't execute empty command)
+			}
+		}
+		// Append remaining filtered text
+		if filteredText.Len() > 0 {
+			m.textInput.SetValue(currentValue + filteredText.String())
+			m.textInput.CursorEnd()
+		} else if currentValue != "" {
+			// Even if no new text, ensure cursor is at end
+			m.textInput.CursorEnd()
+		}
+		m.inputHistory.Reset()
 		return m, nil
 	case WelcomeMsg:
 		m.showWelcome = true
@@ -1018,6 +1079,10 @@ type LogoutMsg struct{}
 
 type GradientTickMsg struct{}
 
+type PasteTextMsg struct {
+	Text string
+}
+
 // getCommandMatches returns commands that start with the given prefix
 func (m *ShellModel) getCommandMatches(prefix string) []string {
 	// Built-in commands (from cmd/commands.go)
@@ -1154,7 +1219,7 @@ func (m *ShellModel) handleEditModeInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.showWelcome = false
 		return m, nil
-	case "ctrl+c", "esc", "ctrl+q":
+	case "esc", "ctrl+q":
 		// Exit edit mode without saving
 		m.editMode = false
 		m.pendingOutput = "Edit mode exited without saving.\n"

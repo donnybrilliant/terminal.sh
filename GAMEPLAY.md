@@ -433,7 +433,7 @@ While in chat mode, you can navigate between rooms using:
 - **Arrow Keys** (←/→) - Switch between room tabs
 - **↑/↓ Arrow Keys** - Navigate command history (like shell)
 - **Tab Key** - Autocomplete commands and room names
-- **Esc** or **Ctrl+C** - Exit chat mode
+- **Esc** or **Ctrl+Q** - Exit chat mode
 
 ### Room Types
 
@@ -534,7 +534,7 @@ Messages are displayed in IRC-style format:
 - **Cross-Interface**: Users on SSH can chat with users on WebSocket - they share the same chat system
 - **Room Names**: Room names can start with `#` (like `#public`) or be plain names (like `mygroup`)
 - **Invitations**: When invited, you'll receive a notification with the room name and join command
-- **Exiting Chat**: Press `Esc` or `Ctrl+C` to exit chat mode and return to the shell
+- **Exiting Chat**: Press `Esc` or `Ctrl+Q` to exit chat mode and return to the shell
 
 ## Tutorials
 

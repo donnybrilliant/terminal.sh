@@ -6,10 +6,11 @@ import (
 	"terminal-sh/models"
 	"terminal-sh/services"
 
-	"github.com/charmbracelet/bubbletea"
+	"terminal-sh/database"
+
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
-	"terminal-sh/database"
 )
 
 var (
@@ -135,10 +136,9 @@ func (m *LoginModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c":
-			// Don't allow quitting from login in web version
-			// Ctrl+C should be handled by the browser/terminal
-			return m, nil
+		case "ctrl+q":
+			// Allow quitting from login
+			return m, tea.Quit
 		}
 
 	case LoginSuccessMsg:
