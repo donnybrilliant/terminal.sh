@@ -2,6 +2,8 @@ package terminal
 
 import (
 	"fmt"
+	"net"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -12,30 +14,239 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// Theme holds all color codes for the terminal theme
+type Theme struct {
+	// Primary colors
+	Primary   string // 205 - Magenta
+	Secondary string // 39 - Blue
+	
+	// Semantic colors
+	Success string // 46 - Green
+	Error   string // 196 - Red
+	Warning string // 220 - Yellow/Orange
+	Info    string // 51 - Cyan
+	
+	// Accent colors
+	Pink    string // 213 - Pink
+	LightPink string // 207 - Light Pink
+	Cyan    string // 51 - Cyan
+	LightBlue string // 45 - Light Blue
+	Green   string // 46 - Green
+	
+	// Neutral colors
+	LightGray string // 252 - Light Gray
+	Gray      string // 240 - Gray
+	DarkGray  string // 235 - Dark Gray
+}
+
+// DefaultTheme returns the default theme matching current color scheme
+var DefaultTheme = Theme{
+	Primary:   "205",
+	Secondary: "39",
+	Success:   "46",
+	Error:     "196",
+	Warning:   "220",
+	Info:      "51",
+	Pink:      "213",
+	LightPink: "207",
+	Cyan:      "51",
+	LightBlue: "45",
+	Green:     "46",
+	LightGray: "252",
+	Gray:      "240",
+	DarkGray:  "235",
+}
+
+// Current theme (can be swapped in the future)
+var currentTheme = DefaultTheme
+
+// Emoji constants organized by category
+const (
+	// Filesystem
+	EmojiFile      = "📄"
+	EmojiFolder    = "📁"
+	EmojiEdit      = "✏️"
+	
+	// User
+	EmojiUser      = "👤"
+	EmojiProfile   = " profile"
+	
+	// Network
+	EmojiServer    = "🖥️"
+	EmojiNetwork   = "🌐"
+	EmojiIP        = "📍"
+	EmojiSSH       = "🔌"
+	EmojiScan      = "🔍"
+	
+	// Tools
+	EmojiTool      = "🛠️"
+	EmojiTools     = "🛠️"
+	EmojiExploit   = "⚡"
+	EmojiHack      = "💻"
+	
+	// Shop
+	EmojiShop      = "🛒"
+	EmojiMoney     = "💰"
+	EmojiBuy       = "🛍️"
+	
+	// System
+	EmojiInfo      = "ℹ️"
+	EmojiSuccess   = "✅"
+	EmojiError     = "❌"
+	EmojiWarning   = "⚠️"
+	EmojiHelp      = "❓"
+	
+	// Learning
+	EmojiTutorial  = "📚"
+	EmojiLearning  = "🎓"
+	
+	// Upgrades
+	EmojiPatch     = "🔧"
+	EmojiUpgrade   = "⬆️"
+	
+	// Mining
+	EmojiMining    = "⛏️"
+	EmojiCrypto    = "₿"
+)
+
 var (
-	// Styles
+	// Styles using current theme
 	promptStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("205")).
+			Foreground(lipgloss.Color(currentTheme.Primary)).
 			Bold(true)
 
 	dirStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39"))
+		Foreground(lipgloss.Color(currentTheme.Secondary))
 
 	fileStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252"))
+		Foreground(lipgloss.Color(currentTheme.LightGray))
 
 	errorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196")).
+			Foreground(lipgloss.Color(currentTheme.Error)).
 			Bold(true)
 
 	successStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("46"))
+		Foreground(lipgloss.Color(currentTheme.Success))
+	
+	// New style variables
+	headerStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Primary)).
+		Bold(true)
+	
+	labelStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Info))
+	
+	valueStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.LightGray))
+	
+	infoStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Info))
+	
+	warningStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Warning)).
+		Bold(true)
+	
+	listItemStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Secondary))
 )
 
 // RenderPrompt renders the shell prompt with styled user, hostname, and path.
 func RenderPrompt(user, hostname, path string) string {
 	prompt := fmt.Sprintf("%s@%s:%s$ ", user, hostname, path)
 	return promptStyle.Render(prompt)
+}
+
+// getFileTypeInfo returns emoji and color for a file based on its extension
+func getFileTypeInfo(filename string) (emoji string, color string) {
+	ext := strings.ToLower(filepath.Ext(filename))
+	
+	// Directories
+	if ext == "" && strings.HasSuffix(filename, "/") {
+		return EmojiFolder, currentTheme.Secondary
+	}
+	
+	// Different file types with colors and emojis
+	switch ext {
+	// Code files
+	case ".go":
+		return "🔷", "81" // Cyan blue
+	case ".js", ".jsx":
+		return "🟨", "220" // Yellow
+	case ".ts", ".tsx":
+		return "🔵", "75" // Light blue
+	case ".py":
+		return "🐍", "208" // Orange
+	case ".java":
+		return "☕", "208" // Orange
+	case ".cpp", ".cxx", ".cc":
+		return "⚙️", "39" // Blue
+	case ".c":
+		return "⚙️", "39" // Blue
+	case ".rs":
+		return "🦀", "196" // Red
+	case ".php":
+		return "🐘", "105" // Purple
+	case ".rb":
+		return "💎", "196" // Red
+	case ".sh", ".bash", ".zsh":
+		return "💻", "46" // Green
+	case ".ps1":
+		return "🔷", "51" // Cyan
+	// Markup/Config
+	case ".html", ".htm":
+		return "🌐", "202" // Orange red
+	case ".css":
+		return "🎨", "51" // Cyan
+	case ".json":
+		return "📋", "220" // Yellow
+	case ".yaml", ".yml":
+		return "📝", "51" // Cyan
+	case ".xml":
+		return "📄", "220" // Yellow
+	case ".toml":
+		return "⚙️", "252" // Light gray
+	case ".ini", ".conf", ".config":
+		return "⚙️", "240" // Gray
+	// Text files
+	case ".txt", ".text":
+		return "📄", "252" // Light gray
+	case ".md", ".markdown":
+		return "📖", "252" // Light gray
+	case ".readme":
+		return "📚", "252" // Light gray
+	case ".log":
+		return "📋", "240" // Gray
+	// Archives
+	case ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar":
+		return "📦", "208" // Orange
+	// Images
+	case ".png", ".jpg", ".jpeg", ".gif", ".svg", ".bmp", ".ico":
+		return "🖼️", "51" // Cyan
+	// Audio
+	case ".mp3", ".wav", ".ogg", ".flac", ".aac":
+		return "🎵", "213" // Pink
+	// Video
+	case ".mp4", ".avi", ".mov", ".mkv", ".webm":
+		return "🎬", "213" // Pink
+	// Documents
+	case ".pdf":
+		return "📕", "196" // Red
+	case ".doc", ".docx":
+		return "📘", "51" // Cyan
+	case ".xls", ".xlsx":
+		return "📗", "46" // Green
+	case ".ppt", ".pptx":
+		return "📙", "208" // Orange
+	// Executables (no extension or .exe)
+	case ".exe", ".bin", ".app":
+		return "⚡", "196" // Red
+	default:
+		// No extension or unknown extension
+		if ext == "" {
+			return EmojiFile, currentTheme.LightGray
+		}
+		return EmojiFile, currentTheme.LightGray
+	}
 }
 
 // FormatDirList formats a list of filesystem nodes for display.
@@ -53,8 +264,8 @@ func FormatDirListWithOptions(nodes []*filesystem.Node, longFormat bool) string 
 	var output strings.Builder
 	for _, node := range nodes {
 		if longFormat {
-			// Long format: show file details
-			// Format: permissions size name
+			// Long format: show file details with colors and emojis
+			// Format: permissions size emoji name
 			perms := "-rw-r--r--"
 			if node.IsDir {
 				perms = "drwxr-xr-x"
@@ -63,16 +274,24 @@ func FormatDirListWithOptions(nodes []*filesystem.Node, longFormat bool) string 
 			if !node.IsDir {
 				size = fmt.Sprintf("%d", len(node.Content))
 			}
+			
 			name := node.Name
+			emoji, color := getFileTypeInfo(name)
 			if node.IsDir {
+				emoji = EmojiFolder
+				color = currentTheme.Secondary
 				name += "/"
 			}
-			output.WriteString(fmt.Sprintf("%s %6s %s\n", perms, size, name))
+			
+			nameStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
+			output.WriteString(fmt.Sprintf("%s %6s %s %s\n", perms, size, emoji, nameStyle.Render(name)))
 		} else {
-			// Short format: just name
+			// Short format: just colored name (no emoji)
 			if node.IsDir {
 				output.WriteString(dirStyle.Render(node.Name + "/"))
 			} else {
+				_, color := getFileTypeInfo(node.Name)
+				fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
 				output.WriteString(fileStyle.Render(node.Name))
 			}
 			output.WriteString("\n")
@@ -108,6 +327,131 @@ func FormatSuccess(msg string) string {
 		result += "\n"
 	}
 	return result
+}
+
+// isPrivateIP checks if the given IP address is in a private network range
+func isPrivateIP(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	
+	// Check private IPv4 ranges:
+	// 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8
+	privateBlocks := []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"127.0.0.0/8",
+	}
+	
+	for _, block := range privateBlocks {
+		_, ipNet, err := net.ParseCIDR(block)
+		if err != nil {
+			continue
+		}
+		if ipNet.Contains(ip) {
+			return true
+		}
+	}
+	
+	return false
+}
+
+// FormatIP formats an IP address for display with color
+// Local IPs (private network) are styled in yellow/orange, internet IPs in cyan
+func FormatIP(ip string) string {
+	var color string
+	if isPrivateIP(ip) {
+		color = currentTheme.Warning // Yellow/Orange (220) for local IPs
+	} else {
+		color = currentTheme.Info // Cyan (51) for internet IPs
+	}
+	
+	ipStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
+	return ipStyle.Render(ip)
+}
+
+// FormatHeader formats a section header with optional emoji
+func FormatHeader(title, emoji string) string {
+	if emoji != "" {
+		title = emoji + " " + title
+	}
+	return headerStyle.Render(title) + "\n"
+}
+
+// FormatLabel formats a field label
+func FormatLabel(label string) string {
+	return labelStyle.Render(label)
+}
+
+// FormatValue formats a data value
+func FormatValue(value string) string {
+	return valueStyle.Render(value)
+}
+
+// FormatKeyValue formats a key-value pair with optional color
+func FormatKeyValue(key, value, color string) string {
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(currentTheme.Info))
+	if color != "" {
+		valStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
+		return keyStyle.Render(key) + ": " + valStyle.Render(value)
+	}
+	return keyStyle.Render(key) + ": " + valueStyle.Render(value)
+}
+
+// FormatListItem formats a list item with optional emoji
+func FormatListItem(text, emoji string) string {
+	prefix := "  "
+	if emoji != "" {
+		prefix = fmt.Sprintf("  %s ", emoji)
+	}
+	return listItemStyle.Render(prefix+text) + "\n"
+}
+
+// FormatSuccessWithEmoji formats a success message with optional emoji
+func FormatSuccessWithEmoji(message, emoji string) string {
+	if message == "" {
+		return ""
+	}
+	prefix := ""
+	if emoji != "" {
+		prefix = emoji + " "
+	}
+	result := successStyle.Render(prefix + message)
+	if !strings.HasSuffix(result, "\n") {
+		result += "\n"
+	}
+	return result
+}
+
+// FormatInfo formats an informational message
+func FormatInfo(message string) string {
+	result := infoStyle.Render(message)
+	if !strings.HasSuffix(result, "\n") {
+		result += "\n"
+	}
+	return result
+}
+
+// FormatBox formats boxed content with a title
+func FormatBox(title, content string) string {
+	width := 45
+	if len(title) > width-4 {
+		width = len(title) + 4
+	}
+	
+	var sb strings.Builder
+	sb.WriteString("╔" + strings.Repeat("═", width-2) + "╗\n")
+	titlePadded := title
+	if len(titlePadded) < width-4 {
+		titlePadded = "   " + titlePadded + strings.Repeat(" ", width-4-len(titlePadded))
+	}
+	sb.WriteString("║" + titlePadded + "║\n")
+	sb.WriteString("╚" + strings.Repeat("═", width-2) + "╝\n\n")
+	sb.WriteString(content)
+	
+	return sb.String()
 }
 
 // AnimatedWelcome returns an animated "TERMINAL.SH" ASCII art welcome message
@@ -183,125 +527,6 @@ func WelcomeHelpText(user *models.User, db *database.Database) string {
 		styled.WriteString("\x1b[38;5;240m\x1b[2mNote: Your account was auto-created on first login\x1b[0m")
 	}
 	
-	return styled.String()
-}
-
-// AnimatedHelp returns help text with color transitions
-func AnimatedHelp() string {
-	// Define sections with their commands
-	sections := []struct {
-		title  string
-		titleColor string
-		commands []struct {
-			cmd     string
-			desc    string
-			color   string
-		}
-	}{
-		{
-			title: "Filesystem",
-			titleColor: "39", // Blue
-			commands: []struct{cmd, desc, color string}{
-				{"pwd", "Print working directory", "46"},
-				{"ls", "List directory contents", "51"},
-				{"cd", "Change directory", "45"},
-				{"cat", "Display file contents", "213"},
-				{"touch", "Create a new file", "207"},
-				{"mkdir", "Create a new directory", "39"},
-				{"rm", "Delete file (rm -r for directory)", "46"},
-				{"cp", "Copy files/folders", "51"},
-				{"mv", "Move or rename files/folders", "45"},
-				{"edit", "Edit a file", "213"},
-			},
-		},
-		{
-			title: "User",
-			titleColor: "46", // Green
-			commands: []struct{cmd, desc, color string}{
-				{"userinfo", "Show user information", "51"},
-				{"whoami", "Display current username", "45"},
-				{"name", "Change username", "213"},
-			},
-		},
-		{
-			title: "Network",
-			titleColor: "51", // Cyan
-			commands: []struct{cmd, desc, color string}{
-				{"ifconfig", "Show network interfaces", "45"},
-				{"scan", "Scan internet or IP", "213"},
-				{"ssh", "Connect to a server", "207"},
-				{"exit", "Disconnect from server", "39"},
-				{"server", "Show current server info", "46"},
-				{"createServer", "Create a new server", "51"},
-				{"createLocalServer", "Create local server", "45"},
-			},
-		},
-		{
-			title: "Tools",
-			titleColor: "213", // Magenta
-			commands: []struct{cmd, desc, color string}{
-				{"get", "Download tool from server", "207"},
-				{"tools", "List owned tools", "39"},
-				{"exploited", "List exploited servers", "46"},
-				{"wallet", "Show wallet balance", "51"},
-			},
-		},
-		{
-			title: "Tool Commands",
-			titleColor: "207", // Pink
-			commands: []struct{cmd, desc, color string}{
-				{"password_cracker", "Crack passwords", "39"},
-				{"ssh_exploit", "Exploit SSH vulnerabilities", "46"},
-				{"user_enum", "Enumerate users", "51"},
-				{"lan_sniffer", "Discover network connections", "45"},
-				{"rootkit", "Install backdoor", "213"},
-				{"exploit_kit", "Multi-vulnerability exploit", "207"},
-				{"crypto_miner", "Start mining", "39"},
-				{"stop_mining", "Stop mining", "46"},
-				{"miners", "List active miners", "51"},
-			},
-		},
-		{
-			title: "System",
-			titleColor: "252", // Light gray
-			commands: []struct{cmd, desc, color string}{
-				{"clear", "Clear the screen", "39"},
-				{"help", "Show this help message", "46"},
-			},
-		},
-	}
-
-	var styled strings.Builder
-	
-	// Title
-	titleStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("205")).
-		Bold(true).
-		MarginBottom(1)
-	styled.WriteString(titleStyle.Render("Available Commands") + "\n\n")
-
-	// Render each section
-	for _, section := range sections {
-		sectionStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color(section.titleColor)).
-			Bold(true)
-		styled.WriteString(sectionStyle.Render(section.title + ":") + "\n")
-		
-		for _, cmd := range section.commands {
-			cmdStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color(cmd.color))
-			// Format: "  command - description" with proper left alignment
-			// Use tabs or fixed spacing for alignment (xterm.js handles tabs better)
-			cmdPadded := cmd.cmd
-			if len(cmdPadded) < 20 {
-				cmdPadded += strings.Repeat(" ", 20-len(cmdPadded))
-			}
-			// Left-align everything - no floating
-			styled.WriteString("  " + cmdStyle.Render(cmdPadded) + " - " + cmd.desc + "\n")
-		}
-		styled.WriteString("\n")
-	}
-
 	return styled.String()
 }
 

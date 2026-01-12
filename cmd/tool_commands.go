@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 	"terminal-sh/models"
 	"terminal-sh/services"
-	"strings"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // showExploitProgress shows a progress bar for exploitation
@@ -100,8 +102,12 @@ func (h *CommandHandler) handlePasswordCracker(args []string) *CommandResult {
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 10)
 
-	output := fmt.Sprintf("Successfully exploited SSH service on %s using password_cracker\n", targetIP)
-	return &CommandResult{Output: output}
+	var output strings.Builder
+	successStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("46")).
+		Bold(true)
+	output.WriteString(successStyle.Render("✅ Successfully exploited SSH service on ") + formatIP(targetIP) + successStyle.Render(" using password_cracker") + "\n")
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleSSHExploit(args []string) *CommandResult {
@@ -145,8 +151,12 @@ func (h *CommandHandler) handleSSHExploit(args []string) *CommandResult {
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 15)
 
-	output := fmt.Sprintf("Successfully exploited SSH service on %s using ssh_exploit\n", targetIP)
-	return &CommandResult{Output: output}
+	var output strings.Builder
+	successStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("46")).
+		Bold(true)
+	output.WriteString(successStyle.Render("✅ Successfully exploited SSH service on ") + formatIP(targetIP) + successStyle.Render(" using ssh_exploit") + "\n")
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleUserEnum(args []string) *CommandResult {
@@ -162,24 +172,28 @@ func (h *CommandHandler) handleUserEnum(args []string) *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
 	}
 
-	output := "Users and roles:\n"
+	var output strings.Builder
+	headerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")).
+		Bold(true)
+	output.WriteString(headerStyle.Render("👥 Users and roles:") + "\n")
+	
+	listStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Blue
+	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")) // Light gray
+	
 	for _, role := range server.Roles {
-		output += fmt.Sprintf("  - %s (level %d)\n", role.Role, role.Level)
+		output.WriteString(listStyle.Render("  - ") + valueStyle.Render(role.Role) + " " + valueStyle.Render(fmt.Sprintf("(level %d)", role.Level)) + "\n")
 	}
 
 	if len(server.Roles) == 0 {
-		output = "No users found\n"
-	} else {
-		// Ensure output ends with newline
-		if !strings.HasSuffix(output, "\n") {
-			output += "\n"
-		}
+		output.Reset()
+		output.WriteString("No users found\n")
 	}
 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 5)
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleLanSniffer(args []string) *CommandResult {
@@ -200,24 +214,27 @@ func (h *CommandHandler) handleLanSniffer(args []string) *CommandResult {
 		return &CommandResult{Error: err}
 	}
 
-	output := "Local network connections:\n"
+	var output strings.Builder
+	headerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")).
+		Bold(true)
+	output.WriteString(headerStyle.Render("🔍 Local network connections:") + "\n")
+	
+	listStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Blue
+	
 	for _, connServer := range connectedServers {
-		output += fmt.Sprintf("  - %s (%s)\n", connServer.IP, connServer.LocalIP)
+		output.WriteString(listStyle.Render("  - ") + formatIP(connServer.IP) + " (" + formatIP(connServer.LocalIP) + ")\n")
 	}
 
 	if len(connectedServers) == 0 {
-		output = "No local network connections found\n"
-	} else {
-		// Ensure output ends with newline
-		if !strings.HasSuffix(output, "\n") {
-			output += "\n"
-		}
+		output.Reset()
+		output.WriteString("No local network connections found\n")
 	}
 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 5)
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleRootkit(args []string) *CommandResult {
@@ -242,12 +259,16 @@ func (h *CommandHandler) handleRootkit(args []string) *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("server must be exploited before installing rootkit")}
 	}
 
-	output := fmt.Sprintf("Rootkit installed on %s. Hidden backdoor access established.\n", targetIP)
+	var output strings.Builder
+	successStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("46")).
+		Bold(true)
+	output.WriteString(successStyle.Render("✅ Rootkit installed on ") + formatIP(targetIP) + successStyle.Render(". Hidden backdoor access established.") + "\n")
 	
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 20)
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleExploitKit(args []string) *CommandResult {
@@ -287,8 +308,12 @@ func (h *CommandHandler) handleExploitKit(args []string) *CommandResult {
 	// Add experience
 	h.userService.AddExperience(h.user.ID, exploitedCount*10)
 
-	output := fmt.Sprintf("Successfully exploited %d service(s) on %s using exploit_kit\n", exploitedCount, targetIP)
-	return &CommandResult{Output: output}
+	var output strings.Builder
+	successStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("46")).
+		Bold(true)
+	output.WriteString(successStyle.Render(fmt.Sprintf("✅ Successfully exploited %d service(s) on ", exploitedCount)) + formatIP(targetIP) + successStyle.Render(" using exploit_kit") + "\n")
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handlePasswordSniffer(args []string) *CommandResult {
@@ -305,24 +330,29 @@ func (h *CommandHandler) handlePasswordSniffer(args []string) *CommandResult {
 	}
 
 	// Sniff passwords from roles
-	output := "Sniffed passwords from user roles:\n"
+	var output strings.Builder
+	headerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")).
+		Bold(true)
+	output.WriteString(headerStyle.Render("🔓 Sniffed passwords from user roles:") + "\n")
+	
+	listStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Blue
+	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")) // Light gray
+	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("46")) // Green
+	
 	for _, role := range server.Roles {
-		output += fmt.Sprintf("  - %s: password123 (cracked)\n", role.Role)
+		output.WriteString(listStyle.Render("  - ") + valueStyle.Render(role.Role+": password123") + " " + successStyle.Render("(cracked)") + "\n")
 	}
 
 	if len(server.Roles) == 0 {
-		output = "No user roles found to sniff\n"
-	} else {
-		// Ensure output ends with newline
-		if !strings.HasSuffix(output, "\n") {
-			output += "\n"
-		}
+		output.Reset()
+		output.WriteString("No user roles found to sniff\n")
 	}
 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 12)
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleAdvancedExploitKit(args []string) *CommandResult {
@@ -362,8 +392,12 @@ func (h *CommandHandler) handleAdvancedExploitKit(args []string) *CommandResult 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, exploitedCount*15)
 
-	output := fmt.Sprintf("Successfully exploited %d service(s) on %s using advanced_exploit_kit\n", exploitedCount, targetIP)
-	return &CommandResult{Output: output}
+	var output strings.Builder
+	successStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("46")).
+		Bold(true)
+	output.WriteString(successStyle.Render(fmt.Sprintf("✅ Successfully exploited %d service(s) on ", exploitedCount)) + formatIP(targetIP) + successStyle.Render(" using advanced_exploit_kit") + "\n")
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleSQLInjector(args []string) *CommandResult {
@@ -406,8 +440,12 @@ func (h *CommandHandler) handleSQLInjector(args []string) *CommandResult {
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 18)
 
-	output := fmt.Sprintf("Successfully exploited HTTP service on %s using sql_injector\n", targetIP)
-	return &CommandResult{Output: output}
+	var output strings.Builder
+	successStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("46")).
+		Bold(true)
+	output.WriteString(successStyle.Render("✅ Successfully exploited HTTP service on ") + formatIP(targetIP) + successStyle.Render(" using sql_injector") + "\n")
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handleXSSExploit(args []string) *CommandResult {
@@ -450,8 +488,12 @@ func (h *CommandHandler) handleXSSExploit(args []string) *CommandResult {
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 12)
 
-	output := fmt.Sprintf("Successfully exploited HTTP service on %s using xss_exploit\n", targetIP)
-	return &CommandResult{Output: output}
+	var output strings.Builder
+	successStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("46")).
+		Bold(true)
+	output.WriteString(successStyle.Render("✅ Successfully exploited HTTP service on ") + formatIP(targetIP) + successStyle.Render(" using xss_exploit") + "\n")
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handlePacketCapture(args []string) *CommandResult {
@@ -467,14 +509,21 @@ func (h *CommandHandler) handlePacketCapture(args []string) *CommandResult {
 	}
 
 	// Simulate packet capture
-	output := fmt.Sprintf("Capturing packets on %s...\n", targetIP)
-	output += "Packets captured: 42\n"
-	output += "Saved to: /tmp/captured_packets.pcap\n"
+	var output strings.Builder
+	headerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")).
+		Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("51")) // Cyan
+	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")) // Light gray
+	
+	output.WriteString(headerStyle.Render("📡 Capturing packets on ") + formatIP(targetIP) + "...\n")
+	output.WriteString(labelStyle.Render("Packets captured:") + " " + valueStyle.Render("42") + "\n")
+	output.WriteString(labelStyle.Render("Saved to:") + " " + valueStyle.Render("/tmp/captured_packets.pcap") + "\n")
 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 8)
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
 func (h *CommandHandler) handlePacketDecoder(args []string) *CommandResult {
@@ -490,16 +539,24 @@ func (h *CommandHandler) handlePacketDecoder(args []string) *CommandResult {
 	}
 
 	// Simulate packet decoding
-	output := fmt.Sprintf("Decoding packets from %s...\n", targetIP)
-	output += "Decoded information:\n"
-	output += "  - Protocol: TCP\n"
-	output += "  - Source: 192.168.1.100:443\n"
-	output += "  - Destination: 10.0.0.5:8080\n"
-	output += "  - Payload: [encrypted data]\n"
+	var output strings.Builder
+	headerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")).
+		Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("51")) // Cyan
+	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")) // Light gray
+	listStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Blue
+	
+	output.WriteString(headerStyle.Render("🔓 Decoding packets from ") + formatIP(targetIP) + "...\n")
+	output.WriteString(headerStyle.Render("Decoded information:") + "\n")
+	output.WriteString(listStyle.Render("  - ") + labelStyle.Render("Protocol:") + " " + valueStyle.Render("TCP") + "\n")
+	output.WriteString(listStyle.Render("  - ") + labelStyle.Render("Source:") + " " + valueStyle.Render("192.168.1.100:443") + "\n")
+	output.WriteString(listStyle.Render("  - ") + labelStyle.Render("Destination:") + " " + valueStyle.Render("10.0.0.5:8080") + "\n")
+	output.WriteString(listStyle.Render("  - ") + labelStyle.Render("Payload:") + " " + valueStyle.Render("[encrypted data]") + "\n")
 
 	// Add experience
 	h.userService.AddExperience(h.user.ID, 6)
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 

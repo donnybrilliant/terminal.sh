@@ -6,6 +6,7 @@ import (
 
 	"terminal-sh/models"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 )
 
@@ -39,17 +40,26 @@ func (h *CommandHandler) handleShopList() *CommandResult {
 	}
 
 	var output strings.Builder
-	output.WriteString("Discovered Shops:\n\n")
+	headerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")).
+		Bold(true)
+	output.WriteString(headerStyle.Render("🛒 Discovered Shops:") + "\n\n")
+	
+	listStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Blue
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("51")) // Cyan
+	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")) // Light gray
+	shopNameStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("213")).Bold(true) // Magenta
 	
 	for _, shop := range shops {
-		output.WriteString(fmt.Sprintf("  [%s] %s\n", shop.ID.String()[:8], shop.Name))
-		output.WriteString(fmt.Sprintf("    Type: %s\n", shop.ShopType))
-		output.WriteString(fmt.Sprintf("    Location: %s\n", shop.ServerIP))
-		output.WriteString(fmt.Sprintf("    %s\n\n", shop.Description))
+		output.WriteString(listStyle.Render(fmt.Sprintf("  [%s] ", shop.ID.String()[:8])) + shopNameStyle.Render(shop.Name) + "\n")
+		output.WriteString(labelStyle.Render("    Type:") + " " + valueStyle.Render(string(shop.ShopType)) + "\n")
+		output.WriteString(labelStyle.Render("    Location:") + " " + formatIP(shop.ServerIP) + "\n")
+		output.WriteString("    " + valueStyle.Render(shop.Description) + "\n\n")
 	}
 
-	output.WriteString("Usage: shop <shopID> - Browse shop inventory\n")
-	output.WriteString("       buy <shopID> <itemID> - Purchase item\n")
+	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Gray
+	output.WriteString(infoStyle.Render("Usage: shop <shopID> - Browse shop inventory\n"))
+	output.WriteString(infoStyle.Render("       buy <shopID> <itemID> - Purchase item\n"))
 
 	return &CommandResult{Output: output.String()}
 }
@@ -89,43 +99,55 @@ func (h *CommandHandler) handleShopBrowse(shopID string) *CommandResult {
 	}
 
 	var output strings.Builder
+	headerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")).
+		Bold(true)
+	shopNameStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("213")).Bold(true) // Magenta
+	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252")) // Light gray
+	
 	output.WriteString("╔═══════════════════════════════════════╗\n")
-	output.WriteString(fmt.Sprintf("║   %s\n", shop.Name))
+	output.WriteString("║   " + shopNameStyle.Render(shop.Name) + "\n")
 	output.WriteString("╚═══════════════════════════════════════╝\n\n")
-	output.WriteString(fmt.Sprintf("%s\n\n", shop.Description))
-	output.WriteString("Items for sale:\n\n")
+	output.WriteString(valueStyle.Render(shop.Description) + "\n\n")
+	output.WriteString(headerStyle.Render("🛍️ Items for sale:") + "\n\n")
 
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("51")) // Cyan
+	itemNameStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("213")) // Magenta
+	priceStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("46")) // Green
+	listStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Blue
+	
 	if len(items) == 0 {
 		output.WriteString("  No items available.\n")
 	} else {
 		for i, item := range items {
-			output.WriteString(fmt.Sprintf("  [%d] %s\n", i+1, item.Name))
-			output.WriteString(fmt.Sprintf("      Type: %s\n", item.ItemType))
+			output.WriteString(listStyle.Render(fmt.Sprintf("  [%d] ", i+1)) + itemNameStyle.Render(item.Name) + "\n")
+			output.WriteString(labelStyle.Render("      Type:") + " " + valueStyle.Render(string(item.ItemType)) + "\n")
 			if item.Description != "" {
-				output.WriteString(fmt.Sprintf("      %s\n", item.Description))
+				output.WriteString("      " + valueStyle.Render(item.Description) + "\n")
 			}
+			priceStr := labelStyle.Render("      Price: ")
 			if item.PriceCrypto > 0 {
-				output.WriteString(fmt.Sprintf("      Price: %.2f crypto", item.PriceCrypto))
+				priceStr += priceStyle.Render(fmt.Sprintf("%.2f crypto", item.PriceCrypto))
 			}
 			if item.PriceData > 0 {
 				if item.PriceCrypto > 0 {
-					output.WriteString(" + ")
-				} else {
-					output.WriteString("      Price: ")
+					priceStr += " + "
 				}
-				output.WriteString(fmt.Sprintf("%.2f data", item.PriceData))
+				priceStr += priceStyle.Render(fmt.Sprintf("%.2f data", item.PriceData))
 			}
-			output.WriteString("\n")
+			output.WriteString(priceStr + "\n")
+			stockStr := labelStyle.Render("      Stock: ")
 			if item.Stock >= 0 {
-				output.WriteString(fmt.Sprintf("      Stock: %d\n", item.Stock))
+				stockStr += valueStyle.Render(fmt.Sprintf("%d", item.Stock))
 			} else {
-				output.WriteString("      Stock: Unlimited\n")
+				stockStr += valueStyle.Render("Unlimited")
 			}
-			output.WriteString("\n")
+			output.WriteString(stockStr + "\n\n")
 		}
 	}
 
-	output.WriteString("Usage: buy <shopID> <itemNumber> - Purchase item\n")
+	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Gray
+	output.WriteString(infoStyle.Render("Usage: buy <shopID> <itemNumber> - Purchase item\n"))
 
 	return &CommandResult{Output: output.String()}
 }
@@ -173,23 +195,29 @@ func (h *CommandHandler) handleBUY(args []string) *CommandResult {
 	}
 
 	// Handle item based on type
-	output := fmt.Sprintf("Successfully purchased %s from %s\n", item.Name, shop.Name)
+	var output strings.Builder
+	successStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("46")).
+		Bold(true)
+	itemNameStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("213")) // Magenta
+	
+	output.WriteString(successStyle.Render("✅ Successfully purchased ") + itemNameStyle.Render(item.Name) + successStyle.Render(fmt.Sprintf(" from %s", shop.Name)) + "\n")
 
 	switch item.ItemType {
 	case models.ItemTypeTool:
 		// Tool needs to be added via tool service
-		output += fmt.Sprintf("Tool %s has been added to your inventory. Use 'get %s %s' to download it.\n", item.Name, shop.ServerIP, item.Name)
+		output.WriteString("Tool " + itemNameStyle.Render(item.Name) + " has been added to your inventory. Use 'get " + formatIP(shop.ServerIP) + " " + item.Name + "' to download it.\n")
 	case models.ItemTypePatch:
 		// Patch needs to be added via patch service
 		if h.patchService != nil {
 			if err := h.patchService.AddUserPatch(h.user.ID, item.Name); err == nil {
-				output += fmt.Sprintf("Patch %s has been added to your inventory. Use 'patch %s <toolName>' to apply it.\n", item.Name, item.Name)
+				output.WriteString("Patch " + itemNameStyle.Render(item.Name) + " has been added to your inventory. Use 'patch " + item.Name + " <toolName>' to apply it.\n")
 			}
 		}
 	case models.ItemTypeResource:
-		output += "Resource upgrade has been applied.\n"
+		output.WriteString(successStyle.Render("Resource upgrade has been applied.") + "\n")
 	}
 
-	return &CommandResult{Output: output}
+	return &CommandResult{Output: output.String()}
 }
 
