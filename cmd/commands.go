@@ -26,6 +26,16 @@ type CommandResult struct {
 	LongFormat bool                // For ls -l format
 	// ASCII animation trigger (for ascii -a command)
 	StartASCIIAnimation *ASCIIAnimationRequest
+	// Progress operation (for long-running operations)
+	StartProgress *ProgressOperationRequest
+}
+
+// ProgressOperationRequest contains parameters for starting a progress operation
+type ProgressOperationRequest struct {
+	ID        string                                     // Unique ID for this operation
+	Message   string                                     // Message to display (e.g., "Downloading...")
+	Duration  float64                                    // Duration in seconds
+	Operation func() *CommandResult                      // The actual operation to run
 }
 
 // ASCIIAnimationRequest contains parameters for starting an ASCII animation
@@ -52,7 +62,7 @@ type CommandHandler struct {
 	tutorialService *services.TutorialService
 	shopService    *services.ShopService
 	shopDiscovery  *services.ShopDiscovery
-	patchService   *services.PatchService
+	upgradeService *services.UpgradeService
 	progressService *services.ProgressService
 	chatService    *services.ChatService
 	missionService *services.MissionService
@@ -71,29 +81,29 @@ type CommandHandler struct {
 func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.User, userService *services.UserService, chatService *services.ChatService) *CommandHandler {
 	serverService := services.NewServerService(db)
 	toolService := services.NewToolService(db, serverService)
-	patchService := services.NewPatchService(db, toolService)
-	toolService.SetPatchService(patchService) // Link patch service to tool service
+	// UpgradeService for progressive tool upgrades
+	upgradeService := services.NewUpgradeService(db, toolService, userService)
 	networkService := services.NewNetworkService(serverService)
 	shopService := services.NewShopService(db, serverService)
 	networkService.SetShopService(shopService) // Link shop service to network service
-	shopDiscovery := services.NewShopDiscovery(shopService, serverService, patchService, toolService)
+	shopDiscovery := services.NewShopDiscovery(shopService, serverService, toolService)
 	progressService := services.NewProgressService()
 	sessionService := services.NewSessionService(db, serverService)
 	exploitationService := services.NewExploitationService(db, toolService, serverService)
 	miningService := services.NewMiningService(db, toolService, serverService)
 	tutorialService, _ := services.NewTutorialService("") // Initialize tutorial service with default path (data/seed/tutorials.json), ignore error for now
 	achievementService, _ := services.NewAchievementService(db, "") // Initialize achievement service
-	rewardService := services.NewRewardService(db, userService, toolService, patchService, achievementService)
+	rewardService := services.NewRewardService(db, userService, toolService, upgradeService, achievementService)
 	missionService, _ := services.NewMissionService(db, "", rewardService) // Initialize mission service
-	
+
 	// Initialize mission generator
 	missionGenerator := services.NewMissionGenerator(db, missionService, serverService, toolService, userService)
 	missionService.SetMissionGenerator(missionGenerator)
-	
+
 	// Initialize server generator
 	serverGenerator := services.NewServerGenerator(db, serverService)
 	networkService.SetServerGenerator(serverGenerator)
-	
+
 	return &CommandHandler{
 		db:              db,
 		vfs:            vfs,
@@ -106,9 +116,9 @@ func NewCommandHandler(db *database.Database, vfs *filesystem.VFS, user *models.
 		exploitationService: exploitationService,
 		miningService: miningService,
 		tutorialService: tutorialService,
-		shopService:   shopService,
-		shopDiscovery: shopDiscovery,
-		patchService:  patchService,
+		shopService:    shopService,
+		shopDiscovery:  shopDiscovery,
+		upgradeService: upgradeService,
 		progressService: progressService,
 		chatService:   chatService,
 		missionService: missionService,
@@ -488,12 +498,15 @@ func (h *CommandHandler) handleHELP() *CommandResult {
 	output.WriteString(formatListItem("patches              - List available patches", ""))
 	output.WriteString(formatListItem("patch <name> <tool>  - Apply patch to tool", ""))
 	output.WriteString(formatListItem("patch info <name>    - Show patch details", ""))
+	output.WriteString(formatListItem("patch discover       - Scan server for patches", ""))
 	output.WriteString("\n")
 	
 	// System
 	output.WriteString(ui.ValueStyle.Render("⚙️ System:") + "\n")
 	output.WriteString(formatListItem("clear                - Clear the screen", ""))
 	output.WriteString(formatListItem("help                 - Show this help message", ""))
+	output.WriteString("\n")
+	output.WriteString(ui.GrayStyle.Render("Tip: use PgUp/PgDn or Ctrl+U/Ctrl+D to scroll output.") + "\n")
 	
 	// Ensure trailing newline
 	helpText := output.String()
@@ -927,9 +940,9 @@ func (h *CommandHandler) handleSCAN(args []string) *CommandResult {
 		// Tools
 		if len(server.Tools) > 0 {
 			output.WriteString("\n" + ui.LabelStyle.Bold(true).Render("🛠️ Available Tools:") + "\n")
-			output.WriteString(ui.ValueStyle.Render(fmt.Sprintf("  Use 'get %s <toolName>' to download\n", server.IP)))
+			output.WriteString(ui.ValueStyle.Render(fmt.Sprintf("  Use 'get %s <toolName>' to download", server.IP)) + "\n")
 			for _, tool := range server.Tools {
-				output.WriteString(ui.FormatListBulletWithStyle("• "+tool, ui.AccentStyle))
+				output.WriteString(ui.FormatListBulletWithStyle(tool, ui.AccentStyle))
 			}
 		}
 		
@@ -937,11 +950,14 @@ func (h *CommandHandler) handleSCAN(args []string) *CommandResult {
 		if len(server.Services) > 0 {
 			output.WriteString("\n" + ui.SectionStyle.Render("🌐 Services:") + "\n")
 			for _, service := range server.Services {
-				output.WriteString("  " + ui.InfoStyle.Render(fmt.Sprintf("• %s (port %d): %s\n", service.Name, service.Port, service.Description)))
+				output.WriteString(ui.FormatListBulletWithStyle(
+					fmt.Sprintf("%s (port %d): %s", service.Name, service.Port, service.Description),
+					ui.InfoStyle,
+				))
 				if service.Vulnerable && len(service.Vulnerabilities) > 0 {
 					output.WriteString("    " + ui.ErrorStyle.Render("⚠️ Vulnerabilities:") + "\n")
 					for _, vuln := range service.Vulnerabilities {
-						output.WriteString("      " + ui.ErrorStyle.Render(fmt.Sprintf("- %s (level %d)\n", vuln.Type, vuln.Level)))
+						output.WriteString("      " + ui.ErrorStyle.Render(fmt.Sprintf("- %s (level %d)", vuln.Type, vuln.Level)) + "\n")
 					}
 				}
 			}
@@ -951,7 +967,7 @@ func (h *CommandHandler) handleSCAN(args []string) *CommandResult {
 		if len(server.ConnectedIPs) > 0 {
 			output.WriteString("\n" + ui.LabelStyle.Bold(true).Render("🔗 Connected IPs:") + "\n")
 			for _, ip := range server.ConnectedIPs {
-				output.WriteString(ui.FormatListBulletWithStyle("• "+formatIP(ip), ui.ListStyle))
+				output.WriteString(ui.FormatListBullet(formatIP(ip)))
 			}
 		}
 		
@@ -960,7 +976,7 @@ func (h *CommandHandler) handleSCAN(args []string) *CommandResult {
 			if shop, err := h.shopService.GetShopByServerIP(server.IP); err == nil {
 				output.WriteString("\n" + ui.AccentStyle.Render("🛒 Shop:") + " ")
 				output.WriteString(ui.AccentStyle.Render(fmt.Sprintf("[%s] %s", shop.ShopType, shop.Name)) + "\n")
-				output.WriteString(ui.ValueStyle.Render(fmt.Sprintf("  %s\n", shop.Description)))
+				output.WriteString(ui.ValueStyle.Render(fmt.Sprintf("  %s", shop.Description)) + "\n")
 			}
 		}
 		
@@ -1026,7 +1042,7 @@ func (h *CommandHandler) handleSSH(args []string) *CommandResult {
 
 	targetIP := args[0]
 
-	// Check if server exists
+	// Check if server exists - validate before starting progress
 	server, err := h.serverService.GetServerByIP(targetIP)
 	if err != nil {
 		// Try to get by path (for nested servers)
@@ -1036,7 +1052,7 @@ func (h *CommandHandler) handleSSH(args []string) *CommandResult {
 		}
 	}
 
-	// Check if server is exploited
+	// Check if server is exploited - validate before starting progress
 	if !h.exploitationService.CanSSHToServer(h.user.ID, server.IP) {
 		// Check by path if nested
 		if h.currentServerPath != "" {
@@ -1057,17 +1073,27 @@ func (h *CommandHandler) handleSSH(args []string) *CommandResult {
 		newServerPath = h.currentServerPath + ".localNetwork." + server.IP
 	}
 
-	// Show progress bar for SSH connection
+	// Calculate SSH connection time based on user resources
+	var duration float64 = 1.0 // default 1 second
 	if h.progressService != nil {
-		duration := h.progressService.CalculateOperationTime(services.OperationSSH, h.user.Resources)
-		durationSeconds := time.Duration(duration * float64(time.Second))
-		
-		showProgressBar(fmt.Sprintf("Connecting to %s...", targetIP), durationSeconds)
+		duration = h.progressService.CalculateOperationTime(services.OperationSSH, h.user.Resources)
 	}
 
-	// Return special marker for shell to handle stack push
-	// Shell will push current context, then update the path
-	return &CommandResult{Output: fmt.Sprintf("__SSH_CONNECT__%s", newServerPath)}
+	// Return a progress operation that will run async
+	operationID := fmt.Sprintf("ssh-%s-%d", targetIP, time.Now().UnixNano())
+
+	return &CommandResult{
+		StartProgress: &ProgressOperationRequest{
+			ID:       operationID,
+			Message:  fmt.Sprintf("Connecting to %s...", targetIP),
+			Duration: duration,
+			Operation: func() *CommandResult {
+				// Return special marker for shell to handle stack push
+				// Shell will push current context, then update the path
+				return &CommandResult{Output: fmt.Sprintf("__SSH_CONNECT__%s", newServerPath)}
+			},
+		},
+	}
 }
 
 func (h *CommandHandler) handleEXIT() *CommandResult {
@@ -1152,23 +1178,37 @@ func (h *CommandHandler) handleGET(args []string) *CommandResult {
 	toolName := args[1]
 
 	// Calculate download time based on user resources
+	var duration float64 = 2.0 // default 2 seconds
 	if h.progressService != nil {
-		duration := h.progressService.CalculateOperationTime(services.OperationDownload, h.user.Resources)
-		durationSeconds := time.Duration(duration * float64(time.Second))
-		
-		// Show progress bar
-		showProgressBar(fmt.Sprintf("Downloading %s from %s...", toolName, targetIP), durationSeconds)
+		duration = h.progressService.CalculateOperationTime(services.OperationDownload, h.user.Resources)
 	}
 
-	if err := h.toolService.DownloadTool(h.user.ID, targetIP, toolName); err != nil {
-		return &CommandResult{Error: err}
+	// Return a progress operation that will run async
+	operationID := fmt.Sprintf("download-%s-%s-%d", targetIP, toolName, time.Now().UnixNano())
+	
+	// Capture variables for the closure
+	toolService := h.toolService
+	userID := h.user.ID
+	handler := h
+	
+	return &CommandResult{
+		StartProgress: &ProgressOperationRequest{
+			ID:       operationID,
+			Message:  fmt.Sprintf("Downloading %s from %s...", toolName, targetIP),
+			Duration: duration,
+			Operation: func() *CommandResult {
+				if err := toolService.DownloadTool(userID, targetIP, toolName); err != nil {
+					return &CommandResult{Error: err}
+				}
+				
+				// Sync tools to VFS so the new tool appears in help
+				handler.SyncUserToolsToVFS()
+				
+				output := ui.SuccessStyle.Render("✅ Tool ") + ui.AccentBoldStyle.Render(toolName) + ui.SuccessStyle.Render(" downloaded successfully from ") + formatIP(targetIP) + "\n"
+				return &CommandResult{Output: output}
+			},
+		},
 	}
-
-	// Sync tools to VFS so the new tool appears in help
-	h.SyncUserToolsToVFS()
-
-	output := ui.SuccessStyle.Render("✅ Tool ") + ui.AccentBoldStyle.Render(toolName) + ui.SuccessStyle.Render(" downloaded successfully from ") + formatIP(targetIP) + "\n"
-	return &CommandResult{Output: output}
 }
 
 func (h *CommandHandler) handleTOOLS() *CommandResult {
@@ -1217,9 +1257,24 @@ func (h *CommandHandler) handleTOOLS() *CommandResult {
 		tool := toolState.Tool
 		output.WriteString(ui.FormatListBulletWithStyle("• "+tool.Name+": "+tool.Function, ui.AccentStyle))
 		output.WriteString("    " + ui.InfoStyle.Render("📦 Version:") + " " + ui.InfoStyle.Render(fmt.Sprintf("%d", toolState.Version)) + "\n")
-		
-		if len(toolState.AppliedPatches) > 0 {
-			output.WriteString("    " + ui.AccentBoldStyle.Render("🔧 Patches:") + " " + ui.AccentBoldStyle.Render(strings.Join(toolState.AppliedPatches, ", ")) + "\n")
+
+		// Show upgrade counts if any
+		totalUpgrades := toolState.ExploitUpgrades + toolState.CPUUpgrades + toolState.RAMUpgrades + toolState.BandwidthUpgrades
+		if totalUpgrades > 0 {
+			upgrades := []string{}
+			if toolState.ExploitUpgrades > 0 {
+				upgrades = append(upgrades, fmt.Sprintf("%d exploit", toolState.ExploitUpgrades))
+			}
+			if toolState.CPUUpgrades > 0 {
+				upgrades = append(upgrades, fmt.Sprintf("%d cpu", toolState.CPUUpgrades))
+			}
+			if toolState.RAMUpgrades > 0 {
+				upgrades = append(upgrades, fmt.Sprintf("%d ram", toolState.RAMUpgrades))
+			}
+			if toolState.BandwidthUpgrades > 0 {
+				upgrades = append(upgrades, fmt.Sprintf("%d bw", toolState.BandwidthUpgrades))
+			}
+			output.WriteString("    " + ui.AccentBoldStyle.Render("🔧 Upgrades:") + " " + ui.AccentBoldStyle.Render(strings.Join(upgrades, ", ")) + "\n")
 		}
 		
 		if len(toolState.EffectiveExploits) > 0 {
@@ -1469,8 +1524,8 @@ func (h *CommandHandler) handleTUTORIAL(args []string) *CommandResult {
 		output.WriteString(ui.HeaderStyle.Render(emojiSparkles + " " + emojiTutorial + " Available Tutorials " + emojiTutorial + " " + emojiSparkles) + "\n\n")
 		
 		if len(tutorials) == 0 {
-			output.WriteString(ui.WarningStyle.Render(emojiLightbulb + " No tutorials available yet.\n"))
-			output.WriteString(ui.WarningStyle.Render("Edit tutorials.json to add tutorials.\n"))
+			output.WriteString(ui.WarningStyle.Render(emojiLightbulb+" No tutorials available yet.") + "\n")
+			output.WriteString(ui.WarningStyle.Render("Edit tutorials.json to add tutorials.") + "\n")
 		} else {
 			for i, tutorial := range tutorials {
 				// Tutorial ID with emoji and color
@@ -1554,8 +1609,8 @@ func (h *CommandHandler) handleTUTORIAL(args []string) *CommandResult {
 	}
 	
 	output.WriteString("\n")
-	output.WriteString(ui.GrayStyle.Render(emojiLightbulb + " Tutorial file location: " + h.tutorialService.GetTutorialPath() + "\n"))
-	output.WriteString(ui.GrayStyle.Render("Edit this file to modify tutorials.\n"))
+	output.WriteString(ui.GrayStyle.Render(emojiLightbulb+" Tutorial file location: "+h.tutorialService.GetTutorialPath()) + "\n")
+	output.WriteString(ui.GrayStyle.Render("Edit this file to modify tutorials.") + "\n")
 
 	return &CommandResult{Output: output.String()}
 }

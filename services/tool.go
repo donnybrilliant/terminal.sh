@@ -6,16 +6,30 @@ import (
 	"os"
 	"terminal-sh/database"
 	"terminal-sh/models"
+	"terminal-sh/patch"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
+// ToolStateStore provides access to user tool state for upgrade application.
+// This interface breaks the circular dependency between ToolService and UpgradeService.
+type ToolStateStore interface {
+	// GetUserToolState retrieves a user's tool state by user ID and tool name.
+	GetUserToolState(userID uuid.UUID, toolName string) (*models.UserToolState, error)
+
+	// SaveToolState persists changes to a user's tool state.
+	SaveToolState(state *models.UserToolState) error
+
+	// GetBaseTool retrieves the base tool definition by ID.
+	GetBaseTool(toolID uuid.UUID) (*models.Tool, error)
+}
+
 // ToolService handles tool-related operations including retrieval, ownership, and effective tool calculations.
 type ToolService struct {
 	db            *database.Database
 	serverService *ServerService
-	patchService  *PatchService // Will be set after patch service is created
+	calculator    *patch.Calculator
 }
 
 // NewToolService creates a new ToolService with the provided database and server service.
@@ -23,12 +37,8 @@ func NewToolService(db *database.Database, serverService *ServerService) *ToolSe
 	return &ToolService{
 		db:            db,
 		serverService: serverService,
+		calculator:    patch.NewCalculator(),
 	}
-}
-
-// SetPatchService sets the patch service for this tool service (called after patch service is created).
-func (s *ToolService) SetPatchService(patchService *PatchService) {
-	s.patchService = patchService
 }
 
 // GetToolByName retrieves a tool by its name from the database.
@@ -75,28 +85,55 @@ func (s *ToolService) GetUserToolState(userID uuid.UUID, toolName string) (*mode
 	return &toolState, nil
 }
 
-// GetEffectiveTool retrieves a tool with effective stats calculated from the user's tool state (with patches applied).
+// GetEffectiveTool retrieves a tool with effective stats calculated from the user's tool state (with upgrades applied).
 func (s *ToolService) GetEffectiveTool(userID uuid.UUID, toolName string) (*models.Tool, error) {
 	toolState, err := s.GetUserToolState(userID, toolName)
 	if err != nil {
 		return nil, err
 	}
 
-	// Calculate effective stats using patch service
-	if s.patchService != nil {
-		effectiveTool := s.patchService.CalculateEffectiveStats(toolState)
-		if effectiveTool != nil {
-			return effectiveTool, nil
-		}
-	}
-
-	// Fallback to base tool if no patches applied
-	var baseTool models.Tool
-	if err := s.db.First(&baseTool, "id = ?", toolState.ToolID).Error; err != nil {
+	// Get base tool
+	baseTool, err := s.GetBaseTool(toolState.ToolID)
+	if err != nil {
 		return nil, err
 	}
 
-	return &baseTool, nil
+	// Calculate effective stats using progressive upgrades
+	baseStats := patch.ToolStatsFromTool(baseTool)
+	effectiveStats := s.calculator.CalculateWithUpgrades(
+		baseStats,
+		toolState.ExploitUpgrades,
+		toolState.CPUUpgrades,
+		toolState.RAMUpgrades,
+		toolState.BandwidthUpgrades,
+	)
+
+	// Build effective tool with calculated stats
+	effectiveTool := &models.Tool{
+		ID:        baseTool.ID,
+		Name:      baseTool.Name,
+		Function:  baseTool.Function,
+		Resources: effectiveStats.Resources,
+		Exploits:  effectiveStats.Exploits,
+		Services:  baseTool.Services,
+		Special:   baseTool.Special,
+	}
+
+	return effectiveTool, nil
+}
+
+// SaveToolState persists changes to a user's tool state (implements ToolStateStore).
+func (s *ToolService) SaveToolState(state *models.UserToolState) error {
+	return s.db.Save(state).Error
+}
+
+// GetBaseTool retrieves the base tool definition by ID (implements ToolStateStore).
+func (s *ToolService) GetBaseTool(toolID uuid.UUID) (*models.Tool, error) {
+	var tool models.Tool
+	if err := s.db.First(&tool, "id = ?", toolID).Error; err != nil {
+		return nil, err
+	}
+	return &tool, nil
 }
 
 // CreateUserToolState creates a new tool state for a user when they download a tool
@@ -113,14 +150,17 @@ func (s *ToolService) CreateUserToolState(userID uuid.UUID, toolID uuid.UUID) (*
 		return nil, fmt.Errorf("tool not found: %w", err)
 	}
 
-	// Create initial tool state with base stats
+	// Create initial tool state with base stats and zero upgrades
 	toolState := &models.UserToolState{
-		UserID:            userID,
-		ToolID:            toolID,
-		AppliedPatches:    []string{},
-		EffectiveExploits: baseTool.Exploits,
+		UserID:             userID,
+		ToolID:             toolID,
+		EffectiveExploits:  baseTool.Exploits,
 		EffectiveResources: baseTool.Resources,
-		Version:           1,
+		Version:            1,
+		ExploitUpgrades:    0,
+		CPUUpgrades:        0,
+		RAMUpgrades:        0,
+		BandwidthUpgrades:  0,
 	}
 
 	if err := s.db.Create(toolState).Error; err != nil {

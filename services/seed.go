@@ -10,27 +10,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// SeedInitialData seeds the database with initial game data from JSON files (servers, shops, patches).
+// SeedInitialData seeds the database with initial game data from JSON files (servers, shops).
 // This should be called during application initialization.
 func SeedInitialData(db *database.Database) error {
 	// Seed servers from JSON
 	if err := seedServersFromJSON(db); err != nil {
 		return fmt.Errorf("failed to seed servers: %w", err)
 	}
-	
-	// Seed patches
-	serverService := NewServerService(db)
-	toolService := NewToolService(db, serverService)
-	patchService := NewPatchService(db, toolService)
-	if err := patchService.SeedPatches(); err != nil {
-		return fmt.Errorf("failed to seed patches: %w", err)
-	}
-	
+
 	// Seed shops from JSON
 	if err := seedShopsFromJSON(db); err != nil {
 		return fmt.Errorf("failed to seed shops: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -234,27 +226,22 @@ func seedShopsFromJSON(db *database.Database) error {
 	}
 
 	var shopData struct {
-		Shops      []struct {
-			ServerIP        string `json:"server_ip"`
+		Shops []struct {
+			ServerIP        string        `json:"server_ip"`
 			Server          models.Server `json:"server"`
-			ShopType        string `json:"shop_type"`
-			ShopName        string `json:"shop_name"`
-			ShopDescription string `json:"shop_description"`
+			ShopType        string        `json:"shop_type"`
+			ShopName        string        `json:"shop_name"`
+			ShopDescription string        `json:"shop_description"`
 			Items           []struct {
-				ItemType    string `json:"item_type"`
-				ItemID      string `json:"item_id"`
-				Name        string `json:"name"`
-				Description string `json:"description"`
-				CryptoPrice  float64 `json:"crypto_price"`
-				DataPrice    float64 `json:"data_price"`
-				Stock        int     `json:"stock"`
+				ItemType    string  `json:"item_type"`
+				ItemID      string  `json:"item_id"`
+				Name        string  `json:"name"`
+				Description string  `json:"description"`
+				CryptoPrice float64 `json:"crypto_price"`
+				DataPrice   float64 `json:"data_price"`
+				Stock       int     `json:"stock"`
 			} `json:"items"`
 		} `json:"shops"`
-		PatchFiles []struct {
-			ServerIP string `json:"server_ip"`
-			FilePath string `json:"file_path"`
-			Content  string `json:"content"`
-		} `json:"patch_files"`
 	}
 	if err := json.Unmarshal(data, &shopData); err != nil {
 		return fmt.Errorf("failed to parse shops.json: %w", err)
@@ -304,8 +291,8 @@ func seedShopsFromJSON(db *database.Database) error {
 			switch item.ItemType {
 			case "tool":
 				itemType = models.ItemTypeTool
-			case "patch":
-				itemType = models.ItemTypePatch
+			case "upgrade_token":
+				itemType = models.ItemTypeUpgradeToken
 			case "resource":
 				itemType = models.ItemTypeResource
 			default:
@@ -316,56 +303,6 @@ func seedShopsFromJSON(db *database.Database) error {
 			if err != nil {
 				return fmt.Errorf("failed to add shop item %s: %w", item.Name, err)
 			}
-		}
-	}
-
-	// Seed patch files on servers
-	for _, patchFile := range shopData.PatchFiles {
-		var server models.Server
-		if err := db.Where("ip = ?", patchFile.ServerIP).First(&server).Error; err != nil {
-			continue // Server doesn't exist, skip
-		}
-
-		if server.FileSystem == nil {
-			server.FileSystem = make(map[string]interface{})
-		}
-
-		// Parse file path to create directory structure
-		parts := []string{}
-		current := ""
-		for _, char := range patchFile.FilePath {
-			if char == '/' {
-				if current != "" {
-					parts = append(parts, current)
-					current = ""
-				}
-			} else {
-				current += string(char)
-			}
-		}
-		if current != "" {
-			parts = append(parts, current)
-		}
-
-		// Create directory structure
-		currentLevel := server.FileSystem
-		for i, part := range parts {
-			if i == len(parts)-1 {
-				// Last part is the file
-				currentLevel[part] = map[string]interface{}{
-					"content": patchFile.Content,
-				}
-			} else {
-				// Directory
-				if _, ok := currentLevel[part].(map[string]interface{}); !ok {
-					currentLevel[part] = make(map[string]interface{})
-				}
-				currentLevel = currentLevel[part].(map[string]interface{})
-			}
-		}
-
-		if err := db.Save(&server).Error; err != nil {
-			return fmt.Errorf("failed to save patch file on server %s: %w", patchFile.ServerIP, err)
 		}
 	}
 
@@ -440,12 +377,12 @@ func seedShops(db *database.Database) error {
 		return fmt.Errorf("failed to add shop item: %w", err)
 	}
 	
-	_, err = shopService.AddShopItem(shop.ID, models.ItemTypePatch, "pass_patch_v2", "Enhanced password cracking algorithm", 0, 500, -1)
+	_, err = shopService.AddShopItem(shop.ID, models.ItemTypeUpgradeToken, "Exploit Booster Token", "Grants one free exploit upgrade to any tool", 150, 0, -1)
 	if err != nil {
 		return fmt.Errorf("failed to add shop item: %w", err)
 	}
 	
-	_, err = shopService.AddShopItem(shop.ID, models.ItemTypePatch, "ssh_patch_v2", "Improved SSH exploitation techniques", 0, 750, -1)
+	_, err = shopService.AddShopItem(shop.ID, models.ItemTypeUpgradeToken, "CPU Optimizer Token", "Grants one free CPU upgrade to any tool", 75, 0, -1)
 	if err != nil {
 		return fmt.Errorf("failed to add shop item: %w", err)
 	}

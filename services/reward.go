@@ -4,26 +4,27 @@ import (
 	"fmt"
 	"terminal-sh/database"
 	"terminal-sh/models"
+	"terminal-sh/patch"
 
 	"github.com/google/uuid"
 )
 
 // RewardService handles granting rewards for mission completion
 type RewardService struct {
-	db                *database.Database
-	userService       *UserService
-	toolService       *ToolService
-	patchService      *PatchService
+	db                 *database.Database
+	userService        *UserService
+	toolService        *ToolService
+	upgradeService     *UpgradeService
 	achievementService *AchievementService
 }
 
 // NewRewardService creates a new RewardService
-func NewRewardService(db *database.Database, userService *UserService, toolService *ToolService, patchService *PatchService, achievementService *AchievementService) *RewardService {
+func NewRewardService(db *database.Database, userService *UserService, toolService *ToolService, upgradeService *UpgradeService, achievementService *AchievementService) *RewardService {
 	return &RewardService{
-		db:                db,
-		userService:       userService,
-		toolService:       toolService,
-		patchService:      patchService,
+		db:                 db,
+		userService:        userService,
+		toolService:        toolService,
+		upgradeService:     upgradeService,
 		achievementService: achievementService,
 	}
 }
@@ -36,7 +37,7 @@ func (s *RewardService) GrantRewards(userID uuid.UUID, rewards models.MissionRew
 			return fmt.Errorf("failed to grant experience: %w", err)
 		}
 	}
-	
+
 	// Grant cryptocurrency
 	if rewards.Crypto > 0 {
 		user, err := s.userService.GetUserByID(userID)
@@ -48,7 +49,7 @@ func (s *RewardService) GrantRewards(userID uuid.UUID, rewards models.MissionRew
 			return fmt.Errorf("failed to grant crypto: %w", err)
 		}
 	}
-	
+
 	// Grant tools
 	for _, toolName := range rewards.Tools {
 		tool, err := s.toolService.GetToolByName(toolName)
@@ -65,20 +66,29 @@ func (s *RewardService) GrantRewards(userID uuid.UUID, rewards models.MissionRew
 			continue
 		}
 	}
-	
-	// Grant patches
-	for _, patchName := range rewards.Patches {
-		patch, err := s.patchService.GetPatchByName(patchName)
-		if err != nil {
-			// Patch might not exist yet, skip
+
+	// Grant tool upgrades (free upgrades as mission rewards)
+	for _, upgradeReward := range rewards.ToolUpgrades {
+		// Check if user owns the tool
+		if !s.toolService.UserHasTool(userID, upgradeReward.ToolName) {
 			continue
 		}
-		if err := s.patchService.GrantPatchToUser(userID, patch.ID); err != nil {
-			// Patch might already be owned, continue
+
+		// Parse upgrade type
+		upgradeType, valid := patch.ParseUpgradeType(upgradeReward.UpgradeType)
+		if !valid {
 			continue
+		}
+
+		// Apply the upgrade(s) for free
+		for i := 0; i < upgradeReward.Count; i++ {
+			if err := s.upgradeService.ApplyFreeUpgrade(userID, upgradeReward.ToolName, upgradeType); err != nil {
+				// Upgrade might fail (e.g., at max level), continue
+				break
+			}
 		}
 	}
-	
+
 	// Grant achievements
 	for _, achievementName := range rewards.Achievements {
 		if err := s.achievementService.UnlockAchievement(userID, achievementName); err != nil {
@@ -86,6 +96,6 @@ func (s *RewardService) GrantRewards(userID uuid.UUID, rewards models.MissionRew
 			continue
 		}
 	}
-	
+
 	return nil
 }

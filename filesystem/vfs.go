@@ -543,8 +543,6 @@ func (vfs *VFS) InitializeSystemCommands() {
 		"ssh":             "Connect to a server",
 		"exit":            "Disconnect from server",
 		"server":          "Show current server info",
-		"createServer":    "Create a new server",
-		"createLocalServer": "Create local server",
 		"get":             "Download tool from server",
 		"tools":           "List owned tools",
 		"exploited":       "List exploited servers",

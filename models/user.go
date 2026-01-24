@@ -39,14 +39,13 @@ type User struct {
 	UpdatedAt       time.Time  `json:"updated_at"`
 	
 	// Relationships
-	Tools           []Tool           `gorm:"many2many:user_tools;" json:"tools,omitempty"`
-	ToolStates      []UserToolState  `gorm:"foreignKey:UserID" json:"tool_states,omitempty"`
-	Purchases       []UserPurchase   `gorm:"foreignKey:UserID" json:"purchases,omitempty"`
-	OwnedPatches    []UserPatch      `gorm:"foreignKey:UserID" json:"owned_patches,omitempty"`
-	Achievements    []UserAchievement `gorm:"foreignKey:UserID" json:"achievements,omitempty"`
+	Tools            []Tool            `gorm:"many2many:user_tools;" json:"tools,omitempty"`
+	ToolStates       []UserToolState   `gorm:"foreignKey:UserID" json:"tool_states,omitempty"`
+	Purchases        []UserPurchase    `gorm:"foreignKey:UserID" json:"purchases,omitempty"`
+	Achievements     []UserAchievement `gorm:"foreignKey:UserID" json:"achievements,omitempty"`
 	ExploitedServers []ExploitedServer `gorm:"foreignKey:UserID" json:"exploited_servers,omitempty"`
-	ActiveMiners    []ActiveMiner     `gorm:"foreignKey:UserID" json:"active_miners,omitempty"`
-	Sessions        []Session         `gorm:"foreignKey:UserID" json:"sessions,omitempty"`
+	ActiveMiners     []ActiveMiner     `gorm:"foreignKey:UserID" json:"active_miners,omitempty"`
+	Sessions         []Session         `gorm:"foreignKey:UserID" json:"sessions,omitempty"`
 }
 
 // BeforeCreate is a GORM hook that generates a UUID for the user if one doesn't exist.

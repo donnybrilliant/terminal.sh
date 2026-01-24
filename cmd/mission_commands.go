@@ -153,8 +153,12 @@ func (h *CommandHandler) handleMissionView(missionID string) *CommandResult {
 	if len(rewards.Tools) > 0 {
 		output.WriteString(ui.FormatListBullet(fmt.Sprintf("Tools: %s", strings.Join(rewards.Tools, ", "))))
 	}
-	if len(rewards.Patches) > 0 {
-		output.WriteString(ui.FormatListBullet(fmt.Sprintf("Patches: %s", strings.Join(rewards.Patches, ", "))))
+	if len(rewards.ToolUpgrades) > 0 {
+		upgrades := []string{}
+		for _, u := range rewards.ToolUpgrades {
+			upgrades = append(upgrades, fmt.Sprintf("%s +%d %s", u.ToolName, u.Count, u.UpgradeType))
+		}
+		output.WriteString(ui.FormatListBullet(fmt.Sprintf("Tool Upgrades: %s", strings.Join(upgrades, ", "))))
 	}
 	if len(rewards.Achievements) > 0 {
 		output.WriteString(ui.FormatListBullet(fmt.Sprintf("Achievements: %s", strings.Join(rewards.Achievements, ", "))))
@@ -204,8 +208,12 @@ func (h *CommandHandler) handleMissionComplete(missionID string) *CommandResult 
 	if len(rewards.Tools) > 0 {
 		output.WriteString(ui.FormatListBullet(ui.SuccessStyleNoBold.Render(fmt.Sprintf("Tools unlocked: %s", strings.Join(rewards.Tools, ", ")))))
 	}
-	if len(rewards.Patches) > 0 {
-		output.WriteString(ui.FormatListBullet(ui.SuccessStyleNoBold.Render(fmt.Sprintf("Patches unlocked: %s", strings.Join(rewards.Patches, ", ")))))
+	if len(rewards.ToolUpgrades) > 0 {
+		upgrades := []string{}
+		for _, u := range rewards.ToolUpgrades {
+			upgrades = append(upgrades, fmt.Sprintf("%s +%d %s", u.ToolName, u.Count, u.UpgradeType))
+		}
+		output.WriteString(ui.FormatListBullet(ui.SuccessStyleNoBold.Render(fmt.Sprintf("Tool upgrades applied: %s", strings.Join(upgrades, ", ")))))
 	}
 	if len(rewards.Achievements) > 0 {
 		output.WriteString(ui.FormatListBullet(ui.SuccessStyleNoBold.Render(fmt.Sprintf("Achievements unlocked: %s", strings.Join(rewards.Achievements, ", ")))))

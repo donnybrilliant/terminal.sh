@@ -81,8 +81,6 @@ func (db *Database) Migrate() error {
 		&models.Shop{},
 		&models.ShopItem{},
 		&models.UserPurchase{},
-		&models.Patch{},
-		&models.UserPatch{},
 		&models.Server{},
 		&models.UserAchievement{},
 		&models.ExploitedServer{},
@@ -92,11 +90,13 @@ func (db *Database) Migrate() error {
 		&models.ChatMessage{},
 		&models.ChatRoomMember{},
 		&models.UserMission{},
+		&models.GeneratedMission{},
+		&models.ProceduralServer{},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to auto-migrate: %w", err)
 	}
-	
+
 	return nil
 }
 

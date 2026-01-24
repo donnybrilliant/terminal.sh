@@ -17,13 +17,20 @@ type MissionObjective struct {
 	Hint        string `json:"hint,omitempty"`          // Tutorial-like hint explaining how to complete this objective
 }
 
+// ToolUpgradeReward represents a free upgrade granted as a mission reward.
+type ToolUpgradeReward struct {
+	ToolName    string `json:"tool"`  // Tool to upgrade (e.g., "sql_injector")
+	UpgradeType string `json:"type"`  // Type of upgrade: "exploit", "cpu", "ram", "bandwidth"
+	Count       int    `json:"count"` // How many free upgrades to grant
+}
+
 // MissionRewards represents rewards for completing a mission
 type MissionRewards struct {
-	Experience   int      `json:"experience"`
-	Crypto       float64  `json:"crypto"`
-	Tools        []string `json:"tools,omitempty"`        // Tools to unlock
-	Patches      []string `json:"patches,omitempty"`     // Patches to unlock
-	Achievements []string `json:"achievements,omitempty"` // Achievements to unlock
+	Experience   int                 `json:"experience"`
+	Crypto       float64             `json:"crypto"`
+	Tools        []string            `json:"tools,omitempty"`         // Tools to unlock
+	ToolUpgrades []ToolUpgradeReward `json:"tool_upgrades,omitempty"` // Free upgrades to grant
+	Achievements []string            `json:"achievements,omitempty"`  // Achievements to unlock
 }
 
 // Mission represents a story mission definition

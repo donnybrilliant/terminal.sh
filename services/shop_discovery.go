@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"terminal-sh/filesystem"
 	"terminal-sh/models"
 
 	"github.com/google/uuid"
@@ -11,19 +12,17 @@ import (
 
 // ShopDiscovery handles shop discovery logic, automatically creating shops on servers when discovered.
 type ShopDiscovery struct {
-	shopService    *ShopService
-	serverService  *ServerService
-	patchService   *PatchService
-	toolService    *ToolService
+	shopService   *ShopService
+	serverService *ServerService
+	toolService   *ToolService
 }
 
 // NewShopDiscovery creates a new ShopDiscovery service with the provided dependencies.
-func NewShopDiscovery(shopService *ShopService, serverService *ServerService, patchService *PatchService, toolService *ToolService) *ShopDiscovery {
+func NewShopDiscovery(shopService *ShopService, serverService *ServerService, toolService *ToolService) *ShopDiscovery {
 	return &ShopDiscovery{
 		shopService:   shopService,
 		serverService: serverService,
-		patchService:  patchService,
-		toolService:  toolService,
+		toolService:   toolService,
 	}
 }
 
@@ -62,60 +61,19 @@ func (s *ShopDiscovery) FindShopFiles(serverIP string) (*models.Shop, error) {
 	return nil, fmt.Errorf("shop metadata file not found")
 }
 
-// findShopMetadataInFilesystem searches for shop metadata in filesystem structure
-func (s *ShopDiscovery) findShopMetadataInFilesystem(filesystem map[string]interface{}) (string, bool) {
-	// Look for shop.json in common locations
+// findShopMetadataInFilesystem searches for shop metadata in filesystem structure using FileReader.
+func (s *ShopDiscovery) findShopMetadataInFilesystem(fs map[string]interface{}) (string, bool) {
+	reader := filesystem.NewMapFileReader(fs)
 	locations := []string{"shop.json", "shop_config.json", "etc/shop.json", "var/shop.json"}
 
 	for _, location := range locations {
-		if content := s.getFileContent(filesystem, location); content != "" {
+		content, err := reader.ReadFile(location)
+		if err == nil && content != "" {
 			return content, true
 		}
 	}
 
 	return "", false
-}
-
-// getFileContent extracts file content from filesystem structure
-func (s *ShopDiscovery) getFileContent(filesystem map[string]interface{}, path string) string {
-	// Simple path traversal - split by /
-	parts := []string{}
-	current := ""
-	for _, char := range path {
-		if char == '/' {
-			if current != "" {
-				parts = append(parts, current)
-				current = ""
-			}
-		} else {
-			current += string(char)
-		}
-	}
-	if current != "" {
-		parts = append(parts, current)
-	}
-
-	// Traverse filesystem
-	currentLevel := filesystem
-	for i, part := range parts {
-		if i == len(parts)-1 {
-			// Last part - should be file
-			if file, ok := currentLevel[part].(map[string]interface{}); ok {
-				if content, ok := file["content"].(string); ok {
-					return content
-				}
-			}
-		} else {
-			// Directory
-			if dir, ok := currentLevel[part].(map[string]interface{}); ok {
-				currentLevel = dir
-			} else {
-				return ""
-			}
-		}
-	}
-
-	return ""
 }
 
 // ParseShopMetadata parses shop metadata from JSON content

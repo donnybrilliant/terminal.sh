@@ -58,6 +58,7 @@ type BubbleTeaBridge struct {
 
 	gradientTickerRunning bool
 	asciiTickerRunning    bool
+	progressTickerRunning bool
 }
 
 // NewBubbleTeaBridge creates a new bridge between Bubble Tea and WebSocket
@@ -432,6 +433,11 @@ func (b *BubbleTeaBridge) processMessages() {
 					b.asciiTickerRunning = true
 					go b.runASCIITicker(shell)
 				}
+				// If progress bar is active, start a bridge-side ticker
+				if shell.IsProgressActive() && !b.progressTickerRunning {
+					b.progressTickerRunning = true
+					go b.runProgressTicker(shell)
+				}
 			}
 			
 			// Render based on mode
@@ -644,6 +650,38 @@ func (b *BubbleTeaBridge) runASCIITicker(shell *terminal.ShellModel) {
 			}
 			select {
 			case b.msgChan <- terminal.ASCIIAnimationTickMsg{}:
+			case <-b.done:
+				return
+			default:
+				// Drop tick if channel is full; next tick will try again.
+			}
+		}
+	}
+}
+
+// runProgressTicker injects progress tick messages while a progress operation is active.
+// This ensures web sessions display animated progress bars like SSH.
+func (b *BubbleTeaBridge) runProgressTicker(shell *terminal.ShellModel) {
+	ticker := time.NewTicker(50 * time.Millisecond) // Update progress every 50ms
+	defer ticker.Stop()
+	defer func() { b.progressTickerRunning = false }()
+
+	for {
+		select {
+		case <-b.done:
+			return
+		case <-ticker.C:
+			// Check if we're still in shell mode
+			currentShell := b.getShellModel()
+			if currentShell == nil || currentShell != shell {
+				// Model changed, stop ticker
+				return
+			}
+			if !shell.IsProgressActive() {
+				return
+			}
+			select {
+			case b.msgChan <- terminal.ProgressTickMsg{}:
 			case <-b.done:
 				return
 			default:

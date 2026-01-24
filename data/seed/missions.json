@@ -50,7 +50,7 @@
           "type": "use_tool",
           "description": "Use phishing_kit on target server",
           "tool": "phishing_kit",
-          "hint": "First, exploit a server with HTTP services. Then use `phishing_kit \u003ctargetIP\u003e` to create a phishing campaign. This tool generates realistic-looking emails and sites to gather credentials. You'll receive this tool as a reward when you complete this mission!"
+          "hint": "First, exploit a server with HTTP services. Then use `phishing_kit <targetIP>` to create a phishing campaign. This tool generates realistic-looking emails and sites to gather credentials. You'll receive this tool as a reward when you complete this mission!"
         }
       ],
       "rewards": {
@@ -87,7 +87,7 @@
           "type": "use_tool",
           "description": "Use database_dumper to extract data",
           "tool": "database_dumper",
-          "hint": "First, find a server with HTTP services and SQL injection vulnerabilities. Use `sql_injector \u003ctargetIP\u003e` to exploit it. Then use `database_dumper \u003ctargetIP\u003e` to extract all database contents. This tool dumps entire databases - perfect for data heists! You'll receive this tool as a reward."
+          "hint": "First, find a server with HTTP services and SQL injection vulnerabilities. Use `sql_injector <targetIP>` to exploit it. Then use `database_dumper <targetIP>` to extract all database contents. This tool dumps entire databases - perfect for data heists! You'll receive this tool as a reward."
         }
       ],
       "rewards": {
@@ -96,8 +96,8 @@
         "tools": [
           "database_dumper"
         ],
-        "patches": [
-          "sql_injector_stealth"
+        "tool_upgrades": [
+          {"tool": "sql_injector", "type": "exploit", "count": 2}
         ],
         "achievements": [
           "data_thief"
@@ -128,14 +128,14 @@
           "type": "use_tool",
           "description": "Use log_cleaner on audit server",
           "tool": "log_cleaner",
-          "hint": "Find and exploit the audit server first. Then use `log_cleaner \u003ctargetIP\u003e` to delete and clear all system logs. This removes evidence of your activities. You'll receive this tool as a reward!"
+          "hint": "Find and exploit the audit server first. Then use `log_cleaner <targetIP>` to delete and clear all system logs. This removes evidence of your activities. You'll receive this tool as a reward!"
         },
         {
           "id": 2,
           "type": "use_tool",
           "description": "Use timestomper to modify file timestamps",
           "tool": "timestomper",
-          "hint": "After clearing logs, use `timestomper \u003ctargetIP\u003e` on the same audit server. This modifies file timestamps to make forensic analysis harder. Combined with log_cleaner, you'll be nearly untraceable! You'll receive this tool as a reward."
+          "hint": "After clearing logs, use `timestomper <targetIP>` on the same audit server. This modifies file timestamps to make forensic analysis harder. Combined with log_cleaner, you'll be nearly untraceable! You'll receive this tool as a reward."
         }
       ],
       "rewards": {
@@ -145,8 +145,9 @@
           "log_cleaner",
           "timestomper"
         ],
-        "patches": [
-          "stealth_patch_v1"
+        "tool_upgrades": [
+          {"tool": "sql_injector", "type": "cpu", "count": 1},
+          {"tool": "database_dumper", "type": "exploit", "count": 1}
         ],
         "achievements": [
           "ghost_in_the_machine"

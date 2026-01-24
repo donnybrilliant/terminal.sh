@@ -112,8 +112,8 @@ func (s *ShopService) PurchaseItem(userID uuid.UUID, shopID uuid.UUID, itemID uu
 	case models.ItemTypeTool:
 		// Tool will be added via tool service
 		return nil
-	case models.ItemTypePatch:
-		// Patch will be added via patch service
+	case models.ItemTypeUpgradeToken:
+		// Upgrade token - will be applied via upgrade service
 		return nil
 	case models.ItemTypeResource:
 		// Resource upgrade

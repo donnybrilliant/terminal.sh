@@ -43,9 +43,9 @@ func (s *Shop) BeforeCreate(tx *gorm.DB) error {
 type ItemType string
 
 const (
-	ItemTypeTool     ItemType = "tool"     // Hacking tool
-	ItemTypePatch    ItemType = "patch"    // Tool upgrade patch
-	ItemTypeResource ItemType = "resource" // Resource upgrade
+	ItemTypeTool         ItemType = "tool"          // Hacking tool
+	ItemTypeUpgradeToken ItemType = "upgrade_token" // Tool upgrade token (exploit, cpu, ram, bandwidth)
+	ItemTypeResource     ItemType = "resource"      // Resource upgrade (CPU/RAM/Bandwidth for user)
 )
 
 // ShopItem represents an item for sale in a shop.

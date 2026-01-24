@@ -72,6 +72,18 @@ type ShellModel struct {
 	// In-app scrollback state
 	scrollOffset    int  // Lines scrolled up from bottom (0 = at bottom)
 	isScrolledUp    bool // True if user has scrolled up (shows indicator)
+
+	// Progress bar state
+	activeProgress    *progressState // Currently active progress operation
+}
+
+// progressState tracks an active progress bar operation
+type progressState struct {
+	ID        string
+	Message   string
+	StartTime time.Time
+	Duration  time.Duration
+	Progress  float64 // 0.0 to 1.0
 }
 
 // ShellContext represents a shell session context
@@ -296,6 +308,14 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Scroll down through history
 			m.scrollDown(m.height / 2) // Half page at a time
 			return m, nil
+		case "ctrl+u":
+			// Scroll up through history (terminal-style)
+			m.scrollUp(m.height / 2) // Half page at a time
+			return m, nil
+		case "ctrl+d":
+			// Scroll down through history (terminal-style)
+			m.scrollDown(m.height / 2) // Half page at a time
+			return m, nil
 		case "home":
 			// Scroll to top of history (only if ctrl is held for home)
 			// Regular home goes to start of input line
@@ -517,7 +537,82 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case LogoutMsg:
 		// Return to login screen
 		return m.handleLogout()
+	case ProgressStartMsg:
+		// Start a progress bar operation
+		m.activeProgress = &progressState{
+			ID:        msg.ID,
+			Message:   msg.Message,
+			StartTime: time.Now(),
+			Duration:  msg.Duration,
+			Progress:  0.0,
+		}
+		// Start the progress ticker
+		return m, m.nextProgressTick()
+	case ProgressTickMsg:
+		// Update progress bar - ID check is optional since we only have one progress at a time
+		if m.activeProgress != nil {
+			// Only check ID if it's provided (not empty)
+			if msg.ID != "" && m.activeProgress.ID != msg.ID {
+				return m, nil
+			}
+			elapsed := time.Since(m.activeProgress.StartTime)
+			m.activeProgress.Progress = float64(elapsed) / float64(m.activeProgress.Duration)
+			if m.activeProgress.Progress > 1.0 {
+				m.activeProgress.Progress = 1.0
+			}
+			// Continue ticking if not complete
+			if m.activeProgress.Progress < 1.0 {
+				return m, m.nextProgressTick()
+			}
+		}
+		return m, nil
+	case ProgressCompleteMsg:
+		// Progress operation completed
+		if m.activeProgress != nil && m.activeProgress.ID == msg.ID {
+			m.activeProgress = nil
+		}
+		// Process the result like a normal command result
+		if msg.Result != nil {
+			return m.Update(CommandResultMsg{Result: msg.Result})
+		}
+		return m, nil
 	case CommandResultMsg:
+		// Handle progress operation trigger
+		if msg.Result.StartProgress != nil {
+			req := msg.Result.StartProgress
+			// Clear input but keep command pending (we're still waiting for the operation)
+			m.textInput.SetValue("")
+			m.commandPending = true // Still waiting for the operation
+			m.showWelcome = false
+			
+			// Start the progress bar and run the operation in background
+			duration := time.Duration(req.Duration * float64(time.Second))
+			operationID := req.ID
+			operation := req.Operation
+			
+			return m, tea.Batch(
+				// Start progress bar
+				func() tea.Msg {
+					return ProgressStartMsg{
+						ID:       operationID,
+						Message:  req.Message,
+						Duration: duration,
+					}
+				},
+				// Run the actual operation in background
+				func() tea.Msg {
+					// Wait for the duration to let progress bar animate
+					time.Sleep(duration)
+					// Execute the actual operation
+					result := operation()
+					return ProgressCompleteMsg{
+						ID:     operationID,
+						Result: result,
+					}
+				},
+			)
+		}
+
 		// Handle ASCII animation trigger
 		if msg.Result.StartASCIIAnimation != nil {
 			req := msg.Result.StartASCIIAnimation
@@ -906,7 +1001,7 @@ func (m *ShellModel) renderScrollIndicator(totalLines, startLine, viewportHeight
 		Padding(0, 1)
 	
 	// Show lines range and scroll hint
-	indicator := fmt.Sprintf("↑ lines %d-%d of %d (PgUp/PgDn to scroll, End to return)", 
+	indicator := fmt.Sprintf("↑ lines %d-%d of %d (PgUp/PgDn or Ctrl+U/Ctrl+D to scroll, End to return)", 
 		startLine+1, endLine, totalLines)
 	
 	return indicatorStyle.Render(indicator)
@@ -1027,6 +1122,14 @@ func (m *ShellModel) GetViewContent() string {
 			outputText := strings.TrimSuffix(entry.output, "\n")
 			outputLines := strings.Split(outputText, "\n")
 			contentLines = append(contentLines, outputLines...)
+		}
+	}
+
+	// Add progress bar if active (after history but before prompt)
+	if m.activeProgress != nil {
+		progressBar := m.GetProgressBar()
+		if progressBar != "" {
+			contentLines = append(contentLines, ui.InfoStyle.Render(progressBar))
 		}
 	}
 
@@ -1207,6 +1310,24 @@ type PasteTextMsg struct {
 	Text string
 }
 
+// ProgressStartMsg signals the start of a progress bar operation
+type ProgressStartMsg struct {
+	ID       string        // Unique identifier for this operation
+	Message  string        // Message to display (e.g., "Downloading password_cracker...")
+	Duration time.Duration // Total duration for the operation
+}
+
+// ProgressTickMsg signals a progress bar update
+type ProgressTickMsg struct {
+	ID string // Which operation to update
+}
+
+// ProgressCompleteMsg signals a progress bar operation completed
+type ProgressCompleteMsg struct {
+	ID     string          // Which operation completed
+	Result *cmd.CommandResult // The result of the operation
+}
+
 // getCommandMatches returns commands that start with the given prefix
 func (m *ShellModel) getCommandMatches(prefix string) []string {
 	// Built-in commands (from cmd/commands.go)
@@ -1214,7 +1335,7 @@ func (m *ShellModel) getCommandMatches(prefix string) []string {
 	builtInCommands := []string{
 		"pwd", "ls", "cd", "cat", "clear", "help", "chat", "tutorial",
 		"login", "logout", "register", "userinfo", "info", "whoami", "name",
-		"ifconfig", "scan", "server", "createServer", "createLocalServer",
+		"ifconfig", "scan", "server",
 		"ssh", "exit", "get", "tools", "exploited", "shop", "buy",
 		"patches", "patch", "crypto_miner", "stop_mining", "miners", "wallet",
 		"touch", "mkdir", "rm", "cp", "mv", "edit", "vi", "nano",
@@ -1378,6 +1499,51 @@ func (m *ShellModel) nextASCIIAnimationTick() tea.Cmd {
 	return tea.Tick(ui.ASCIIGradientFrameDelay, func(time.Time) tea.Msg {
 		return ASCIIAnimationTickMsg{}
 	})
+}
+
+// nextProgressTick schedules the next progress bar update
+func (m *ShellModel) nextProgressTick() tea.Cmd {
+	if m.activeProgress == nil {
+		return nil
+	}
+	return tea.Tick(50*time.Millisecond, func(time.Time) tea.Msg {
+		return ProgressTickMsg{ID: m.activeProgress.ID}
+	})
+}
+
+// IsProgressActive returns true if a progress bar is currently active
+func (m *ShellModel) IsProgressActive() bool {
+	return m.activeProgress != nil
+}
+
+// GetProgressBar returns the current progress bar string for rendering
+func (m *ShellModel) GetProgressBar() string {
+	if m.activeProgress == nil {
+		return ""
+	}
+	
+	progress := m.activeProgress.Progress
+	if progress > 1.0 {
+		progress = 1.0
+	}
+	if progress < 0 {
+		progress = 0
+	}
+	
+	width := 50
+	filled := int(float64(width) * progress)
+	empty := width - filled
+	
+	bar := ""
+	for i := 0; i < filled; i++ {
+		bar += "█"
+	}
+	for i := 0; i < empty; i++ {
+		bar += "░"
+	}
+	
+	percentage := int(progress * 100)
+	return fmt.Sprintf("%s [%s] %d%%", m.activeProgress.Message, bar, percentage)
 }
 
 // refreshGradientFrames rebuilds the gradient frames for the current viewport.

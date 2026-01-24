@@ -330,10 +330,10 @@ func (g *MissionGenerator) calculateRewards(level int, missionType string, objec
 	}
 
 	rewards := models.MissionRewards{
-		Experience: experience,
-		Crypto:     crypto,
-		Tools:      []string{},
-		Patches:    []string{},
+		Experience:   experience,
+		Crypto:       crypto,
+		Tools:        []string{},
+		ToolUpgrades: []models.ToolUpgradeReward{},
 		Achievements: []string{},
 	}
 

@@ -72,7 +72,10 @@ func StartServer(cfg *config.Config, db *database.Database, chatService *service
 				// After login, transition to shell
 				// Note: We don't use tea.WithAltScreen() because we want scrollback history in shell
 				// Enable mouse support for scroll wheel
-				return model, []tea.ProgramOption{tea.WithMouseCellMotion()}
+				return model, []tea.ProgramOption{
+					tea.WithAltScreen(),
+					tea.WithMouseAllMotion(),
+				}
 			}),
 		),
 		// No authentication callbacks = no SSH auth required

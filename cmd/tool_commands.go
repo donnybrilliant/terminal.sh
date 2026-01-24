@@ -9,13 +9,66 @@ import (
 	"time"
 )
 
-// showExploitProgress shows a progress bar for exploitation
-func (h *CommandHandler) showExploitProgress(toolName, targetIP string) {
-	if h.progressService != nil && h.user != nil {
-		duration := h.progressService.CalculateOperationTime(services.OperationExploit, h.user.Resources)
-		durationSeconds := time.Duration(duration * float64(time.Second))
-		
-		showProgressBar(fmt.Sprintf("Exploiting %s with %s...", targetIP, toolName), durationSeconds)
+// getExploitDuration calculates the duration for an exploit operation based on user resources and tool resources
+func (h *CommandHandler) getExploitDuration(toolName string) float64 {
+	if h.progressService == nil || h.user == nil {
+		return 2.0 // default 2 seconds
+	}
+	
+	// Try to get the user's tool state with effective resources (includes upgrades)
+	toolResources := h.getToolEffectiveResources(toolName)
+	
+	// Use the combined calculation if we have tool resources
+	if toolResources.CPU > 0 || toolResources.Bandwidth > 0 || toolResources.RAM > 0 {
+		return h.progressService.CalculateToolOperationTime(services.OperationExploit, h.user.Resources, toolResources)
+	}
+	
+	// Fallback to user-only calculation
+	return h.progressService.CalculateOperationTime(services.OperationExploit, h.user.Resources)
+}
+
+// getToolEffectiveResources gets the effective resources for a tool (including upgrades)
+func (h *CommandHandler) getToolEffectiveResources(toolName string) models.ToolResources {
+	if h.user == nil || h.db == nil {
+		return models.ToolResources{}
+	}
+	
+	// First, try to get the user's tool state (which has effective resources from upgrades)
+	var toolState models.UserToolState
+	if err := h.db.Preload("Tool").
+		Where("user_id = ?", h.user.ID).
+		Joins("JOIN tools ON tools.id = user_tool_states.tool_id").
+		Where("tools.name = ?", toolName).
+		First(&toolState).Error; err == nil {
+		// Return effective resources if they exist
+		if toolState.EffectiveResources.CPU > 0 || toolState.EffectiveResources.Bandwidth > 0 || toolState.EffectiveResources.RAM > 0 {
+			return toolState.EffectiveResources
+		}
+		// Fall back to base tool resources
+		return toolState.Tool.Resources
+	}
+	
+	// If no tool state, try to get the base tool resources
+	var tool models.Tool
+	if err := h.db.Where("name = ?", toolName).First(&tool).Error; err == nil {
+		return tool.Resources
+	}
+	
+	return models.ToolResources{}
+}
+
+// createExploitProgressResult creates a CommandResult with async progress for exploits
+func (h *CommandHandler) createExploitProgressResult(toolName, targetIP string, operation func() *CommandResult) *CommandResult {
+	duration := h.getExploitDuration(toolName)
+	operationID := fmt.Sprintf("exploit-%s-%s-%d", toolName, targetIP, time.Now().UnixNano())
+	
+	return &CommandResult{
+		StartProgress: &ProgressOperationRequest{
+			ID:        operationID,
+			Message:   fmt.Sprintf("Exploiting %s with %s...", targetIP, toolName),
+			Duration:  duration,
+			Operation: operation,
+		},
 	}
 }
 
@@ -83,13 +136,13 @@ func (h *CommandHandler) handlePasswordCracker(args []string) *CommandResult {
 
 	targetIP := args[0]
 	
-	// Get server
+	// Get server - validate before starting progress
 	server, err := h.serverService.GetServerByIP(targetIP)
 	if err != nil {
 		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
 	}
 
-	// Find SSH service
+	// Find SSH service - validate before starting progress
 	var sshService *models.Service
 	for i := range server.Services {
 		if server.Services[i].Name == "ssh" {
@@ -102,24 +155,29 @@ func (h *CommandHandler) handlePasswordCracker(args []string) *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("SSH service not found on server")}
 	}
 
-	// Exploit the server
+	// Calculate server path
 	serverPath := targetIP
 	if h.currentServerPath != "" {
 		serverPath = h.currentServerPath + ".localNetwork." + targetIP
 	}
 
-	h.showExploitProgress("password_cracker", targetIP)
+	// Capture variables for the closure
+	exploitService := h.exploitationService
+	userService := h.userService
+	userID := h.user.ID
 
-	if err := h.exploitationService.ExploitServer(h.user.ID, serverPath, "password_cracker", "ssh"); err != nil {
-		return &CommandResult{Error: err}
-	}
+	return h.createExploitProgressResult("password_cracker", targetIP, func() *CommandResult {
+		if err := exploitService.ExploitServer(userID, serverPath, "password_cracker", "ssh"); err != nil {
+			return &CommandResult{Error: err}
+		}
 
-	// Add experience
-	h.userService.AddExperience(h.user.ID, 10)
+		// Add experience
+		userService.AddExperience(userID, 10)
 
-	var output strings.Builder
-	output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited SSH service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using password_cracker") + "\n")
-	return &CommandResult{Output: output.String()}
+		var output strings.Builder
+		output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited SSH service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using password_cracker") + "\n")
+		return &CommandResult{Output: output.String()}
+	})
 }
 
 func (h *CommandHandler) handleSSHExploit(args []string) *CommandResult {
@@ -129,13 +187,13 @@ func (h *CommandHandler) handleSSHExploit(args []string) *CommandResult {
 
 	targetIP := args[0]
 	
-	// Get server
+	// Get server - validate before starting progress
 	server, err := h.serverService.GetServerByIP(targetIP)
 	if err != nil {
 		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
 	}
 
-	// Find SSH service
+	// Find SSH service - validate before starting progress
 	var sshService *models.Service
 	for i := range server.Services {
 		if server.Services[i].Name == "ssh" {
@@ -148,24 +206,29 @@ func (h *CommandHandler) handleSSHExploit(args []string) *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("SSH service not found on server")}
 	}
 
-	// Exploit the server
+	// Calculate server path
 	serverPath := targetIP
 	if h.currentServerPath != "" {
 		serverPath = h.currentServerPath + ".localNetwork." + targetIP
 	}
 
-	h.showExploitProgress("ssh_exploit", targetIP)
+	// Capture variables for the closure
+	exploitService := h.exploitationService
+	userService := h.userService
+	userID := h.user.ID
 
-	if err := h.exploitationService.ExploitServer(h.user.ID, serverPath, "ssh_exploit", "ssh"); err != nil {
-		return &CommandResult{Error: err}
-	}
+	return h.createExploitProgressResult("ssh_exploit", targetIP, func() *CommandResult {
+		if err := exploitService.ExploitServer(userID, serverPath, "ssh_exploit", "ssh"); err != nil {
+			return &CommandResult{Error: err}
+		}
 
-	// Add experience
-	h.userService.AddExperience(h.user.ID, 15)
+		// Add experience
+		userService.AddExperience(userID, 15)
 
-	var output strings.Builder
-	output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited SSH service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using ssh_exploit") + "\n")
-	return &CommandResult{Output: output.String()}
+		var output strings.Builder
+		output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited SSH service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using ssh_exploit") + "\n")
+		return &CommandResult{Output: output.String()}
+	})
 }
 
 func (h *CommandHandler) handleUserEnum(args []string) *CommandResult {
@@ -273,7 +336,7 @@ func (h *CommandHandler) handleExploitKit(args []string) *CommandResult {
 
 	targetIP := args[0]
 	
-	// Get server
+	// Get server - validate before starting progress
 	server, err := h.serverService.GetServerByIP(targetIP)
 	if err != nil {
 		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
@@ -284,28 +347,34 @@ func (h *CommandHandler) handleExploitKit(args []string) *CommandResult {
 		serverPath = h.currentServerPath + ".localNetwork." + targetIP
 	}
 
-	h.showExploitProgress("exploit_kit", targetIP)
+	// Capture variables for the closure
+	exploitService := h.exploitationService
+	userService := h.userService
+	userID := h.user.ID
+	services := server.Services
 
-	// Try to exploit all vulnerable services
-	exploitedCount := 0
-	for _, service := range server.Services {
-		if service.Vulnerable {
-			if err := h.exploitationService.ExploitServer(h.user.ID, serverPath, "exploit_kit", service.Name); err == nil {
-				exploitedCount++
+	return h.createExploitProgressResult("exploit_kit", targetIP, func() *CommandResult {
+		// Try to exploit all vulnerable services
+		exploitedCount := 0
+		for _, service := range services {
+			if service.Vulnerable {
+				if err := exploitService.ExploitServer(userID, serverPath, "exploit_kit", service.Name); err == nil {
+					exploitedCount++
+				}
 			}
 		}
-	}
 
-	if exploitedCount == 0 {
-		return &CommandResult{Error: fmt.Errorf("no vulnerabilities could be exploited")}
-	}
+		if exploitedCount == 0 {
+			return &CommandResult{Error: fmt.Errorf("no vulnerabilities could be exploited")}
+		}
 
-	// Add experience
-	h.userService.AddExperience(h.user.ID, exploitedCount*10)
+		// Add experience
+		userService.AddExperience(userID, exploitedCount*10)
 
-	var output strings.Builder
-	output.WriteString(ui.SuccessStyle.Render(fmt.Sprintf("✅ Successfully exploited %d service(s) on ", exploitedCount)) + formatIP(targetIP) + ui.SuccessStyle.Render(" using exploit_kit") + "\n")
-	return &CommandResult{Output: output.String()}
+		var output strings.Builder
+		output.WriteString(ui.SuccessStyle.Render(fmt.Sprintf("✅ Successfully exploited %d service(s) on ", exploitedCount)) + formatIP(targetIP) + ui.SuccessStyle.Render(" using exploit_kit") + "\n")
+		return &CommandResult{Output: output.String()}
+	})
 }
 
 func (h *CommandHandler) handlePasswordSniffer(args []string) *CommandResult {
@@ -347,7 +416,7 @@ func (h *CommandHandler) handleAdvancedExploitKit(args []string) *CommandResult 
 
 	targetIP := args[0]
 	
-	// Get server
+	// Get server - validate before starting progress
 	server, err := h.serverService.GetServerByIP(targetIP)
 	if err != nil {
 		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
@@ -358,28 +427,34 @@ func (h *CommandHandler) handleAdvancedExploitKit(args []string) *CommandResult 
 		serverPath = h.currentServerPath + ".localNetwork." + targetIP
 	}
 
-	h.showExploitProgress("advanced_exploit_kit", targetIP)
+	// Capture variables for the closure
+	exploitService := h.exploitationService
+	userService := h.userService
+	userID := h.user.ID
+	services := server.Services
 
-	// Try to exploit all vulnerable services with advanced kit
-	exploitedCount := 0
-	for _, service := range server.Services {
-		if service.Vulnerable {
-			if err := h.exploitationService.ExploitServer(h.user.ID, serverPath, "advanced_exploit_kit", service.Name); err == nil {
-				exploitedCount++
+	return h.createExploitProgressResult("advanced_exploit_kit", targetIP, func() *CommandResult {
+		// Try to exploit all vulnerable services with advanced kit
+		exploitedCount := 0
+		for _, service := range services {
+			if service.Vulnerable {
+				if err := exploitService.ExploitServer(userID, serverPath, "advanced_exploit_kit", service.Name); err == nil {
+					exploitedCount++
+				}
 			}
 		}
-	}
 
-	if exploitedCount == 0 {
-		return &CommandResult{Error: fmt.Errorf("no vulnerabilities could be exploited")}
-	}
+		if exploitedCount == 0 {
+			return &CommandResult{Error: fmt.Errorf("no vulnerabilities could be exploited")}
+		}
 
-	// Add experience
-	h.userService.AddExperience(h.user.ID, exploitedCount*15)
+		// Add experience
+		userService.AddExperience(userID, exploitedCount*15)
 
-	var output strings.Builder
-	output.WriteString(ui.SuccessStyle.Render(fmt.Sprintf("✅ Successfully exploited %d service(s) on ", exploitedCount)) + formatIP(targetIP) + ui.SuccessStyle.Render(" using advanced_exploit_kit") + "\n")
-	return &CommandResult{Output: output.String()}
+		var output strings.Builder
+		output.WriteString(ui.SuccessStyle.Render(fmt.Sprintf("✅ Successfully exploited %d service(s) on ", exploitedCount)) + formatIP(targetIP) + ui.SuccessStyle.Render(" using advanced_exploit_kit") + "\n")
+		return &CommandResult{Output: output.String()}
+	})
 }
 
 func (h *CommandHandler) handleSQLInjector(args []string) *CommandResult {
@@ -389,13 +464,13 @@ func (h *CommandHandler) handleSQLInjector(args []string) *CommandResult {
 
 	targetIP := args[0]
 	
-	// Get server
+	// Get server - validate before starting progress
 	server, err := h.serverService.GetServerByIP(targetIP)
 	if err != nil {
 		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
 	}
 
-	// Find HTTP service
+	// Find HTTP service - validate before starting progress
 	var httpService *models.Service
 	for i := range server.Services {
 		if server.Services[i].Name == "http" {
@@ -413,18 +488,23 @@ func (h *CommandHandler) handleSQLInjector(args []string) *CommandResult {
 		serverPath = h.currentServerPath + ".localNetwork." + targetIP
 	}
 
-	h.showExploitProgress("sql_injector", targetIP)
+	// Capture variables for the closure
+	exploitService := h.exploitationService
+	userService := h.userService
+	userID := h.user.ID
 
-	if err := h.exploitationService.ExploitServer(h.user.ID, serverPath, "sql_injector", "http"); err != nil {
-		return &CommandResult{Error: err}
-	}
+	return h.createExploitProgressResult("sql_injector", targetIP, func() *CommandResult {
+		if err := exploitService.ExploitServer(userID, serverPath, "sql_injector", "http"); err != nil {
+			return &CommandResult{Error: err}
+		}
 
-	// Add experience
-	h.userService.AddExperience(h.user.ID, 18)
+		// Add experience
+		userService.AddExperience(userID, 18)
 
-	var output strings.Builder
-	output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited HTTP service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using sql_injector") + "\n")
-	return &CommandResult{Output: output.String()}
+		var output strings.Builder
+		output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited HTTP service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using sql_injector") + "\n")
+		return &CommandResult{Output: output.String()}
+	})
 }
 
 func (h *CommandHandler) handleXSSExploit(args []string) *CommandResult {
@@ -434,13 +514,13 @@ func (h *CommandHandler) handleXSSExploit(args []string) *CommandResult {
 
 	targetIP := args[0]
 	
-	// Get server
+	// Get server - validate before starting progress
 	server, err := h.serverService.GetServerByIP(targetIP)
 	if err != nil {
 		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
 	}
 
-	// Find HTTP service
+	// Find HTTP service - validate before starting progress
 	var httpService *models.Service
 	for i := range server.Services {
 		if server.Services[i].Name == "http" {
@@ -458,18 +538,23 @@ func (h *CommandHandler) handleXSSExploit(args []string) *CommandResult {
 		serverPath = h.currentServerPath + ".localNetwork." + targetIP
 	}
 
-	h.showExploitProgress("xss_exploit", targetIP)
+	// Capture variables for the closure
+	exploitService := h.exploitationService
+	userService := h.userService
+	userID := h.user.ID
 
-	if err := h.exploitationService.ExploitServer(h.user.ID, serverPath, "xss_exploit", "http"); err != nil {
-		return &CommandResult{Error: err}
-	}
+	return h.createExploitProgressResult("xss_exploit", targetIP, func() *CommandResult {
+		if err := exploitService.ExploitServer(userID, serverPath, "xss_exploit", "http"); err != nil {
+			return &CommandResult{Error: err}
+		}
 
-	// Add experience
-	h.userService.AddExperience(h.user.ID, 12)
+		// Add experience
+		userService.AddExperience(userID, 12)
 
-	var output strings.Builder
-	output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited HTTP service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using xss_exploit") + "\n")
-	return &CommandResult{Output: output.String()}
+		var output strings.Builder
+		output.WriteString(ui.SuccessStyle.Render("✅ Successfully exploited HTTP service on ") + formatIP(targetIP) + ui.SuccessStyle.Render(" using xss_exploit") + "\n")
+		return &CommandResult{Output: output.String()}
+	})
 }
 
 func (h *CommandHandler) handlePacketCapture(args []string) *CommandResult {
@@ -592,13 +677,13 @@ func (h *CommandHandler) handleDatabaseDumper(args []string) *CommandResult {
 
 	targetIP := args[0]
 	
-	// Get server
+	// Get server - validate before starting progress
 	server, err := h.serverService.GetServerByIP(targetIP)
 	if err != nil {
 		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
 	}
 
-	// Find HTTP service
+	// Find HTTP service - validate before starting progress
 	var httpService *models.Service
 	for i := range server.Services {
 		if server.Services[i].Name == "http" {
@@ -616,23 +701,27 @@ func (h *CommandHandler) handleDatabaseDumper(args []string) *CommandResult {
 		serverPath = h.currentServerPath + ".localNetwork." + targetIP
 	}
 
-	// Check if server is exploited
+	// Check if server is exploited - validate before starting progress
 	if !h.exploitationService.IsServerExploited(h.user.ID, serverPath) {
 		return &CommandResult{Error: fmt.Errorf("server must be exploited before dumping database")}
 	}
 
-	h.showExploitProgress("database_dumper", targetIP)
+	// Capture variables for the closure
+	userService := h.userService
+	userID := h.user.ID
 
-	var output strings.Builder
-	output.WriteString(ui.SuccessStyle.Render("✅ Database contents extracted from ") + formatIP(targetIP) + "\n")
-	output.WriteString(ui.FormatKeyValuePair("Tables dumped:", "12") + "\n")
-	output.WriteString(ui.FormatKeyValuePair("Records extracted:", "1,234") + "\n")
-	output.WriteString(ui.FormatKeyValuePair("Data size:", "45.2 MB") + "\n")
-	
-	// Add experience
-	h.userService.AddExperience(h.user.ID, 25)
+	return h.createExploitProgressResult("database_dumper", targetIP, func() *CommandResult {
+		var output strings.Builder
+		output.WriteString(ui.SuccessStyle.Render("✅ Database contents extracted from ") + formatIP(targetIP) + "\n")
+		output.WriteString(ui.FormatKeyValuePair("Tables dumped:", "12") + "\n")
+		output.WriteString(ui.FormatKeyValuePair("Records extracted:", "1,234") + "\n")
+		output.WriteString(ui.FormatKeyValuePair("Data size:", "45.2 MB") + "\n")
+		
+		// Add experience
+		userService.AddExperience(userID, 25)
 
-	return &CommandResult{Output: output.String()}
+		return &CommandResult{Output: output.String()}
+	})
 }
 
 func (h *CommandHandler) handlePhishingKit(args []string) *CommandResult {
@@ -697,24 +786,28 @@ func (h *CommandHandler) handleHashCracker(args []string) *CommandResult {
 
 	targetIP := args[0]
 	
-	// Check if server exists
+	// Check if server exists - validate before starting progress
 	if _, err := h.serverService.GetServerByIP(targetIP); err != nil {
 		return &CommandResult{Error: fmt.Errorf("server not found: %s", targetIP)}
 	}
 
-	h.showExploitProgress("hash_cracker", targetIP)
+	// Capture variables for the closure
+	userService := h.userService
+	userID := h.user.ID
 
-	var output strings.Builder
-	output.WriteString(ui.HeaderStyle.Render("🔓 Cracking hashes on ") + formatIP(targetIP) + "...\n")
-	output.WriteString(ui.FormatSectionHeader("Cracked hashes:", ""))
-	output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render("admin:") + " " + ui.SuccessStyleNoBold.Render("password123") + " " + ui.FormatKeyValuePair("(MD5)", "")))
-	output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render("user1:") + " " + ui.SuccessStyleNoBold.Render("qwerty") + " " + ui.FormatKeyValuePair("(SHA256)", "")))
-	output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render("user2:") + " " + ui.SuccessStyleNoBold.Render("admin123") + " " + ui.FormatKeyValuePair("(bcrypt)", "")))
-	
-	// Add experience
-	h.userService.AddExperience(h.user.ID, 22)
+	return h.createExploitProgressResult("hash_cracker", targetIP, func() *CommandResult {
+		var output strings.Builder
+		output.WriteString(ui.HeaderStyle.Render("🔓 Cracking hashes on ") + formatIP(targetIP) + "...\n")
+		output.WriteString(ui.FormatSectionHeader("Cracked hashes:", ""))
+		output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render("admin:") + " " + ui.SuccessStyleNoBold.Render("password123") + " " + ui.FormatKeyValuePair("(MD5)", "")))
+		output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render("user1:") + " " + ui.SuccessStyleNoBold.Render("qwerty") + " " + ui.FormatKeyValuePair("(SHA256)", "")))
+		output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render("user2:") + " " + ui.SuccessStyleNoBold.Render("admin123") + " " + ui.FormatKeyValuePair("(bcrypt)", "")))
+		
+		// Add experience
+		userService.AddExperience(userID, 22)
 
-	return &CommandResult{Output: output.String()}
+		return &CommandResult{Output: output.String()}
+	})
 }
 
 func (h *CommandHandler) handleLogAnalyzer(args []string) *CommandResult {
