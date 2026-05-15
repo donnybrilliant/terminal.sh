@@ -88,9 +88,10 @@ type progressState struct {
 
 // ShellContext represents a shell session context
 type ShellContext struct {
-	serverPath string
-	vfs        *filesystem.VFS
-	handler    *cmd.CommandHandler
+	serverPath  string
+	serviceType string // Service type used for connection (ssh, ftp, telnet, etc.)
+	vfs         *filesystem.VFS
+	handler     *cmd.CommandHandler
 }
 
 // NewShellModel creates a new shell model
@@ -354,6 +355,22 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if cmd == "tutorial" && len(parts) >= 2 {
 					tutorialNames := m.getTutorialNames(prefix)
 					if completed, ok := CompleteFromList(prefix, tutorialNames); ok {
+						current := m.textInput.Value()
+						lastSpaceIdx := strings.LastIndex(current, " ")
+						if lastSpaceIdx >= 0 {
+							m.textInput.SetValue(current[:lastSpaceIdx+1] + completed)
+						} else {
+							m.textInput.SetValue(completed)
+						}
+						m.textInput.CursorEnd()
+						return m, nil
+					}
+				}
+				
+				// Handle mission subcommand and ID autocomplete
+				if cmd == "mission" && len(parts) >= 2 {
+					missionMatches := m.getMissionMatches(prefix)
+					if completed, ok := CompleteFromList(prefix, missionMatches); ok {
 						current := m.textInput.Value()
 						lastSpaceIdx := strings.LastIndex(current, " ")
 						if lastSpaceIdx >= 0 {
@@ -669,8 +686,81 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				output = FormatDirListWithOptions(msg.Result.Nodes, msg.Result.LongFormat)
 			} else if msg.Result.Output != "" {
 				// Handle special messages
-				if strings.HasPrefix(msg.Result.Output, "__SSH_CONNECT__") {
-					// Handle SSH connection - push to stack and update path
+				if strings.HasPrefix(msg.Result.Output, "__CONNECT__") {
+					// Handle server connection - push to stack and update path
+					// Format: __CONNECT__<serviceType>:<accessMethod>:<accessUsername>:<isRoot>:<homeDir>:<serverPath>
+					connectData := strings.TrimPrefix(msg.Result.Output, "__CONNECT__")
+					parts := strings.SplitN(connectData, ":", 6)
+					serviceType := "ssh"
+					accessMethod := "backdoor"
+					accessUsername := "root"
+					isRoot := true
+					homeDir := "/root"
+					newServerPath := connectData
+					
+					if len(parts) >= 6 {
+						serviceType = parts[0]
+						accessMethod = parts[1]
+						accessUsername = parts[2]
+						isRoot = parts[3] == "1"
+						homeDir = parts[4]
+						newServerPath = parts[5]
+					} else if len(parts) >= 4 {
+						// Legacy format without role info
+						serviceType = parts[0]
+						accessMethod = parts[1]
+						accessUsername = parts[2]
+						newServerPath = parts[3]
+					} else if len(parts) == 2 {
+						// Legacy format: serviceType:serverPath
+						serviceType = parts[0]
+						newServerPath = parts[1]
+					}
+					
+					// Get server filesystem and create new VFS
+					serverVFS, err := m.handler.CreateServerVFS(newServerPath)
+					if err != nil {
+						output = FormatError(fmt.Errorf("failed to load server filesystem: %w", err))
+					} else {
+						// Set role on the VFS for permission checking
+						serverVFS.SetRole(accessUsername, isRoot, homeDir)
+						
+						// Push current context to stack (including current service type)
+						m.shellStack = append(m.shellStack, ShellContext{
+							serverPath:  m.handler.GetCurrentServerPath(),
+							serviceType: m.handler.GetCurrentServiceType(),
+							vfs:         m.vfs,
+							handler:     m.handler,
+						})
+						
+						// Switch to server VFS
+						m.vfs = serverVFS
+						m.handler.SetVFS(serverVFS)
+						
+						// Update handler's server path and service type
+						m.handler.SetCurrentServerPath(newServerPath)
+						m.handler.SetCurrentServiceType(serviceType)
+						
+						// Navigate to home directory
+						serverVFS.ChangeDir(homeDir)
+						
+						// Add connection message to history
+						pathParts := strings.Split(newServerPath, ".")
+						serverIP := pathParts[len(pathParts)-1]
+						roleIndicator := "$"
+						if isRoot {
+							roleIndicator = "#"
+						}
+						if accessMethod == "backdoor" {
+							output = fmt.Sprintf("Connected to %s via %s (backdoor)\nLogged in as %s\n%s@%s:%s%s\n", 
+								serverIP, serviceType, accessUsername, accessUsername, serverIP, homeDir, roleIndicator)
+						} else {
+							output = fmt.Sprintf("Authenticated to %s via %s as %s\n%s@%s:%s%s\n", 
+								serverIP, serviceType, accessUsername, accessUsername, serverIP, homeDir, roleIndicator)
+						}
+					}
+				} else if strings.HasPrefix(msg.Result.Output, "__SSH_CONNECT__") {
+					// Legacy SSH connection marker - for backward compatibility
 					newServerPath := strings.TrimPrefix(msg.Result.Output, "__SSH_CONNECT__")
 					
 					// Get server filesystem and create new VFS
@@ -680,9 +770,10 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					} else {
 						// Push current context to stack
 						m.shellStack = append(m.shellStack, ShellContext{
-							serverPath: m.handler.GetCurrentServerPath(),
-							vfs:        m.vfs,
-							handler:    m.handler,
+							serverPath:  m.handler.GetCurrentServerPath(),
+							serviceType: m.handler.GetCurrentServiceType(),
+							vfs:         m.vfs,
+							handler:     m.handler,
 						})
 						
 						// Switch to server VFS
@@ -691,16 +782,17 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						
 						// Update handler's server path
 						m.handler.SetCurrentServerPath(newServerPath)
+						m.handler.SetCurrentServiceType("ssh")
 						
 						// Add connection message to history
-						parts := strings.Split(newServerPath, ".")
-						serverIP := parts[len(parts)-1]
+						pathParts := strings.Split(newServerPath, ".")
+						serverIP := pathParts[len(pathParts)-1]
 						output = fmt.Sprintf("Connected to %s\n", serverIP)
 						output += fmt.Sprintf("Server path: %s\n", newServerPath)
 					}
-				} else if msg.Result.Output == "__EXIT_SSH__" {
-					// Handle exit from SSH session - return immediately
-					return m.handleExitSSH()
+				} else if msg.Result.Output == "__EXIT_CONNECT__" || msg.Result.Output == "__EXIT_SSH__" {
+					// Handle exit from server session - return immediately
+					return m.handleExitConnection()
 				} else if msg.Result.Output == "__QUIT__" {
 					// Quit the program
 					return m, tea.Quit
@@ -741,6 +833,10 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						output += "\n"
 					}
 				}
+			}
+			// Append mission auto-completion rewards if any
+			if msg.Result.MissionCompleted != nil {
+				output += cmd.FormatMissionCompletion(msg.Result.MissionCompleted)
 			}
 			// Set output in history
 			m.history[lastIdx].output = output
@@ -879,7 +975,10 @@ func (m *ShellModel) GetIncrementalOutput() (output string, isClear bool, prompt
 
 // getPromptLine returns the current prompt line with input
 func (m *ShellModel) getPromptLine(username string) string {
-	m.textInput.Prompt = RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
+	// Get prompt info from handler (respects SSH context)
+	promptUser, hostname := m.handler.GetPromptInfo()
+	promptChar := m.handler.GetPromptChar()
+	m.textInput.Prompt = RenderPromptWithChar(promptUser, hostname, m.vfs.GetCurrentPath(), promptChar)
 	return m.textInput.View()
 }
 
@@ -1010,12 +1109,6 @@ func (m *ShellModel) renderScrollIndicator(totalLines, startLine, viewportHeight
 // GetViewContent returns the view content without the prompt line
 // Used to detect if only the prompt changed (user typing)
 func (m *ShellModel) GetViewContent() string {
-	// Get username for prompt
-	username := "guest"
-	if m.user != nil && m.user.Username != "" {
-		username = m.user.Username
-	}
-
 	// Ensure we have valid dimensions
 	width := m.width
 	height := m.height
@@ -1112,8 +1205,9 @@ func (m *ShellModel) GetViewContent() string {
 
 	// Add all history entries
 	for _, entry := range m.history {
-		// Command line: prompt + command
-		prompt := RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
+		// Command line: prompt + command (use handler's prompt info for SSH context)
+		promptUser, hostname := m.handler.GetPromptInfo()
+		prompt := RenderPrompt(promptUser, hostname, m.vfs.GetCurrentPath())
 		commandLine := prompt + entry.command
 		contentLines = append(contentLines, commandLine)
 
@@ -1225,12 +1319,6 @@ func (m *ShellModel) GetViewContent() string {
 
 // View renders the shell (used for edit mode and fallback)
 func (m *ShellModel) View() string {
-	// Get username for prompt
-	username := "guest"
-	if m.user != nil && m.user.Username != "" {
-		username = m.user.Username
-	}
-
 	// Ensure we have valid dimensions
 	width := m.width
 	height := m.height
@@ -1273,8 +1361,9 @@ func (m *ShellModel) View() string {
 	// Add content
 	output.WriteString(content)
 	
-	// Build the current prompt line
-	m.textInput.Prompt = RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
+	// Build the current prompt line (use handler's prompt info for SSH context)
+	promptUser, hostname := m.handler.GetPromptInfo()
+	m.textInput.Prompt = RenderPrompt(promptUser, hostname, m.vfs.GetCurrentPath())
 	m.textInput.Width = width
 	promptLine := m.textInput.View()
 
@@ -1330,15 +1419,17 @@ type ProgressCompleteMsg struct {
 
 // getCommandMatches returns commands that start with the given prefix
 func (m *ShellModel) getCommandMatches(prefix string) []string {
-	// Built-in commands (from cmd/commands.go)
+	// Built-in commands (from cmd/commands.go - must stay in sync with parseAndExecute switch)
 	// Note: crypto_miner, stop_mining, miners are built-in commands, not tool commands
+	// Tool commands (password_cracker, ssh_exploit, etc.) come from GetUserToolNames()
 	builtInCommands := []string{
-		"pwd", "ls", "cd", "cat", "clear", "help", "chat", "tutorial",
+		"pwd", "ls", "cd", "cat", "clear", "help", "chat", "tutorial", "mission",
 		"login", "logout", "register", "userinfo", "info", "whoami", "name",
 		"ifconfig", "scan", "server",
-		"ssh", "exit", "get", "tools", "exploited", "shop", "buy",
+		"connect", "ssh", "telnet", "ftp", "exit", "get", "download", "dl",
+		"tools", "exploited", "credentials", "creds", "backdoors", "shop", "buy",
 		"patches", "patch", "crypto_miner", "stop_mining", "miners", "wallet",
-		"touch", "mkdir", "rm", "cp", "mv", "edit", "vi", "nano",
+		"ascii", "touch", "mkdir", "rm", "cp", "mv", "edit", "vi", "nano",
 	}
 	
 	// Get user's owned tools (only include tool commands the user owns)
@@ -1372,13 +1463,16 @@ func (m *ShellModel) getTutorialNames(prefix string) []string {
 	if m.handler == nil {
 		return []string{}
 	}
-	
-	// Get tutorial service from handler (we need to access it)
-	// Since we can't directly access tutorialService from handler, we'll need to
-	// reload tutorials each time. This is acceptable since it's only on tab completion.
-	// We'll use a helper method on CommandHandler to get tutorial names
 	tutorialNames := m.handler.GetTutorialNames(prefix)
 	return tutorialNames
+}
+
+// getMissionMatches returns mission subcommands (start, stop, status, list) and IDs that start with the prefix
+func (m *ShellModel) getMissionMatches(prefix string) []string {
+	if m.handler == nil {
+		return []string{}
+	}
+	return m.handler.GetMissionMatches(prefix)
 }
 
 // getFileMatches returns files/directories in current directory that start with prefix
@@ -1406,10 +1500,10 @@ func (m *ShellModel) handleLogout() (tea.Model, tea.Cmd) {
 	return loginModel, loginModel.Init()
 }
 
-// handleExitSSH handles exiting from an SSH session
-func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
+// handleExitConnection handles exiting from a server connection
+func (m *ShellModel) handleExitConnection() (tea.Model, tea.Cmd) {
 	if len(m.shellStack) == 0 {
-		// No more shells in stack, quit program (SSH closes connection)
+		// No more shells in stack, quit program (connection closes)
 		return m, tea.Quit
 	}
 
@@ -1425,8 +1519,9 @@ func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
 	// Update handler's VFS reference
 	m.handler.SetVFS(context.vfs)
 
-	// Update handler's server path
+	// Update handler's server path and service type
 	m.handler.SetCurrentServerPath(context.serverPath)
+	m.handler.SetCurrentServiceType(context.serviceType)
 
 	// Add exit message as pending output
 	m.pendingOutput = "Disconnected\n"
@@ -1438,6 +1533,12 @@ func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
 	m.commandJustDone = true
 
 	return m, nil
+}
+
+// handleExitSSH handles exiting from an SSH session
+// Deprecated: Use handleExitConnection instead
+func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
+	return m.handleExitConnection()
 }
 
 // handleEditModeInput handles input when in edit mode
@@ -1506,8 +1607,10 @@ func (m *ShellModel) nextProgressTick() tea.Cmd {
 	if m.activeProgress == nil {
 		return nil
 	}
+	// Capture the ID now, not in the callback (activeProgress may be nil by then)
+	progressID := m.activeProgress.ID
 	return tea.Tick(50*time.Millisecond, func(time.Time) tea.Msg {
-		return ProgressTickMsg{ID: m.activeProgress.ID}
+		return ProgressTickMsg{ID: progressID}
 	})
 }
 

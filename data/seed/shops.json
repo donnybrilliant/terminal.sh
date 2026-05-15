@@ -44,40 +44,15 @@
       "shop_type": "tools",
       "shop_name": "Elite Tools Shop",
       "shop_description": "Premium tools for professional hackers",
+      "required_mission": "ssh_exploitation",
+      "required_level": 3,
       "items": [
-        {
-          "item_type": "tool",
-          "item_id": "advanced_exploit_kit",
-          "name": "advanced_exploit_kit",
-          "description": "Advanced multi-vulnerability exploitation tool",
-          "crypto_price": 1000,
-          "data_price": 0,
-          "stock": -1
-        },
-        {
-          "item_type": "tool",
-          "item_id": "rootkit",
-          "name": "rootkit",
-          "description": "Install hidden backdoor for persistent access",
-          "crypto_price": 500,
-          "data_price": 0,
-          "stock": -1
-        },
-        {
-          "item_type": "tool",
-          "item_id": "password_sniffer",
-          "name": "password_sniffer",
-          "description": "Sniff and crack passwords from user roles - more effective than basic password cracking",
-          "crypto_price": 300,
-          "data_price": 0,
-          "stock": -1
-        },
         {
           "item_type": "upgrade_token",
           "item_id": "exploit_token",
           "name": "Exploit Booster Token",
           "description": "Grants one free exploit upgrade (+3 level) to any tool",
-          "crypto_price": 150,
+          "crypto_price": 100,
           "data_price": 0,
           "stock": -1
         },
@@ -86,7 +61,7 @@
           "item_id": "cpu_optimizer_token",
           "name": "CPU Optimizer Token",
           "description": "Grants one free CPU upgrade (-2 CPU usage) to any tool",
-          "crypto_price": 75,
+          "crypto_price": 50,
           "data_price": 0,
           "stock": -1
         },
@@ -95,7 +70,7 @@
           "item_id": "full_tune_token",
           "name": "Full Tune-up Token",
           "description": "Grants one full tune-up (-1 CPU, -1 RAM, -0.05 BW) to any tool",
-          "crypto_price": 200,
+          "crypto_price": 150,
           "data_price": 0,
           "stock": -1
         },
@@ -154,6 +129,8 @@
       "shop_type": "resources",
       "shop_name": "Resource Boost Shop",
       "shop_description": "Upgrade your computational resources",
+      "required_mission": "first_hack",
+      "required_level": 1,
       "items": [
         {
           "item_type": "resource",
@@ -178,7 +155,7 @@
           "item_id": "ram_optimizer_token",
           "name": "RAM Optimizer Token",
           "description": "Grants one free RAM upgrade (-1 RAM usage) to any tool",
-          "crypto_price": 75,
+          "crypto_price": 50,
           "data_price": 0,
           "stock": -1
         },
@@ -187,7 +164,7 @@
           "item_id": "bandwidth_optimizer_token",
           "name": "Bandwidth Optimizer Token",
           "description": "Grants one free bandwidth upgrade (-0.1 BW usage) to any tool",
-          "crypto_price": 100,
+          "crypto_price": 75,
           "data_price": 0,
           "stock": -1
         },

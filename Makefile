@@ -1,4 +1,4 @@
-.PHONY: build build-ssh build-web build-all dev run run-ssh run-web run-all clean
+.PHONY: build build-ssh build-web build-all dev run run-ssh run-web run-all clean reset dev-reset
 
 # Build directory
 BIN_DIR := bin
@@ -71,4 +71,17 @@ clean: ## Remove all built binaries
 	@echo "$(CYAN)Cleaning binaries...$(RESET)"
 	@rm -f $(BINARY_SSH) $(BINARY_WEB) $(BINARY_ALL)
 	@echo "$(GREEN)✓$(RESET) $(CYAN)Cleaned$(RESET)"
+
+reset: ## Delete database and start fresh
+	@echo "$(CYAN)Resetting database...$(RESET)"
+	@rm -f data/terminal.db
+	@echo "$(GREEN)✓$(RESET) $(CYAN)Database deleted$(RESET)"
+
+dev-reset: reset build-all ## Reset database and start dev server
+	@echo ""
+	@echo "$(MAGENTA)╔═══════════════════════════════════════╗$(RESET)"
+	@echo "$(MAGENTA)║   Development Mode - Fresh Start      ║$(RESET)"
+	@echo "$(MAGENTA)╚═══════════════════════════════════════╝$(RESET)"
+	@echo ""
+	@./$(BINARY_ALL)
 

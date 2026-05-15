@@ -1,6 +1,18 @@
 {
   "achievements": [
     {
+      "id": "back_online",
+      "name": "Back Online",
+      "description": "Recovered your hacking tools and got back online",
+      "icon": "🔌"
+    },
+    {
+      "id": "first_blood",
+      "name": "First Blood",
+      "description": "Successfully hacked your first real target",
+      "icon": "🩸"
+    },
+    {
       "id": "wifi_warrior",
       "name": "WiFi Warrior",
       "description": "Successfully hacked public WiFi",

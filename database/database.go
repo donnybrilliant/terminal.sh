@@ -92,6 +92,12 @@ func (db *Database) Migrate() error {
 		&models.UserMission{},
 		&models.GeneratedMission{},
 		&models.ProceduralServer{},
+		&models.ServerLog{},
+		&models.DiscoveredCredential{},
+		&models.DiscoveredUser{},
+		&models.BackdoorAccess{},
+		&models.PrivilegeEscalation{},
+		&models.TrackedAction{},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to auto-migrate: %w", err)

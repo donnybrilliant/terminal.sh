@@ -1,6 +1,304 @@
 {
   "servers": [
     {
+      "ip": "home.pc",
+      "local_ip": "192.168.1.2",
+      "security_level": 0,
+      "resources": {
+        "cpu": 500,
+        "bandwidth": 1000,
+        "ram": 128
+      },
+      "wallet": {
+        "crypto": 0,
+        "data": 50
+      },
+      "tools": ["password_cracker"],
+      "connected_ips": [],
+      "services": [
+        {
+          "name": "ssh",
+          "description": "Your old home PC - no password needed",
+          "port": 22,
+          "vulnerable": false,
+          "level": 0,
+          "grants_shell_access": true,
+          "requires_auth": false,
+          "vulnerabilities": []
+        }
+      ],
+      "roles": [
+        {
+          "role": "user",
+          "level": 1,
+          "type": "user",
+          "home_dir": "/home/user",
+          "can_sudo": false
+        }
+      ],
+      "file_system": {
+        "home": {
+          "user": {
+            "tools": {
+              "password_cracker.info": {"content": "Your trusty password cracker.\nDownload with: get home.pc password_cracker\n\nThis tool can crack passwords on SSH, Telnet, and FTP services."},
+              "README.txt": {"content": "=== YOUR OLD TOOLKIT ===\n\nMost of your tools were lost when the feds seized your main rig.\nBut password_cracker survived - it's still here.\n\nUse 'get home.pc password_cracker' to download it."}
+            },
+            "notes": {
+              "targets.txt": {"content": "=== SERVERS TO HACK ===\n\n- test (easy target, practice here first)\n- More targets will appear once you're back online\n\nRemember: scan first, then exploit."},
+              "old_passwords.txt": {"content": "=== CRACKED PASSWORDS ===\n\nSome passwords I cracked before the bust:\n\n- admin:password123\n- root:toor\n- guest:guest\n\nMaybe these still work somewhere?"}
+            },
+            ".bash_history": {"content": "password_cracker 192.168.1.50\nssh_exploit target.corp\ncat /etc/shadow\nrm -rf /var/log/*"}
+          }
+        },
+        "var": {
+          "log": {
+            "auth.log": {"content": "[2025-06-15 03:42:11] Last login from 192.168.1.1\n[2025-06-15 03:45:22] Session ended\n[...months of inactivity...]\n[2026-01-24 00:00:01] System awakened"}
+          }
+        }
+      }
+    },
+    {
+      "ip": "wifi.coffeeshop",
+      "local_ip": "192.168.100.1",
+      "security_level": 3,
+      "resources": {
+        "cpu": 1000,
+        "bandwidth": 5000,
+        "ram": 256
+      },
+      "wallet": {
+        "crypto": 10,
+        "data": 500
+      },
+      "tools": [],
+      "connected_ips": [],
+      "services": [
+        {
+          "name": "ssh",
+          "description": "Coffee Shop WiFi Access Point",
+          "port": 22,
+          "vulnerable": true,
+          "level": 3,
+          "grants_shell_access": true,
+          "vulnerabilities": [
+            {
+              "type": "password_cracking",
+              "level": 2
+            }
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "role": "guest",
+          "level": 1,
+          "type": "user",
+          "home_dir": "/home/guest",
+          "can_sudo": false
+        },
+        {
+          "role": "employee",
+          "level": 3,
+          "type": "user",
+          "home_dir": "/home/employee",
+          "can_sudo": false
+        }
+      ],
+      "file_system": {
+        "var": {
+          "log": {
+            "wifi.log": {"content": "2026-01-20 08:15:00 Guest connected: MAC aa:bb:cc:dd:ee:01\n2026-01-20 09:30:22 Employee login: jsmith@corporate.local\n2026-01-21 14:45:11 Guest traffic captured: 1.2GB\n2026-01-22 10:00:00 Employee credentials transmitted: admin@corp.internal"}
+          }
+        },
+        "home": {
+          "guest": {
+            "welcome.txt": {"content": "Welcome to Coffee Corner WiFi!\nFree internet for all customers.\nPlease enjoy responsibly."}
+          },
+          "employee": {
+            "notes.txt": {"content": "Corporate VPN credentials:\nUsername: jsmith\nPassword: CoffeeBean2026!\n\nInternal server: 172.16.0.10"}
+          }
+        },
+        "etc": {
+          "motd": {"content": "=== COFFEE CORNER PUBLIC WIFI ===\nFree WiFi for customers\nNo illegal activities please!"}
+        }
+      },
+      "local_network": {}
+    },
+    {
+      "ip": "legacy.corp",
+      "local_ip": "10.10.1.50",
+      "security_level": 8,
+      "resources": {
+        "cpu": 2000,
+        "bandwidth": 3000,
+        "ram": 256
+      },
+      "wallet": {
+        "crypto": 25,
+        "data": 1500
+      },
+      "tools": [],
+      "connected_ips": [],
+      "services": [
+        {
+          "name": "telnet",
+          "description": "Legacy Telnet Access",
+          "port": 23,
+          "vulnerable": true,
+          "level": 5,
+          "grants_shell_access": true,
+          "vulnerabilities": [
+            {
+              "type": "password_cracking",
+              "level": 4
+            }
+          ]
+        },
+        {
+          "name": "ftp",
+          "description": "Legacy FTP Server",
+          "port": 21,
+          "vulnerable": true,
+          "level": 6,
+          "grants_shell_access": false,
+          "vulnerabilities": [
+            {
+              "type": "password_cracking",
+              "level": 5
+            }
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "role": "backup",
+          "level": 5,
+          "type": "user",
+          "home_dir": "/home/backup",
+          "can_sudo": false
+        },
+        {
+          "role": "legacy_admin",
+          "level": 8,
+          "type": "admin",
+          "home_dir": "/home/legacy_admin",
+          "can_sudo": true
+        }
+      ],
+      "file_system": {
+        "var": {
+          "log": {
+            "access.log": {"content": "2026-01-15 Legacy system online\n2026-01-16 FTP backup started\n2026-01-17 Telnet session from 10.10.1.1"}
+          }
+        },
+        "home": {
+          "backup": {
+            "backup_schedule.txt": {"content": "Daily backup at 02:00 AM\nWeekly full backup Sunday\nTarget: /srv/backups/"}
+          },
+          "legacy_admin": {
+            "maintenance.txt": {"content": "Legacy System Maintenance Notes\n================================\nThis system runs old protocols for backward compatibility.\nDO NOT UPGRADE - breaks dependent systems.\n\nDefault creds (change these!):\n- telnet: backup/backup123\n- ftp: legacy_admin/L3g@cyFTP!"}
+          }
+        },
+        "srv": {
+          "backups": {
+            "readme.txt": {"content": "Backup storage directory\nContains: financial records, employee data, contracts"}
+          }
+        },
+        "etc": {
+          "motd": {"content": "=== LEGACY CORPORATE SERVER ===\nThis system is maintained for backward compatibility.\nContact IT before making changes."}
+        }
+      },
+      "local_network": {}
+    },
+    {
+      "ip": "mail.corporate",
+      "local_ip": "10.20.5.100",
+      "security_level": 12,
+      "resources": {
+        "cpu": 5000,
+        "bandwidth": 10000,
+        "ram": 512
+      },
+      "wallet": {
+        "crypto": 50,
+        "data": 3000
+      },
+      "tools": [],
+      "connected_ips": [],
+      "services": [
+        {
+          "name": "http",
+          "description": "Corporate Webmail Portal",
+          "port": 80,
+          "vulnerable": true,
+          "level": 10,
+          "grants_shell_access": false,
+          "vulnerabilities": [
+            {
+              "type": "xss",
+              "level": 8
+            }
+          ]
+        },
+        {
+          "name": "ssh",
+          "description": "Secure Shell",
+          "port": 22,
+          "vulnerable": true,
+          "level": 12,
+          "grants_shell_access": true,
+          "vulnerabilities": [
+            {
+              "type": "password_cracking",
+              "level": 10
+            }
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "role": "mailuser",
+          "level": 8,
+          "type": "user",
+          "home_dir": "/home/mailuser",
+          "can_sudo": false
+        },
+        {
+          "role": "postmaster",
+          "level": 12,
+          "type": "admin",
+          "home_dir": "/home/postmaster",
+          "can_sudo": true
+        }
+      ],
+      "file_system": {
+        "var": {
+          "www": {
+            "html": {
+              "index.html": {"content": "<!DOCTYPE html>\n<html>\n<head><title>Corporate Webmail</title></head>\n<body>\n<h1>Corporate Email Portal</h1>\n<form action='/login' method='post'>\n<input name='email' placeholder='Email'>\n<input name='password' type='password'>\n<button>Login</button>\n</form>\n</body>\n</html>"}
+            }
+          },
+          "mail": {
+            "inbox": {
+              "important.eml": {"content": "From: ceo@corporate.local\nTo: all-staff@corporate.local\nSubject: Quarterly Review\n\nTeam,\n\nPlease review the attached financial documents.\nCredentials for the secure portal: finance2026\n\n- CEO"}
+            }
+          },
+          "log": {
+            "mail.log": {"content": "2026-01-20 Sent 150 emails\n2026-01-21 Received 200 emails\n2026-01-22 Spam filter blocked 45 messages"}
+          }
+        },
+        "home": {
+          "postmaster": {
+            "email_list.txt": {"content": "Employee Email Directory\n========================\nceo@corporate.local\ncfo@corporate.local\nhr@corporate.local\nit-support@corporate.local\nsecurity@corporate.local"}
+          }
+        },
+        "etc": {
+          "motd": {"content": "=== CORPORATE MAIL SERVER ===\nEmail portal for corporate communications.\nReport suspicious emails to security@corporate.local"}
+        }
+      },
+      "local_network": {}
+    },
+    {
       "ip": "repo",
       "local_ip": "10.0.0.1",
       "security_level": 200,
@@ -31,7 +329,18 @@
           "level": 200
         }
       ],
-      "file_system": {},
+      "file_system": {
+        "var": {
+          "repo": {
+            "tools": {
+              "README.md": {"content": "# Tool Repository\n\nThis is the official tool repository server.\nAll tools are cryptographically signed and verified."}
+            }
+          }
+        },
+        "etc": {
+          "motd": {"content": "=== OFFICIAL REPOSITORY SERVER ===\nUnauthorized access is prohibited.\nAll activities are logged and monitored."}
+        }
+      },
       "local_network": {}
     },
     {
@@ -56,14 +365,29 @@
           "port": 22,
           "vulnerable": true,
           "level": 10,
+          "grants_shell_access": true,
           "vulnerabilities": [
             {
-              "type": "weak_password",
+              "type": "password_cracking",
               "level": 5
             },
             {
-              "type": "ssh_vulnerability",
+              "type": "remote_code_execution",
               "level": 10
+            }
+          ]
+        },
+        {
+          "name": "telnet",
+          "description": "Telnet Service",
+          "port": 23,
+          "vulnerable": true,
+          "level": 5,
+          "grants_shell_access": true,
+          "vulnerabilities": [
+            {
+              "type": "password_cracking",
+              "level": 3
             }
           ]
         }
@@ -71,15 +395,200 @@
       "roles": [
         {
           "role": "user",
-          "level": 5
+          "level": 5,
+          "type": "user",
+          "home_dir": "/home/user",
+          "shell": "/bin/bash",
+          "can_sudo": false,
+          "sudo_no_pass": false,
+          "groups": ["users"]
         },
         {
           "role": "admin",
-          "level": 10
+          "level": 10,
+          "type": "admin",
+          "home_dir": "/home/admin",
+          "shell": "/bin/bash",
+          "can_sudo": true,
+          "sudo_no_pass": false,
+          "groups": ["users", "sudo", "adm"]
+        },
+        {
+          "role": "root",
+          "level": 50,
+          "type": "root",
+          "home_dir": "/root",
+          "shell": "/bin/bash",
+          "can_sudo": true,
+          "sudo_no_pass": true,
+          "groups": ["root"]
         }
       ],
-      "file_system": {},
-      "local_network": {}
+      "local_vulnerabilities": [
+        {
+          "type": "sudo_misconfiguration",
+          "level": 8,
+          "description": "User can run vim as root without password",
+          "target": "/usr/bin/vim",
+          "grants_root": true
+        },
+        {
+          "type": "suid_binary",
+          "level": 12,
+          "description": "Custom SUID binary with buffer overflow",
+          "target": "/opt/backup/backup_tool",
+          "grants_root": true
+        }
+      ],
+      "file_system": {
+        "root": {
+          ".bash_history": {"content": "cat /etc/shadow\npasswd admin\niptables -L\nsystemctl restart sshd"},
+          "secret_key.txt": {"content": "MASTER_KEY=sk_live_9x8y7z6w5v4u3t2s1r0q\nDO NOT SHARE THIS KEY!"}
+        },
+        "var": {
+          "log": {
+            "auth.log": {"content": "Jan 24 03:14:22 test sshd[1234]: Failed password for admin from 192.168.1.50\nJan 24 03:14:25 test sshd[1234]: Accepted password for user from 192.168.1.100\nJan 24 08:42:11 test sshd[5678]: Connection closed by 10.0.0.5\nJan 24 09:00:00 test telnetd[9012]: Connection attempt from 192.168.1.200"},
+            "system.log": {"content": "System started at 2026-01-01 00:00:00\nServices initialized successfully\nSSH daemon listening on port 22\nTelnet daemon listening on port 23"}
+          },
+          "www": {
+            "index.html": {"content": "<!DOCTYPE html>\n<html>\n<head><title>Test Server</title></head>\n<body><h1>Welcome to the Test Server</h1></body>\n</html>"}
+          }
+        },
+        "etc": {
+          "passwd": {"content": "root:x:0:0:root:/root:/bin/bash\nuser:x:1000:1000:User:/home/user:/bin/bash\nadmin:x:1001:1001:Admin:/home/admin:/bin/bash"},
+          "shadow": {"content": "root:$6$rounds=5000$saltsalt$hashhashhashhash:18000:0:99999:7:::\nuser:$6$rounds=5000$saltsalt$weakweakweakweak:18000:0:99999:7:::\nadmin:$6$rounds=5000$saltsalt$strongstrongstrong:18000:0:99999:7:::"},
+          "hosts": {"content": "127.0.0.1 localhost\n192.168.1.100 test\n192.168.1.10 db-internal\n192.168.1.20 backup-internal"},
+          "sudoers": {"content": "# sudoers file\nroot ALL=(ALL:ALL) ALL\n%sudo ALL=(ALL:ALL) ALL\n\n# VULNERABLE: user can run vim as root\nuser ALL=(root) NOPASSWD: /usr/bin/vim"}
+        },
+        "home": {
+          "user": {
+            "notes.txt": {"content": "Remember to change password!\nDefault creds: user/password123"},
+            ".bash_history": {"content": "ls -la\ncat /etc/passwd\nsudo su -\nsudo vim /etc/passwd"}
+          },
+          "admin": {
+            "server_config.txt": {"content": "Database: internal.db\nAPI Key: sk_test_12345\nBackup server: 192.168.1.20"},
+            "network_notes.txt": {"content": "Internal servers:\n- 192.168.1.10: Database server (MySQL)\n- 192.168.1.20: Backup server (has all the good stuff)"}
+          }
+        },
+        "opt": {
+          "backup": {
+            "backup_tool": {"content": "#!/bin/bash\n# SUID backup utility - VULNERABLE TO BUFFER OVERFLOW\n# Usage: backup_tool <path>"},
+            "readme.txt": {"content": "Backup Tool v1.2\n\nThis tool has SUID bit set for backup operations.\nWARNING: Known buffer overflow vulnerability in path handling."}
+          }
+        }
+      },
+      "local_network": {
+        "192.168.1.10": {
+          "ip": "192.168.1.10",
+          "local_ip": "127.0.0.1",
+          "security_level": 8,
+          "resources": {"cpu": 3000, "bandwidth": 5000, "ram": 512},
+          "wallet": {"crypto": 50, "data": 2000},
+          "tools": [],
+          "connected_ips": [],
+          "services": [
+            {
+              "name": "mysql",
+              "description": "MySQL Database",
+              "port": 3306,
+              "vulnerable": true,
+              "level": 8,
+              "grants_shell_access": false,
+              "vulnerabilities": [{"type": "sql_injection", "level": 6}]
+            },
+            {
+              "name": "ssh",
+              "description": "Secure Shell",
+              "port": 22,
+              "vulnerable": true,
+              "level": 8,
+              "grants_shell_access": true,
+              "vulnerabilities": [{"type": "password_cracking", "level": 7}]
+            }
+          ],
+          "roles": [
+            {"role": "dbadmin", "level": 8, "type": "admin", "home_dir": "/home/dbadmin", "can_sudo": true},
+            {"role": "backup", "level": 5, "type": "user", "home_dir": "/home/backup", "can_sudo": false},
+            {"role": "root", "level": 50, "type": "root", "home_dir": "/root", "can_sudo": true}
+          ],
+          "local_vulnerabilities": [
+            {
+              "type": "kernel_exploit",
+              "level": 15,
+              "description": "Linux kernel 4.x local privilege escalation (CVE-2021-4034)",
+              "target": "CVE-2021-4034 (PwnKit)",
+              "grants_root": true
+            }
+          ],
+          "file_system": {
+            "var": {
+              "lib": {
+                "mysql": {
+                  "users.sql": {"content": "-- User dump\nINSERT INTO users VALUES (1, 'admin', 'admin123', 'admin@test.local');\nINSERT INTO users VALUES (2, 'backup', 'b4ckup!', 'backup@test.local');"}
+                }
+              },
+              "log": {
+                "mysql.log": {"content": "2026-01-20 Connection from 192.168.1.100\n2026-01-21 Query: SELECT * FROM users\n2026-01-22 Backup completed"}
+              }
+            },
+            "home": {
+              "dbadmin": {
+                "db_credentials.txt": {"content": "Production DB:\nHost: localhost\nUser: root\nPass: r00tdb2026!"}
+              }
+            }
+          },
+          "local_network": {}
+        },
+        "192.168.1.20": {
+          "ip": "192.168.1.20",
+          "local_ip": "127.0.0.1",
+          "security_level": 12,
+          "resources": {"cpu": 2000, "bandwidth": 8000, "ram": 1024},
+          "wallet": {"crypto": 200, "data": 5000},
+          "tools": ["log_cleaner"],
+          "connected_ips": [],
+          "services": [
+            {
+              "name": "ssh",
+              "description": "Secure Shell",
+              "port": 22,
+              "vulnerable": true,
+              "level": 10,
+              "grants_shell_access": true,
+              "vulnerabilities": [{"type": "password_cracking", "level": 10}]
+            },
+            {
+              "name": "ftp",
+              "description": "FTP Server",
+              "port": 21,
+              "vulnerable": true,
+              "level": 8,
+              "grants_shell_access": true,
+              "vulnerabilities": [{"type": "remote_code_execution", "level": 8}]
+            }
+          ],
+          "roles": [{"role": "backup_admin", "level": 12}, {"role": "readonly", "level": 3}],
+          "file_system": {
+            "var": {
+              "backups": {
+                "users_backup.tar.gz": {"content": "[BINARY BACKUP DATA]\nContains: user credentials, API keys, financial records"},
+                "database_backup.sql": {"content": "-- Full database backup\n-- Contains sensitive customer data\n-- Last backup: 2026-01-23"},
+                "secrets.enc": {"content": "ENCRYPTED: AES-256\nContents: SSH keys, API tokens, wallet seeds\nDecryption key location: /home/backup_admin/.keyfile"}
+              },
+              "log": {
+                "backup.log": {"content": "2026-01-20 Backup started\n2026-01-20 Backed up 15GB\n2026-01-21 Incremental backup: 2GB\n2026-01-22 Full backup completed"}
+              }
+            },
+            "home": {
+              "backup_admin": {
+                ".keyfile": {"content": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC...\n-----END PRIVATE KEY-----"},
+                "recovery_codes.txt": {"content": "Emergency recovery codes:\n1. XKCD-HORSE-BATTERY-STAPLE\n2. CORRECT-HORSE-BATTERY-STAPLE\n3. HUNTER2-HUNTER2-HUNTER2"}
+              }
+            }
+          },
+          "local_network": {}
+        }
+      }
     },
     {
       "ip": "172.16.0.10",
@@ -105,10 +614,6 @@
           "level": 5,
           "vulnerabilities": [
             {
-              "type": "weak_password",
-              "level": 3
-            },
-            {
               "type": "password_cracking",
               "level": 5
             }
@@ -125,7 +630,26 @@
           "level": 3
         }
       ],
-      "file_system": {},
+      "file_system": {
+        "var": {
+          "log": {
+            "access.log": {"content": "Guest login: 2026-01-20 09:15:00\nEmployee login: 2026-01-21 14:30:22\nGuest logout: 2026-01-20 17:45:11"}
+          }
+        },
+        "home": {
+          "guest": {
+            "welcome.txt": {"content": "Welcome, guest!\nYou have limited access to this system."}
+          },
+          "employee": {
+            "projects": {
+              "report_q4.txt": {"content": "Q4 Sales Report\n---------------\nTotal revenue: $1.2M\nNew customers: 450\nChurn rate: 2.3%"}
+            }
+          }
+        },
+        "tmp": {
+          "session_data.tmp": {"content": "session_id=abc123\nuser=guest\nexpires=2026-01-25"}
+        }
+      },
       "local_network": {}
     },
     {
@@ -185,8 +709,132 @@
           "level": 15
         }
       ],
-      "file_system": {},
-      "local_network": {}
+      "file_system": {
+        "var": {
+          "www": {
+            "html": {
+              "index.html": {"content": "<!DOCTYPE html>\n<html>\n<head><title>Corporate Portal</title></head>\n<body>\n<h1>Welcome to Corporate Portal</h1>\n<p>Please login to continue.</p>\n</body>\n</html>"},
+              "admin": {
+                "dashboard.php": {"content": "<?php\n// Admin dashboard\n// TODO: Fix SQL injection in user search\n$query = \"SELECT * FROM users WHERE name='\".$_GET['search'].\"'\";"},
+                "config.php": {"content": "<?php\n$db_host = 'localhost';\n$db_user = 'webapp';\n$db_pass = 'WebApp2026!';\n$db_name = 'corporate';"}
+              }
+            }
+          },
+          "log": {
+            "apache2": {
+              "access.log": {"content": "203.0.113.1 - - [24/Jan/2026:10:15:32] \"GET /admin/dashboard.php?search=admin HTTP/1.1\" 200 4523\n203.0.113.1 - - [24/Jan/2026:10:15:35] \"GET /admin/config.php HTTP/1.1\" 403 287"},
+              "error.log": {"content": "[error] SQL syntax error near 'admin'--' at line 1\n[warn] Potential XSS attempt blocked"}
+            }
+          }
+        },
+        "etc": {
+          "apache2": {
+            "apache2.conf": {"content": "ServerRoot \"/etc/apache2\"\nTimeout 300\nKeepAlive On\nMaxKeepAliveRequests 100"}
+          }
+        },
+        "home": {
+          "webadmin": {
+            "backup_credentials.txt": {"content": "FTP Server: 10.10.10.50\nUsername: backup_user\nPassword: BackupSecure2026"},
+            "internal_network.txt": {"content": "Internal Network Hosts:\n- 10.10.10.50: File server (backups)\n- 10.10.10.200: Payment processing\n- 10.10.10.100: This server (web)"}
+          }
+        }
+      },
+      "local_network": {
+        "10.10.10.50": {
+          "ip": "10.10.10.50",
+          "local_ip": "127.0.0.1",
+          "security_level": 18,
+          "resources": {"cpu": 4000, "bandwidth": 20000, "ram": 2048},
+          "wallet": {"crypto": 100, "data": 8000},
+          "tools": [],
+          "connected_ips": [],
+          "services": [
+            {
+              "name": "ssh",
+              "description": "Secure Shell",
+              "port": 22,
+              "vulnerable": true,
+              "level": 15,
+              "vulnerabilities": [{"type": "password_cracking", "level": 12}]
+            },
+            {
+              "name": "smb",
+              "description": "File Sharing",
+              "port": 445,
+              "vulnerable": true,
+              "level": 18,
+              "vulnerabilities": [{"type": "remote_code_execution", "level": 16}]
+            }
+          ],
+          "roles": [{"role": "fileadmin", "level": 18}, {"role": "user", "level": 10}],
+          "file_system": {
+            "srv": {
+              "shares": {
+                "confidential": {
+                  "financial_report_2025.xlsx": {"content": "[EXCEL DATA]\nQ4 Revenue: $4.2M\nProfit Margin: 23%\nProjected 2026: $5.8M"},
+                  "employee_salaries.csv": {"content": "name,role,salary\nJohn Smith,CEO,450000\nJane Doe,CTO,380000\nBob Wilson,CFO,350000"},
+                  "acquisition_plans.docx": {"content": "CONFIDENTIAL\n\nTarget: TechStartup Inc.\nValuation: $12M\nTimeline: Q2 2026"}
+                },
+                "public": {
+                  "readme.txt": {"content": "Public file share\nFor general company documents"}
+                }
+              }
+            },
+            "var": {
+              "log": {
+                "smb.log": {"content": "2026-01-22 User webadmin accessed confidential/\n2026-01-23 User backup_user ran full backup\n2026-01-24 Anonymous access attempt blocked"}
+              }
+            }
+          },
+          "local_network": {}
+        },
+        "10.10.10.200": {
+          "ip": "10.10.10.200",
+          "local_ip": "127.0.0.1",
+          "security_level": 35,
+          "resources": {"cpu": 10000, "bandwidth": 50000, "ram": 4096},
+          "wallet": {"crypto": 5000, "data": 50000},
+          "tools": [],
+          "connected_ips": [],
+          "services": [
+            {
+              "name": "ssh",
+              "description": "Secure Shell",
+              "port": 22,
+              "vulnerable": true,
+              "level": 30,
+              "vulnerabilities": [{"type": "remote_code_execution", "level": 28}]
+            },
+            {
+              "name": "https",
+              "description": "Payment Gateway",
+              "port": 443,
+              "vulnerable": true,
+              "level": 35,
+              "vulnerabilities": [{"type": "sql_injection", "level": 32}]
+            }
+          ],
+          "roles": [{"role": "payment_admin", "level": 35}, {"role": "auditor", "level": 25}],
+          "file_system": {
+            "var": {
+              "payment": {
+                "transactions.log": {"content": "2026-01-24 TXN001: $15,000 from ACCT-4521 to ACCT-8832\n2026-01-24 TXN002: $8,500 from ACCT-1122 to ACCT-9921\n2026-01-24 TXN003: $42,000 from ACCT-5544 to ACCT-7766"},
+                "api_keys.json": {"content": "{\n  \"stripe_live\": \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\",\n  \"paypal_client\": \"AYSq3RDGsmBLJE\",\n  \"paypal_secret\": \"EGnHDxD_qRPdaLdZz8iCr8N7_MzF\"\n}"}
+              },
+              "log": {
+                "payment.log": {"content": "2026-01-24 10:00:00 Payment gateway started\n2026-01-24 10:15:32 Processed 15 transactions\n2026-01-24 11:00:00 Daily settlement: $245,000"}
+              }
+            },
+            "home": {
+              "payment_admin": {
+                "wallet_seeds.txt": {"content": "DO NOT SHARE!\n\nBitcoin wallet seed:\nabout beach cargo dance eagle fabric gift...\n\nEthereum wallet seed:\nzebra yellow xray window vendor uncle tiger..."},
+                "emergency_access.txt": {"content": "Emergency bypass code: PAYMENT-OVERRIDE-2026\nUse only in case of system failure"}
+              }
+            }
+          },
+          "local_network": {}
+        }
+      }
     },
     {
       "ip": "198.51.100.77",
@@ -213,7 +861,7 @@
           "vulnerabilities": [
             {
               "type": "remote_code_execution",
-              "level": 20
+              "level": 30
             }
           ]
         }
@@ -228,7 +876,35 @@
           "level": 25
         }
       ],
-      "file_system": {},
+      "file_system": {
+        "var": {
+          "audit": {
+            "compliance_2025.txt": {"content": "COMPLIANCE AUDIT REPORT 2025\n============================\nStatus: PASSED\nFindings: 3 minor issues\nNext audit: Q2 2026"},
+            "security_scan.log": {"content": "Scan started: 2026-01-15 02:00:00\nVulnerabilities found: 2 high, 5 medium, 12 low\nScan completed: 2026-01-15 04:35:22"}
+          },
+          "log": {
+            "audit.log": {"content": "2026-01-20 Admin accessed financial records\n2026-01-21 Auditor ran compliance check\n2026-01-22 System backup completed"}
+          }
+        },
+        "home": {
+          "auditor": {
+            "findings": {
+              "critical_2026.txt": {"content": "CRITICAL FINDINGS\n=================\n1. Unpatched SSH vulnerability on server 203.0.113.42\n2. Weak password policy on internal network\n3. Exposed database credentials in web configs"}
+            },
+            "tools": {
+              "scan_script.sh": {"content": "#!/bin/bash\n# Security scan script\nnmap -sV -sC $1\nnessus_scan --target $1 --profile full"}
+            }
+          },
+          "admin": {
+            "network_map.txt": {"content": "Internal Network Map\n====================\n10.0.0.1 - Main router\n10.0.0.50 - Backup server\n10.0.0.100 - Database server\n10.0.0.200 - This server (audit)"}
+          }
+        },
+        "etc": {
+          "ssh": {
+            "sshd_config": {"content": "Port 22\nPermitRootLogin no\nPasswordAuthentication yes\nMaxAuthTries 3\nLoginGraceTime 60"}
+          }
+        }
+      },
       "local_network": {}
     }
   ]

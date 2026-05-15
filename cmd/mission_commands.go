@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"terminal-sh/models"
 	"terminal-sh/ui"
@@ -30,11 +31,11 @@ func (h *CommandHandler) handleMISSION(args []string) *CommandResult {
 			return &CommandResult{Error: fmt.Errorf("usage: mission start <missionID>")}
 		}
 		return h.handleMissionStart(args[1])
-	case "complete":
+	case "stop":
 		if len(args) < 2 {
-			return &CommandResult{Error: fmt.Errorf("usage: mission complete <missionID>")}
+			return &CommandResult{Error: fmt.Errorf("usage: mission stop <missionID>")}
 		}
-		return h.handleMissionComplete(args[1])
+		return h.handleMissionStop(args[1])
 	case "list":
 		return h.handleMissionList()
 	case "status":
@@ -46,6 +47,9 @@ func (h *CommandHandler) handleMISSION(args []string) *CommandResult {
 }
 
 func (h *CommandHandler) handleMissionList() *CommandResult {
+	// Re-check completion so missions done in any order (e.g. before trigger) can complete when viewing
+	missionCompleted := h.missionService.TryAutoComplete(h.user.ID)
+
 	userLevel := h.user.Level
 	availableMissions := h.missionService.GetAvailableMissions(h.user.ID, userLevel)
 	userMissions, _ := h.missionService.GetUserMissions(h.user.ID)
@@ -56,28 +60,24 @@ func (h *CommandHandler) handleMissionList() *CommandResult {
 	}
 
 	var output strings.Builder
-	output.WriteString(ui.FormatSectionHeader("Available Missions:", "🎯"))
-	output.WriteString("\n")
 
-	if len(availableMissions) == 0 {
-		output.WriteString("No missions available. Complete tutorials to unlock missions.\n")
-		return &CommandResult{Output: output.String()}
+	// Split into story missions (trigger-based) and board missions (manual start)
+	var storyMissions, boardMissions []models.Mission
+	for _, m := range availableMissions {
+		if m.Trigger != nil {
+			storyMissions = append(storyMissions, m)
+		} else {
+			boardMissions = append(boardMissions, m)
+		}
 	}
 
-	// Group by arc
-	arcs := make(map[string][]models.Mission)
-	for _, mission := range availableMissions {
-		arcs[mission.ArcName] = append(arcs[mission.ArcName], mission)
-	}
-
-	for arcName, missions := range arcs {
-		output.WriteString(ui.AccentBoldStyle.Render("📖 " + arcName) + "\n")
-		
-		for _, mission := range missions {
+	if len(storyMissions) > 0 {
+		output.WriteString(ui.FormatSectionHeader("Story Missions:", "📖"))
+		output.WriteString(ui.DimStyle.Render("(Start automatically on triggers)\n\n"))
+		for _, mission := range storyMissions {
 			status := userMissionMap[mission.ID]
 			var statusIcon string
 			var statusStyle lipgloss.Style
-			
 			switch status {
 			case "completed":
 				statusIcon = "✅"
@@ -89,18 +89,80 @@ func (h *CommandHandler) handleMissionList() *CommandResult {
 				statusIcon = "⭕"
 				statusStyle = ui.GrayStyle
 			}
-			
-			output.WriteString(fmt.Sprintf("  %s %s - %s\n", statusIcon, statusStyle.Render(mission.ID), mission.Name))
-			output.WriteString(fmt.Sprintf("    %s\n", ui.ValueStyle.Render(mission.Description)))
+			// Line 1: ID - Name - Description (keeps related content together)
+			output.WriteString(fmt.Sprintf("  %s %s - %s - %s\n",
+				statusIcon, statusStyle.Render(mission.ID), mission.Name, ui.ValueStyle.Render(mission.Description)))
+			// Line 2: Trigger hint (when applicable)
+			if mission.Trigger != nil && mission.Trigger.Type == "cat_file" && mission.Trigger.Path != "" {
+				output.WriteString(fmt.Sprintf("    %s\n", ui.DimStyle.Render("starts when you: cat "+mission.Trigger.Path)))
+			}
 		}
 		output.WriteString("\n")
 	}
 
-	output.WriteString(ui.FormatKeyValuePair("Commands:", "mission <id> - View mission details") + "\n")
-	output.WriteString(ui.FormatKeyValuePair("", "mission start <id> - Start a mission") + "\n")
-	output.WriteString(ui.FormatKeyValuePair("", "mission status - View your mission progress") + "\n")
+	if len(boardMissions) > 0 {
+		output.WriteString(ui.FormatSectionHeader("Mission Board:", "📋"))
+		output.WriteString(ui.DimStyle.Render("(Use 'mission start <id>' to accept)\n\n"))
+		arcs := make(map[string][]models.Mission)
+		for _, m := range boardMissions {
+			arcs[m.ArcName] = append(arcs[m.ArcName], m)
+		}
+		// Sort arcs: story arcs first, "Procedurally Generated Missions" last
+		arcNames := make([]string, 0, len(arcs))
+		for name := range arcs {
+			arcNames = append(arcNames, name)
+		}
+		sort.Slice(arcNames, func(i, j int) bool {
+			if arcNames[i] == "Procedurally Generated Missions" {
+				return false
+			}
+			if arcNames[j] == "Procedurally Generated Missions" {
+				return true
+			}
+			return arcNames[i] < arcNames[j]
+		})
+		for _, arcName := range arcNames {
+			missions := arcs[arcName]
+			output.WriteString(ui.AccentBoldStyle.Render("  "+arcName) + "\n")
+			for _, mission := range missions {
+				status := userMissionMap[mission.ID]
+				var statusIcon string
+				var statusStyle lipgloss.Style
+				switch status {
+				case "completed":
+					statusIcon = "✅"
+					statusStyle = ui.SuccessStyleNoBold
+				case "in_progress":
+					statusIcon = "🔄"
+					statusStyle = ui.WarningStyle
+				default:
+					statusIcon = "⭕"
+					statusStyle = ui.GrayStyle
+				}
+				// Procedural missions: show "Name (id)" so the readable name comes first
+				var firstLine string
+				if strings.HasPrefix(mission.ID, "generated_mission_") {
+					firstLine = fmt.Sprintf("    %s %s (%s)\n", statusIcon, mission.Name, statusStyle.Render(mission.ID))
+				} else {
+					firstLine = fmt.Sprintf("    %s %s - %s\n", statusIcon, statusStyle.Render(mission.ID), mission.Name)
+				}
+				output.WriteString(firstLine)
+				output.WriteString(fmt.Sprintf("      %s\n", ui.ValueStyle.Render(mission.Description)))
+			}
+			output.WriteString("\n")
+		}
+	}
 
-	return &CommandResult{Output: output.String()}
+	if len(availableMissions) == 0 {
+		output.WriteString("No missions available. Complete the getting started tutorial.\n")
+	}
+
+	output.WriteString(ui.FormatKeyValuePair("Commands:", "mission <id> - View mission details") + "\n")
+	output.WriteString(ui.FormatKeyValuePair("", "mission start <id> - Accept a board mission") + "\n")
+	output.WriteString(ui.FormatKeyValuePair("", "mission stop <id> - Abandon a mission") + "\n")
+	output.WriteString(ui.FormatKeyValuePair("", "mission status - View your progress") + "\n")
+
+	return &CommandResult{Output: output.String(), MissionCompleted: missionCompleted}
 }
 
 func (h *CommandHandler) handleMissionView(missionID string) *CommandResult {
@@ -166,7 +228,11 @@ func (h *CommandHandler) handleMissionView(missionID string) *CommandResult {
 
 	if userMission == nil || userMission.Status != "completed" {
 		output.WriteString("\n")
-		output.WriteString(ui.FormatKeyValuePair("To start:", fmt.Sprintf("mission start %s", missionID)) + "\n")
+		if mission.Trigger != nil && mission.Trigger.Type == "cat_file" && mission.Trigger.Path != "" {
+			output.WriteString(ui.FormatKeyValuePair("Starts when you:", fmt.Sprintf("cat %s", mission.Trigger.Path)) + "\n")
+		} else {
+			output.WriteString(ui.FormatKeyValuePair("To accept:", fmt.Sprintf("mission start %s", missionID)) + "\n")
+		}
 	}
 
 	return &CommandResult{Output: output.String()}
@@ -182,67 +248,87 @@ func (h *CommandHandler) handleMissionStart(missionID string) *CommandResult {
 	var output strings.Builder
 	output.WriteString(ui.SuccessStyle.Render("✅ Mission started: ") + mission.Name + "\n")
 	output.WriteString(ui.FormatKeyValuePair("Objectives:", fmt.Sprintf("%d objectives to complete", len(mission.Objectives))) + "\n")
-	output.WriteString(ui.FormatKeyValuePair("View progress:", fmt.Sprintf("mission status") + "\n"))
+	output.WriteString(ui.FormatKeyValuePair("View progress:", "mission status") + "\n")
 
 	return &CommandResult{Output: output.String()}
 }
 
-func (h *CommandHandler) handleMissionComplete(missionID string) *CommandResult {
-	if err := h.missionService.CompleteMission(h.user.ID, missionID); err != nil {
+func (h *CommandHandler) handleMissionStop(missionID string) *CommandResult {
+	if err := h.missionService.StopMission(h.user.ID, missionID); err != nil {
 		return &CommandResult{Error: err}
 	}
-
 	mission, _ := h.missionService.GetMissionByID(missionID)
-	
-	var output strings.Builder
-	output.WriteString(ui.SuccessStyle.Render("🎉 Mission completed: ") + mission.Name + "\n")
-	output.WriteString("\n")
-	output.WriteString(ui.FormatSectionHeader("Rewards granted:", ""))
-	rewards := mission.Rewards
-	if rewards.Experience > 0 {
-		output.WriteString(ui.FormatListBullet(ui.SuccessStyleNoBold.Render(fmt.Sprintf("+%d XP", rewards.Experience))))
+	name := missionID
+	if mission != nil {
+		name = mission.Name
 	}
-	if rewards.Crypto > 0 {
-		output.WriteString(ui.FormatListBullet(ui.SuccessStyleNoBold.Render(fmt.Sprintf("+%.2f cryptocurrency", rewards.Crypto))))
-	}
-	if len(rewards.Tools) > 0 {
-		output.WriteString(ui.FormatListBullet(ui.SuccessStyleNoBold.Render(fmt.Sprintf("Tools unlocked: %s", strings.Join(rewards.Tools, ", ")))))
-	}
-	if len(rewards.ToolUpgrades) > 0 {
-		upgrades := []string{}
-		for _, u := range rewards.ToolUpgrades {
-			upgrades = append(upgrades, fmt.Sprintf("%s +%d %s", u.ToolName, u.Count, u.UpgradeType))
-		}
-		output.WriteString(ui.FormatListBullet(ui.SuccessStyleNoBold.Render(fmt.Sprintf("Tool upgrades applied: %s", strings.Join(upgrades, ", ")))))
-	}
-	if len(rewards.Achievements) > 0 {
-		output.WriteString(ui.FormatListBullet(ui.SuccessStyleNoBold.Render(fmt.Sprintf("Achievements unlocked: %s", strings.Join(rewards.Achievements, ", ")))))
-	}
-
-	if len(mission.Unlocks) > 0 {
-		output.WriteString("\n")
-		output.WriteString(ui.FormatKeyValuePair("New missions unlocked:", strings.Join(mission.Unlocks, ", ")) + "\n")
-	}
-
-	return &CommandResult{Output: output.String()}
+	return &CommandResult{Output: ui.SuccessStyle.Render("Mission abandoned: ") + name + "\n"}
 }
 
 func (h *CommandHandler) handleMissionStatus() *CommandResult {
+	// Re-check completion so missions done in any order can complete when viewing progress
+	missionCompleted := h.missionService.TryAutoComplete(h.user.ID)
+
+	var output strings.Builder
+
+	// Show Story Arc Progress
+	arcProgress := h.missionService.GetStoryArcProgress(h.user.ID)
+	if len(arcProgress) > 0 {
+		output.WriteString(ui.FormatSectionHeader("Story Arc Progress:", "📖"))
+		output.WriteString("\n")
+		
+		for _, arc := range arcProgress {
+			statusIcon := "🔄"
+			var statusStyle lipgloss.Style = ui.WarningStyle
+			if arc.IsCompleted {
+				statusIcon = "✅"
+				statusStyle = ui.SuccessStyleNoBold
+			}
+			
+			output.WriteString(fmt.Sprintf("  %s %s\n", statusIcon, ui.AccentBoldStyle.Render(arc.ArcName)))
+			output.WriteString(fmt.Sprintf("     %s (%d/%d missions)\n", 
+				statusStyle.Render(fmt.Sprintf("%d%%", arc.PercentComplete)),
+				arc.CompletedCount, arc.TotalMissions))
+		}
+		output.WriteString("\n")
+	}
+	
+	// Show Endless Mode Status
+	endlessMode := h.missionService.GetEndlessModeStatus(h.user.ID)
+	if endlessMode.IsUnlocked {
+		output.WriteString(ui.FormatSectionHeader("Endless Mode:", "♾️"))
+		output.WriteString("\n")
+		output.WriteString(ui.SuccessStyle.Render("  ✓ UNLOCKED") + "\n")
+		output.WriteString(fmt.Sprintf("  Story Arcs Completed: %d/%d\n", endlessMode.CompletedArcs, endlessMode.TotalArcs))
+		output.WriteString(fmt.Sprintf("  Procedural Missions: %d\n", endlessMode.ProceduralMissions))
+		output.WriteString(fmt.Sprintf("  Highest Tier Reached: %d/10\n", endlessMode.HighestTierReached))
+		output.WriteString(fmt.Sprintf("  Servers Exploited: %d\n", endlessMode.ServersExploited))
+		output.WriteString("\n")
+	} else if len(arcProgress) > 0 {
+		output.WriteString(ui.DimStyle.Render("  Endless Mode: Complete a story arc to unlock") + "\n\n")
+	}
+	
+	// Show Current Mission Progress
 	userMissions, err := h.missionService.GetUserMissions(h.user.ID)
 	if err != nil {
 		return &CommandResult{Error: err}
 	}
 
-	var output strings.Builder
-	output.WriteString(ui.FormatSectionHeader("Your Mission Progress:", "📊"))
+	output.WriteString(ui.FormatSectionHeader("Active Missions:", "📊"))
 	output.WriteString("\n")
 
 	if len(userMissions) == 0 {
-		output.WriteString("No missions started yet. Use 'mission' to see available missions.\n")
-		return &CommandResult{Output: output.String()}
+		output.WriteString("  No missions started yet. Use 'mission' to see available missions.\n")
+		return &CommandResult{Output: output.String(), MissionCompleted: missionCompleted}
 	}
 
+	hasActive := false
 	for _, um := range userMissions {
+		if um.Status == "completed" {
+			continue // Skip completed missions in active list
+		}
+		hasActive = true
+		
 		mission, err := h.missionService.GetMissionByID(um.MissionID)
 		if err != nil {
 			continue
@@ -250,19 +336,33 @@ func (h *CommandHandler) handleMissionStatus() *CommandResult {
 
 		var statusStyle lipgloss.Style
 		switch um.Status {
-		case "completed":
-			statusStyle = ui.SuccessStyleNoBold
 		case "in_progress":
 			statusStyle = ui.WarningStyle
 		default:
 			statusStyle = ui.GrayStyle
 		}
 
-		output.WriteString(ui.FormatKeyValuePair("Mission:", mission.Name) + "\n")
-		output.WriteString(ui.FormatKeyValuePair("Status:", statusStyle.Render(um.Status)) + "\n")
-		output.WriteString(ui.FormatKeyValuePair("Progress:", fmt.Sprintf("%d%%", um.Progress)) + "\n")
+		output.WriteString(ui.FormatKeyValuePair("  Mission:", mission.Name) + "\n")
+		output.WriteString(ui.FormatKeyValuePair("    Status:", statusStyle.Render(um.Status)) + "\n")
+		
+		// Calculate real-time progress from action tracker
+		realProgress := h.missionService.GetMissionProgress(h.user.ID, um.MissionID)
+		output.WriteString(ui.FormatKeyValuePair("    Progress:", fmt.Sprintf("%d%%", realProgress)) + "\n")
+		
+		// Show incomplete objectives
+		incomplete := h.missionService.GetIncompleteObjectives(h.user.ID, um.MissionID)
+		if len(incomplete) > 0 {
+			output.WriteString("    " + ui.DimStyle.Render("Remaining:") + "\n")
+			for _, obj := range incomplete {
+				output.WriteString("      • " + ui.DimStyle.Render(obj.Description) + "\n")
+			}
+		}
 		output.WriteString("\n")
 	}
+	
+	if !hasActive {
+		output.WriteString("  No active missions. Use 'mission' to see available missions.\n")
+	}
 
-	return &CommandResult{Output: output.String()}
+	return &CommandResult{Output: output.String(), MissionCompleted: missionCompleted}
 }

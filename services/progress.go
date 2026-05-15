@@ -11,7 +11,8 @@ type OperationType string
 const (
 	OperationDownload OperationType = "download" // Tool download operation
 	OperationExploit  OperationType = "exploit"  // Server exploitation operation
-	OperationSSH      OperationType = "ssh"      // SSH connection operation
+	OperationConnect  OperationType = "connect"  // Server connection operation (SSH, FTP, Telnet, etc.)
+	OperationSSH      OperationType = "ssh"      // Deprecated: use OperationConnect instead
 	OperationTransfer OperationType = "transfer" // Data transfer operation
 )
 
@@ -31,7 +32,8 @@ func (s *ProgressService) CalculateOperationTime(operationType OperationType, us
 	baseTimes := map[OperationType]float64{
 		OperationDownload: 5.0,
 		OperationExploit:  3.0,
-		OperationSSH:      2.0,
+		OperationConnect:  2.0,
+		OperationSSH:      2.0, // Deprecated: kept for backward compatibility
 		OperationTransfer: 4.0,
 	}
 
@@ -55,7 +57,8 @@ func (s *ProgressService) CalculateToolOperationTime(operationType OperationType
 	baseTimes := map[OperationType]float64{
 		OperationDownload: 5.0,
 		OperationExploit:  3.0,
-		OperationSSH:      2.0,
+		OperationConnect:  2.0,
+		OperationSSH:      2.0, // Deprecated: kept for backward compatibility
 		OperationTransfer: 4.0,
 	}
 

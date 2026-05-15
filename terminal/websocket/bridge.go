@@ -345,15 +345,7 @@ func (b *BubbleTeaBridge) processMessages() {
 			
 			// Execute any returned command
 			if cmd != nil {
-				go func(c tea.Cmd) {
-					if msg := c(); msg != nil {
-						select {
-						case b.msgChan <- msg:
-						case <-b.done:
-							return
-						}
-					}
-				}(cmd)
+				go b.executeCmd(cmd)
 			}
 			
 			// Check if we transitioned models
@@ -593,6 +585,36 @@ func (b *BubbleTeaBridge) closeDone() {
 // Close closes the bridge
 func (b *BubbleTeaBridge) Close() {
 	b.closeDone()
+}
+
+// executeCmd executes a tea.Cmd and handles BatchMsg properly.
+// This is essential for commands that use tea.Batch to run multiple operations.
+func (b *BubbleTeaBridge) executeCmd(c tea.Cmd) {
+	if c == nil {
+		return
+	}
+	
+	msg := c()
+	if msg == nil {
+		return
+	}
+	
+	// Handle BatchMsg - execute all commands in the batch
+	if batchMsg, ok := msg.(tea.BatchMsg); ok {
+		for _, cmd := range batchMsg {
+			if cmd != nil {
+				go b.executeCmd(cmd)
+			}
+		}
+		return
+	}
+	
+	// Regular message - send to channel
+	select {
+	case b.msgChan <- msg:
+	case <-b.done:
+		return
+	}
 }
 
 // runGradientTicker injects gradient tick messages while the shell welcome animation is active.

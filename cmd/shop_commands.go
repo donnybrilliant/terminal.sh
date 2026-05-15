@@ -31,23 +31,49 @@ func (h *CommandHandler) handleShopList() *CommandResult {
 		return &CommandResult{Error: fmt.Errorf("shop discovery not available")}
 	}
 
-	shops, err := h.shopDiscovery.DiscoverShops(h.user.ID)
+	// Get all shops with their accessibility status
+	shopsWithStatus, err := h.shopDiscovery.GetAllShopsWithStatus(h.user.ID)
 	if err != nil {
 		return &CommandResult{Error: err}
 	}
 
-	if len(shops) == 0 {
+	if len(shopsWithStatus) == 0 {
 		return &CommandResult{Output: "No shops discovered yet. Scan servers to find shops.\n"}
 	}
 
 	var output strings.Builder
 	output.WriteString(ui.FormatSectionHeader("Discovered Shops:", "🛒"))
 	
-	for _, shop := range shops {
-		output.WriteString(ui.ListStyle.Render(fmt.Sprintf("  [%s] ", shop.ID.String()[:8])) + ui.AccentBoldStyle.Render(shop.Name) + "\n")
-		output.WriteString(ui.FormatKeyValuePair("    Type:", string(shop.ShopType)) + "\n")
-		output.WriteString(ui.FormatKeyValuePair("    Location:", formatIP(shop.ServerIP)) + "\n")
-		output.WriteString("    " + ui.ValueStyle.Render(shop.Description) + "\n\n")
+	// Show accessible shops first
+	hasAccessible := false
+	for _, shopStatus := range shopsWithStatus {
+		if shopStatus.Accessible {
+			hasAccessible = true
+			shop := shopStatus.Shop
+			output.WriteString(ui.ListStyle.Render(fmt.Sprintf("  [%s] ", shop.ID.String()[:8])) + ui.AccentBoldStyle.Render(shop.Name) + "\n")
+			output.WriteString(ui.FormatKeyValuePair("    Type:", string(shop.ShopType)) + "\n")
+			output.WriteString(ui.FormatKeyValuePair("    Location:", formatIP(shop.ServerIP)) + "\n")
+			output.WriteString("    " + ui.ValueStyle.Render(shop.Description) + "\n\n")
+		}
+	}
+
+	// Show locked shops
+	hasLocked := false
+	for _, shopStatus := range shopsWithStatus {
+		if !shopStatus.Accessible {
+			if !hasLocked {
+				output.WriteString(ui.FormatSectionHeader("Locked Shops:", "🔒"))
+				hasLocked = true
+			}
+			shop := shopStatus.Shop
+			output.WriteString(ui.DimStyle.Render(fmt.Sprintf("  [%s] %s\n", shop.ID.String()[:8], shop.Name)))
+			output.WriteString(ui.DimStyle.Render(fmt.Sprintf("    %s\n", shopStatus.Reason)))
+			output.WriteString("\n")
+		}
+	}
+
+	if !hasAccessible && hasLocked {
+		output.WriteString(ui.InfoStyle.Render("Complete missions and level up to unlock shops!\n\n"))
 	}
 
 	output.WriteString(ui.FormatUsage("Usage: shop <shopID> - Browse shop inventory"))
@@ -82,6 +108,14 @@ func (h *CommandHandler) handleShopBrowse(shopID string) *CommandResult {
 		}
 		if shop == nil {
 			return &CommandResult{Error: fmt.Errorf("shop not found")}
+		}
+	}
+
+	// Check if user can access this shop
+	if h.shopDiscovery != nil {
+		accessible, reason := h.shopDiscovery.CanAccessShop(h.user.ID, shop)
+		if !accessible {
+			return &CommandResult{Error: fmt.Errorf("shop locked: %s", reason)}
 		}
 	}
 
@@ -153,6 +187,14 @@ func (h *CommandHandler) handleBUY(args []string) *CommandResult {
 	shop, err := h.shopService.GetShopByServerIP(shopID)
 	if err != nil {
 		return &CommandResult{Error: fmt.Errorf("shop not found")}
+	}
+
+	// Check if user can access this shop
+	if h.shopDiscovery != nil {
+		accessible, reason := h.shopDiscovery.CanAccessShop(h.user.ID, shop)
+		if !accessible {
+			return &CommandResult{Error: fmt.Errorf("shop locked: %s", reason)}
+		}
 	}
 
 	// Get items

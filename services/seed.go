@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"terminal-sh/database"
@@ -40,7 +41,52 @@ func seedServersFromJSON(db *database.Database) error {
 		return fmt.Errorf("failed to parse servers.json: %w", err)
 	}
 
-		for _, server := range serverData.Servers {
+	for i := range serverData.Servers {
+		server := serverData.Servers[i]
+		if err := seedServerWithLocalNetwork(db, &server); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func seedServerWithLocalNetwork(db *database.Database, server *models.Server) error {
+	if server.LocalNetwork == nil {
+		server.LocalNetwork = make(map[string]interface{})
+	}
+
+	localRefs := make(map[string]interface{})
+	for ip, raw := range server.LocalNetwork {
+		switch value := raw.(type) {
+		case map[string]interface{}:
+			var child models.Server
+			payload, err := json.Marshal(value)
+			if err != nil {
+				return fmt.Errorf("failed to marshal local server %s: %w", ip, err)
+			}
+			if err := json.Unmarshal(payload, &child); err != nil {
+				return fmt.Errorf("failed to parse local server %s: %w", ip, err)
+			}
+			if child.IP == "" {
+				child.IP = ip
+			}
+			if child.LocalIP == "" {
+				child.LocalIP = ip
+			}
+			if err := seedServerWithLocalNetwork(db, &child); err != nil {
+				return err
+			}
+			localRefs[ip] = child.IP
+		case string:
+			localRefs[ip] = value
+		default:
+			localRefs[ip] = ip
+		}
+	}
+
+	server.LocalNetwork = localRefs
+
 		// Check if server already exists
 		var existing models.Server
 		err := db.Where("ip = ?", server.IP).First(&existing).Error
@@ -51,14 +97,30 @@ func seedServersFromJSON(db *database.Database) error {
 				if err := db.Find(&tools).Error; err == nil {
 					// Mission-exclusive tools that should NOT be in repo
 					missionExclusiveTools := map[string]bool{
-						"phishing_kit":      true,
-						"database_dumper":   true,
-						"log_cleaner":       true,
-						"timestomper":       true,
-						"audit_disable":     true,
-						"hash_cracker":      true,
-						"log_analyzer":      true,
-						"backup_destroyer":  true,
+						"packet_capture":     true,
+						"password_sniffer":   true,
+						"password_cracker":   true,
+						"ssh_exploit":        true,
+						"user_enum":          true,
+						"privesc_scanner":    true,
+						"sudo_exploit":       true,
+						"kernel_exploit":     true,
+						"suid_finder":        true,
+						"phishing_kit":       true,
+						"database_dumper":    true,
+						"hash_cracker":       true,
+						"log_cleaner":        true,
+						"timestomper":        true,
+						"audit_disable":      true,
+						"lan_sniffer":        true,
+						"packet_decoder":     true,
+						"log_analyzer":       true,
+						"rootkit":            true,
+						"exploit_kit":        true,
+						"advanced_exploit_kit": true,
+						"xss_exploit":        true,
+						"crypto_miner":       true,
+						"backup_destroyer":   true,
 					}
 					
 					var toolNames []string
@@ -72,15 +134,13 @@ func seedServersFromJSON(db *database.Database) error {
 				}
 			}
 			
-			if err := db.Create(&server).Error; err != nil {
+			if err := db.Create(server).Error; err != nil {
 				return fmt.Errorf("failed to seed server %s: %w", server.IP, err)
 			}
 		} else if err != nil {
 			return fmt.Errorf("failed to check server %s: %w", server.IP, err)
 		}
 		// If server exists, skip it
-	}
-
 	return nil
 }
 
@@ -92,7 +152,7 @@ func createRepoServer(db *database.Database) (*models.Server, error) {
 	if err == nil {
 		return &existing, nil
 	}
-	if err != nil && err != gorm.ErrRecordNotFound {
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 	
@@ -104,14 +164,30 @@ func createRepoServer(db *database.Database) (*models.Server, error) {
 	
 	// Mission-exclusive tools that should NOT be in repo
 	missionExclusiveTools := map[string]bool{
-		"phishing_kit":      true,
-		"database_dumper":   true,
-		"log_cleaner":       true,
-		"timestomper":       true,
-		"audit_disable":     true,
-		"hash_cracker":      true,
-		"log_analyzer":      true,
-		"backup_destroyer":  true,
+		"packet_capture":     true,
+		"password_sniffer":   true,
+		"password_cracker":   true,
+		"ssh_exploit":        true,
+		"user_enum":          true,
+		"privesc_scanner":    true,
+		"sudo_exploit":       true,
+		"kernel_exploit":     true,
+		"suid_finder":        true,
+		"phishing_kit":       true,
+		"database_dumper":    true,
+		"hash_cracker":       true,
+		"log_cleaner":        true,
+		"timestomper":        true,
+		"audit_disable":      true,
+		"lan_sniffer":        true,
+		"packet_decoder":     true,
+		"log_analyzer":       true,
+		"rootkit":            true,
+		"exploit_kit":        true,
+		"advanced_exploit_kit": true,
+		"xss_exploit":        true,
+		"crypto_miner":       true,
+		"backup_destroyer":   true,
 	}
 	
 	// Create tool names list (exclude patches and mission-exclusive tools)
@@ -169,7 +245,7 @@ func createTestServer(db *database.Database) (*models.Server, error) {
 	if err == nil {
 		return &existing, nil
 	}
-	if err != nil && err != gorm.ErrRecordNotFound {
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 	
@@ -232,6 +308,8 @@ func seedShopsFromJSON(db *database.Database) error {
 			ShopType        string        `json:"shop_type"`
 			ShopName        string        `json:"shop_name"`
 			ShopDescription string        `json:"shop_description"`
+			RequiredMission string        `json:"required_mission,omitempty"`
+			RequiredLevel   int           `json:"required_level,omitempty"`
 			Items           []struct {
 				ItemType    string  `json:"item_type"`
 				ItemID      string  `json:"item_id"`
@@ -279,8 +357,15 @@ func seedShopsFromJSON(db *database.Database) error {
 			shopType = models.ShopTypeTools
 		}
 
-		// Create shop
-		shop, err := shopService.CreateShop(shopDef.ServerIP, shopType, shopDef.ShopName, shopDef.ShopDescription)
+		// Create shop with requirements
+		shop, err := shopService.CreateShopWithRequirements(
+			shopDef.ServerIP, 
+			shopType, 
+			shopDef.ShopName, 
+			shopDef.ShopDescription,
+			shopDef.RequiredMission,
+			shopDef.RequiredLevel,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to create shop: %w", err)
 		}

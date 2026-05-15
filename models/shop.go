@@ -19,13 +19,15 @@ const (
 
 // Shop represents a shop on a server where users can purchase items.
 type Shop struct {
-	ID          uuid.UUID `gorm:"type:text;primary_key" json:"id"`
-	ServerIP    string    `gorm:"uniqueIndex;not null" json:"server_ip"`
-	ShopType    ShopType  `gorm:"not null" json:"shop_type"`
-	Name        string    `gorm:"not null" json:"name"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID              uuid.UUID `gorm:"type:text;primary_key" json:"id"`
+	ServerIP        string    `gorm:"uniqueIndex;not null" json:"server_ip"`
+	ShopType        ShopType  `gorm:"not null" json:"shop_type"`
+	Name            string    `gorm:"not null" json:"name"`
+	Description     string    `json:"description"`
+	RequiredMission string    `json:"required_mission,omitempty"` // Mission ID that must be completed to access this shop
+	RequiredLevel   int       `json:"required_level,omitempty"`   // Minimum player level to access this shop
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 
 	// Relationships
 	Items []ShopItem `gorm:"foreignKey:ShopID" json:"items,omitempty"`

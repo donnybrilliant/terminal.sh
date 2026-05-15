@@ -228,7 +228,13 @@ var (
 
 // RenderPrompt renders the shell prompt with styled user, hostname, and path.
 func RenderPrompt(user, hostname, path string) string {
-	prompt := fmt.Sprintf("%s@%s:%s$ ", user, hostname, path)
+	return RenderPromptWithChar(user, hostname, path, "$")
+}
+
+// RenderPromptWithChar renders a command prompt with a custom prompt character.
+// Uses # for root, $ for regular users.
+func RenderPromptWithChar(user, hostname, path, promptChar string) string {
+	prompt := fmt.Sprintf("%s@%s:%s%s ", user, hostname, path, promptChar)
 	return promptStyle.Render(prompt)
 }
 

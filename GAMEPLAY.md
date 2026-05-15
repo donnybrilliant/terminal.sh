@@ -80,6 +80,16 @@ The game features a virtual filesystem where you can create and manage files:
 - `edit <filename>` or `vi <filename>` or `nano <filename>` - Edit a file
   - In edit mode: `:save` to save, `:exit` to exit
 
+**Download files from remote servers (when connected):**
+- `download <path>` or `dl <path>` - Download a file to `~/Downloads/` on your home computer
+  - Must be connected to a server (via `ssh`, `telnet`, `connect`, or `ftp`)
+  - Supports absolute paths (`/root/secret.txt`) and relative paths (`secret.txt`)
+  - Files are saved to `~/Downloads/` - the Downloads folder is created automatically
+  - Examples:
+    - `download /root/secret_key.txt` - Download from root's home
+    - `download secret.txt` - Download from current directory
+    - `download ../etc/config.conf` - Download using relative path
+
 ### System Commands
 
 - `clear` - Clear the screen
@@ -125,33 +135,72 @@ This discovers servers on the public internet. Servers with shops will be marked
 scan <targetIP>
 ```
 This reveals:
-- Services running on the server
+- Services running on the server (SSH, Telnet, FTP, HTTP, etc.)
 - Vulnerabilities and their security levels
 - Server resources (CPU, RAM, bandwidth)
 - Security level
 
-**Scan local network (when SSH'd into a server):**
+**Vulnerability Status:**
+- **CLOSED** (red): Vulnerability not yet exploited
+- **OPEN** (green): Vulnerability successfully exploited - stays open permanently
+
+**Scan local network (when connected to a server):**
 ```bash
 scan
 ```
-When connected to a server via SSH, `scan` shows servers on that server's local network.
+When connected to a server, `scan` shows servers on that server's local network. This enables "server hopping" - exploiting internal servers that are only accessible from within the network.
 
 ### Connecting to Servers
 
-**SSH into a server:**
+To connect to a server, you must first exploit a **shell-granting service** on that server. Different services grant shell access:
+
+| Service | Grants Shell Access | Notes |
+|---------|---------------------|-------|
+| SSH | Always | Primary shell access method |
+| Telnet | Always | Legacy protocol, often weaker security |
+| FTP | Only with RCE | Requires Remote Code Execution vulnerability |
+| HTTP | Never | Data extraction only (SQL injection, XSS) |
+| MySQL | Never | Data extraction only |
+
+#### Connection Commands
+
+**Connect via any exploited service (auto-detect):**
 ```bash
-ssh <targetIP>
+connect <targetIP>
 ```
-- You must exploit a server before you can SSH into it
-- Supports nested SSH (SSH into servers within servers)
+Automatically uses the first shell-granting service you've exploited.
+
+**Connect via specific service:**
+```bash
+ssh <targetIP>      # Connect via SSH (requires SSH to be exploited)
+telnet <targetIP>   # Connect via Telnet (requires Telnet to be exploited)
+ftp <targetIP>      # Connect via FTP (requires FTP with RCE exploit)
+```
+
+**Examples:**
+```bash
+# After exploiting SSH on "test" server
+ssh test            # Connects via SSH
+
+# After exploiting Telnet on "test" server  
+telnet test         # Connects via Telnet
+
+# Auto-detect - uses whichever service you've exploited
+connect test        # Uses SSH, Telnet, or FTP (whichever is available)
+```
+
+**Connection Notes:**
+- You must exploit a shell-granting service before you can connect
+- Supports nested connections (connect to servers within servers for "server hopping")
 - Use `exit` to disconnect and return to the previous server
 - Use `exit` at the top level to quit the game
+- The connection message shows which service type was used
 
 **View current server info:**
 ```bash
 server
 ```
-Shows hardware info when connected to a server via SSH.
+Shows hardware info when connected to a server.
 
 ## Game Mechanics
 
@@ -165,11 +214,16 @@ Tools are hacking utilities that allow you to exploit servers. Each tool has:
 
 #### Getting Tools
 
-**Download from the repo server:**
+**Unlock via missions and shops first:**
+- Early tools are granted by story missions.
+- Advanced tools unlock later via shops or additional repos.
+- Tools hosted on servers are only visible after you gain access.
+
+**Download from the repo server (when unlocked):**
 ```bash
 get repo <toolName>
 ```
-The `repo` server contains all basic tools for free download.
+The `repo` server contains basic tools once your progression unlocks access.
 
 **List your tools:**
 ```bash
@@ -179,25 +233,62 @@ Shows all tools you own, their versions, applied patches, and effective exploits
 
 #### Using Tools
 
-Once you own a tool, you can use it as a command:
+Once you own a tool, you can use it as a command. The game features a **realistic exploitation flow**:
 
-**Password Cracking:**
+### Credential-Based Access (Password Cracking)
+
+This is the most common path to gaining access:
+
+**Step 1: Enumerate Users**
+```bash
+user_enum <targetIP>
+```
+Discovers usernames on the server. This information helps `password_cracker` crack more accounts.
+
+**Step 2: Crack Passwords**
 ```bash
 password_cracker <targetIP>
 ```
-Cracks passwords on a server. Works on servers with password vulnerabilities.
+Cracks passwords for discovered users. Works on services with `password_cracking` vulnerabilities:
+- SSH (port 22)
+- Telnet (port 23)
+- FTP (port 21)
+
+If you ran `user_enum` first, you'll crack all discovered users. Otherwise, it tries common usernames.
+
+**Step 3: Connect with Credentials**
+```bash
+ssh <targetIP>      # Connect via SSH with cracked credentials
+telnet <targetIP>   # Connect via Telnet
+connect <targetIP>  # Auto-detect service
+```
+
+### Direct Access (RCE Exploits)
+
+For servers with Remote Code Execution vulnerabilities, you can gain direct shell access without credentials:
 
 **SSH Exploitation:**
 ```bash
 ssh_exploit <targetIP>
 ```
-Exploits SSH vulnerabilities to gain access.
+Exploits RCE/buffer overflow vulnerabilities on SSH to install a **backdoor**. This gives you immediate root access without needing passwords.
+
+### Managing Access
+
+**View all your access:**
+```bash
+exploited          # Show all server access (credentials + backdoors)
+credentials        # List all discovered username/password pairs
+backdoors          # List all installed backdoors
+```
+
+### Reconnaissance Tools
 
 **User Enumeration:**
 ```bash
 user_enum <targetIP>
 ```
-Enumerates users on a server to gather information.
+Discovers usernames on a server. Run this before `password_cracker` for better results.
 
 **Network Sniffing:**
 ```bash
@@ -284,6 +375,10 @@ Creates phishing emails and sites to gather credentials. Must be used on an expl
 
 ### Exploitation Workflow
 
+There are two paths to gaining server access:
+
+#### Path A: Credential Cracking (Most Common)
+
 1. **Scan for servers:**
    ```bash
    scan
@@ -293,33 +388,214 @@ Creates phishing emails and sites to gather credentials. Must be used on an expl
    ```bash
    scan <targetIP>
    ```
-   Note the services and vulnerabilities.
+   Note the services and `password_cracking` vulnerabilities.
 
-3. **Download the appropriate tool:**
+3. **Download tools:**
    ```bash
-   get repo <toolName>
+   get repo user_enum
+   get repo password_cracker
    ```
 
-4. **Exploit the server:**
+4. **Enumerate users (optional but recommended):**
    ```bash
-   <toolName> <targetIP>
+   user_enum <targetIP>
+   ```
+   Discovers usernames - `password_cracker` will crack all discovered users.
+
+5. **Crack passwords:**
+   ```bash
+   password_cracker <targetIP>
+   ```
+   Outputs cracked username:password pairs.
+
+6. **Connect with credentials:**
+   ```bash
+   ssh <targetIP>      # Uses cracked credentials
+   connect <targetIP>  # Auto-detect
    ```
 
-5. **SSH into the exploited server:**
+#### Path B: RCE Exploit (Direct Access)
+
+1. **Find server with RCE vulnerability:**
+   ```bash
+   scan <targetIP>
+   ```
+   Look for `remote_code_execution` or `buffer_overflow` vulnerabilities.
+
+2. **Download RCE tool:**
+   ```bash
+   get repo ssh_exploit
+   ```
+
+3. **Exploit and install backdoor:**
+   ```bash
+   ssh_exploit <targetIP>
+   ```
+   Installs a backdoor with root access - no credentials needed!
+
+4. **Connect via backdoor:**
    ```bash
    ssh <targetIP>
    ```
 
-6. **Explore the server:**
-   - Use filesystem commands to browse
-   - Scan the local network for more servers
-   - Look for tools to download
+#### After Gaining Access
 
-**Check exploited servers:**
+**Explore the server:**
+- Use filesystem commands (`ls`, `cd`, `cat`)
+- Check `/var/log/` for useful information
+- Scan the local network for internal servers
+- Look for tools or sensitive data
+
+**Manage your access:**
 ```bash
-exploited
+exploited      # Show all access (credentials + backdoors)
+credentials    # List cracked passwords
+backdoors      # List installed backdoors
 ```
-Lists all servers you've successfully exploited.
+
+### Role-Based Access System
+
+Servers have multiple user accounts (roles) with different privilege levels. Your access level determines what you can do on a server.
+
+#### Role Types
+
+| Role Type | Symbol | Home Directory | Can Access |
+|-----------|--------|----------------|------------|
+| **root** | `#` | `/root` | Everything - full system access |
+| **admin** | `$` | `/home/<username>` | Most files, can sudo |
+| **user** | `$` | `/home/<username>` | Own home, `/tmp`, public files |
+| **guest** | `$` | `/home/<username>` | Read-only, very limited |
+
+#### Prompt Indicators
+
+The shell prompt shows your current user and privilege level:
+
+```bash
+root@192.168.1.100:/root#      # Root user (# prompt)
+admin@192.168.1.100:/home/admin$   # Admin user ($ prompt)
+user@192.168.1.100:/home/user$     # Regular user ($ prompt)
+```
+
+#### File Access Permissions
+
+Different roles have different filesystem permissions:
+
+| Path | root | admin | user | guest |
+|------|------|-------|------|-------|
+| `/root/*` | ✅ | ❌ | ❌ | ❌ |
+| `/etc/shadow` | ✅ | ❌ | ❌ | ❌ |
+| `/etc/sudoers` | ✅ | ❌ | ❌ | ❌ |
+| `/home/<user>/*` | ✅ | ✅ (own) | ✅ (own) | ❌ |
+| `/var/log/*` | ✅ | ✅ (read) | ✅ (read) | ❌ |
+| `/tmp/*` | ✅ | ✅ | ✅ | ✅ (read) |
+
+#### How Role is Determined
+
+Your role depends on how you gained access:
+
+- **Credential cracking** → Connects as the cracked user (user, admin, etc.)
+- **RCE backdoor** → Usually grants root access
+- **Privilege escalation** → Upgrades current role to root
+
+### Privilege Escalation
+
+If you connect as a low-privilege user (not root), you can attempt to escalate to root using local vulnerabilities.
+
+#### Workflow
+
+1. **Connect with non-root credentials:**
+   ```bash
+   ssh <targetIP>   # Connects as 'user' if you cracked user's password
+   ```
+
+2. **Scan for privilege escalation vectors:**
+   ```bash
+   privesc_scanner
+   ```
+   Shows local vulnerabilities like sudo misconfigurations, SUID binaries, kernel vulns.
+
+3. **Exploit a vulnerability:**
+   ```bash
+   sudo_exploit     # Exploit sudo misconfiguration
+   suid_finder      # Find and exploit SUID binaries
+   kernel_exploit   # Exploit kernel vulnerability
+   ```
+
+4. **Reconnect with root:**
+   ```bash
+   exit
+   ssh <targetIP>   # Now connects as root!
+   ```
+
+#### Privilege Escalation Tools
+
+| Tool | What It Exploits | Difficulty |
+|------|------------------|------------|
+| `privesc_scanner` | Scans for all local vulns | - |
+| `sudo_exploit` | Sudo misconfigurations | Medium |
+| `suid_finder` | SUID binary vulnerabilities | Medium |
+| `kernel_exploit` | Kernel CVEs | Hard |
+
+#### Example: Privilege Escalation
+
+```bash
+# 1. You cracked 'user' password and connected
+user@192.168.1.100:/home/user$ 
+
+# 2. Try to read root's secrets - permission denied!
+user@192.168.1.100:/home/user$ cd /root
+Permission denied
+
+# 3. Scan for privilege escalation
+user@192.168.1.100:/home/user$ privesc_scanner
+Found 2 potential privilege escalation vectors:
+  1. SUDO Misconfiguration Level 8 → root
+     User can run vim as root without password
+     Target: /usr/bin/vim
+
+# 4. Exploit it!
+user@192.168.1.100:/home/user$ sudo_exploit
+✅ PRIVILEGE ESCALATION SUCCESSFUL!
+Now running as: root
+
+# 5. Reconnect to use root
+user@192.168.1.100:/home/user$ exit
+$ ssh 192.168.1.100
+root@192.168.1.100:/root# 
+
+# 6. Now we can access everything!
+root@192.168.1.100:/root# cat secret_key.txt
+MASTER_KEY=sk_live_9x8y7z6w5v4u3t2s1r0q
+```
+
+#### Why Privilege Escalation Matters
+
+- **Access sensitive files** like `/root/*`, `/etc/shadow`
+- **Find more credentials** stored in root's home
+- **Install persistent backdoors**
+- **Complete missions** that require root access
+- **Higher rewards** from fully compromising servers
+
+### Server Logs
+
+Servers maintain dynamic logs that record activity. When you read log files on a server, you'll see both pre-existing (seeded) logs and real-time activity logs from your actions and other players.
+
+**Key log files:**
+- `/var/log/auth.log` - Authentication events (connections, exploits, login attempts)
+- `/var/log/system.log` - System events (commands, file access, scans)
+
+**Log entries include:**
+- **Connections**: When users connect/disconnect via SSH, Telnet, FTP
+- **Exploit attempts**: Both successful and failed exploitation attempts
+- **Scans**: Port scans detected from specific IPs
+- **Commands**: Commands executed on the server
+
+**IP Tracking:**
+Logs show the **source IP** of each action. When server hopping, the source IP reflects your last hop:
+- Direct connection from your machine → your IP is logged
+- Connection from Server A to Server B → Server A's IP is logged on Server B
+
+This is important for stealth - use `log_cleaner` to cover your tracks!
 
 ### Cryptocurrency Mining
 
@@ -358,6 +634,9 @@ Shops are special servers where you can purchase items. Shops are discovered aut
 ```bash
 shop
 ```
+This shows:
+- **Accessible shops** - Shops you can browse and purchase from
+- **Locked shops** - Shops that require mission completion or higher level
 
 **Browse a shop:**
 ```bash
@@ -370,16 +649,24 @@ Shows inventory with prices in crypto and/or data currency.
 buy <shopID> <itemNumber>
 ```
 
+**Shop Unlocking:**
+Some shops require completing missions or reaching certain levels:
+- **Resource Boost Shop** - Unlocks after completing "The Coffee Shop WiFi" (corp_espionage_01)
+- **Elite Tools Shop** - Unlocks after completing "Secure Shell Access" (corp_espionage_03) and reaching Level 3
+
+Locked shops will show requirements in the shop list.
+
 **Shop Types:**
 - **repo**: Free downloadable resources (tools)
-- **tools**: Purchasable tools
+- **tools**: Purchasable upgrade tokens
 - **resources**: CPU/RAM/Bandwidth upgrades
 - **mixed**: Combination of the above
 
 **Item Types:**
-- **Tools**: New hacking tools
-- **Patches**: Tool upgrades (see Patch System)
-- **Resources**: Resource upgrades for your user account
+- **Upgrade Tokens**: Free tool upgrades (exploit boost, CPU/RAM/BW optimization)
+- **Resources**: Resource upgrades for your user account (CPU, RAM, Bandwidth boosts)
+
+Note: Tools are primarily obtained through mission rewards, not shops.
 
 ### Patch System
 
@@ -619,6 +906,7 @@ tutorial <tutorialID>
 - `exploitation` - Learn how to exploit servers
 - `mining` - Learn cryptocurrency mining
 - `advanced_tools` - Learn about advanced exploitation tools
+- `privilege_escalation` - Learn how to escalate privileges
 - `story_missions` - Learn about story missions and exclusive rewards
 
 Tutorials have prerequisites, so complete them in order for the best learning experience.
@@ -650,49 +938,44 @@ Shows complete information including:
 - Prerequisites (previous missions)
 - Rewards (experience, crypto, tools, patches, achievements)
 
-### Starting Missions
+### Story vs Board Missions
 
-**Start a mission:**
+**Story missions** start automatically on triggers (e.g., `cat README.txt` starts the home recovery mission). Objectives complete automatically as you play—no need to type "mission complete".
+
+**Mission board** missions require you to accept them:
 ```bash
 mission start <missionID>
 ```
 
-Requirements:
-- All prerequisite missions must be completed
-- You must meet the required level
-- You must have the required tools (if any)
+**Abandon a mission:**
+```bash
+mission stop <missionID>
+```
 
 **Check your progress:**
 ```bash
 mission status
 ```
 
-Shows all your started missions with completion percentage.
-
-### Completing Missions
-
-**Complete a mission:**
-```bash
-mission complete <missionID>
-```
-
-After completing all objectives, use this command to finish the mission and receive rewards:
-- Experience points
-- Cryptocurrency
-- **Exclusive tools** (unlocked only through missions)
-- **Exclusive patches** (cannot be purchased)
-- **Achievements** (displayed in `userinfo`)
+This shows:
+- Story arc completion percentages
+- Endless mode status (if unlocked)
+- Active missions with real-time objective progress
+- Remaining objectives for each mission
 
 ### Mission Rewards
 
 Missions unlock exclusive content that cannot be obtained elsewhere:
 
 **Mission-Locked Tools:**
-- `log_cleaner` - Delete system logs (from "Cover Your Tracks")
-- `timestomper` - Modify file timestamps (from "Cover Your Tracks")
-- `database_dumper` - Extract database contents (from "Database Heist")
-- `phishing_kit` - Create phishing campaigns (from "Phishing for Answers")
-- `hash_cracker` - Advanced hash cracking (from various missions)
+- `packet_capture`, `password_sniffer`, `password_cracker` - Early access tools from WiFi/Legacy missions
+- `ssh_exploit`, `user_enum` - Secure Shell access mission
+- `privesc_scanner`, `sudo_exploit`, `kernel_exploit`, `suid_finder` - Privilege escalation mission
+- `phishing_kit`, `database_dumper`, `hash_cracker` - Corporate espionage missions
+- `log_cleaner`, `timestomper`, `audit_disable` - Cover Your Tracks mission
+- `lan_sniffer`, `packet_decoder`, `log_analyzer`, `rootkit` - Field Operations arc
+- `exploit_kit`, `advanced_exploit_kit`, `xss_exploit` - Scale exploitation mission
+- `crypto_miner`, `backup_destroyer` - Late Field Operations missions
 
 **Mission-Exclusive Patches:**
 - `stealth_patch_v1` - Reduces log generation
@@ -708,12 +991,59 @@ Missions unlock exclusive content that cannot be obtained elsewhere:
 Missions are organized into story arcs:
 
 **Corporate Espionage Arc:**
-1. "The Coffee Shop WiFi" - Hack public WiFi, find credentials
-2. "Phishing for Answers" - Create phishing campaign
-3. "The Database Heist" - Steal corporate data
-4. "Cover Your Tracks" - Cover your tracks before detection
+1. "The Coffee Shop WiFi" - Capture traffic and extract credentials
+2. "Legacy Access" - Telnet/FTP password access
+3. "Secure Shell Access" - SSH enumeration and exploitation
+4. "Privilege Escalation" - Escalate to root locally
+5. "Phishing for Answers" - Launch phishing campaigns
+6. "The Database Heist" - SQL injection + data extraction
+7. "Cover Your Tracks" - Clean logs and disable auditing
+
+**Field Operations Arc:**
+1. "Network Recon" - LAN sniffing and log analysis
+2. "Persistent Access" - Rootkit installation
+3. "Exploit at Scale" - Multi-exploit tooling
+4. "Resource Hijack" - Crypto mining
+5. "Backup Erasure" - Destroy recovery data
 
 Complete each arc to unlock the next one. Each mission builds on the previous, creating an engaging narrative experience.
+
+### Endless Mode
+
+After completing at least one story arc, **Endless Mode** is unlocked! This provides infinite gameplay through procedurally generated content.
+
+**What Endless Mode offers:**
+- **Procedural Missions** - New missions generated based on your level and capabilities
+- **Procedural Servers** - Fresh servers to exploit, scaled to your tier
+- **10-Tier Difficulty System** - Content scales from Tier 1 (beginner) to Tier 10 (expert)
+- **Server Recycling** - Depleted servers are replaced with new challenges
+
+**Check your Endless Mode status:**
+```bash
+mission status
+```
+
+This shows:
+- Story arcs completed
+- Procedural missions completed
+- Highest tier reached (1-10)
+- Total servers exploited
+
+**Tier System:**
+| Tier | Player Level | Security Range | Features |
+|------|--------------|----------------|----------|
+| 1 | 1 | 1-10 | Basic password cracking |
+| 2 | 2 | 10-20 | SSH, Telnet, FTP |
+| 3 | 3 | 20-30 | HTTP, SQL injection |
+| 4 | 4 | 25-35 | XSS, advanced exploits |
+| 5 | 5 | 30-40 | Complex vulnerabilities |
+| 6 | 6 | 35-50 | **Privilege escalation unlocked** |
+| 7 | 7 | 45-60 | Buffer overflow, rootkits |
+| 8 | 8 | 55-70 | Advanced local exploits |
+| 9 | 9 | 65-85 | Multiple local vulnerabilities |
+| 10 | 10+ | 80-100 | Maximum difficulty |
+
+Local privilege escalation vulnerabilities (sudo misconfig, SUID binaries, kernel exploits) only appear at Tier 6 and above.
 
 ### Mission Tips
 
@@ -751,8 +1081,7 @@ Complete each arc to unlock the next one. Each mission builds on the previous, c
 
 3. **Download basic tools:**
    ```bash
-   get repo password_cracker
-   get repo ssh_exploit
+   mission start corp_espionage_01
    ```
 
 4. **Exploit low-security servers first:**
@@ -765,10 +1094,11 @@ Complete each arc to unlock the next one. Each mission builds on the previous, c
 
 ### Mid Game
 
-1. **Explore nested networks:**
-   - SSH into exploited servers
-   - Scan their local networks
-   - Find more targets
+1. **Explore nested networks (Server Hopping):**
+   - Connect to exploited servers using `connect`, `ssh`, `telnet`, or `ftp`
+   - Scan their local networks to find internal servers
+   - Exploit and connect to internal servers for deeper access
+   - Note: Internal servers may have weaker security but contain valuable data
 
 2. **Upgrade your tools:**
    - Look for patches in shops
@@ -834,24 +1164,32 @@ tools                   # Verify upgrade
 ## Command Reference
 
 ### Filesystem
-- `pwd`, `ls`, `cd`, `cat`, `touch`, `mkdir`, `rm`, `cp`, `mv`, `edit`
+- `pwd`, `ls`, `cd`, `cat`, `touch`, `mkdir`, `rm`, `cp`, `mv`, `edit`, `download`/`dl`
 
 ### System
 - `help`, `clear`, `whoami`, `name`, `info`, `userinfo`, `wallet`
 
 ### Network
-- `scan [targetIP]`, `ifconfig`, `ssh <targetIP>`, `exit`, `server`
+- `scan [targetIP]`, `ifconfig`, `server`, `exit`
+- `connect <targetIP>` - Auto-detect and connect via any exploited service
+- `ssh <targetIP>` - Connect via SSH
+- `telnet <targetIP>` - Connect via Telnet
+- `ftp <targetIP>` - Connect via FTP (requires RCE exploit)
 
 ### Game
-- `get <targetIP> <toolName>`, `tools`, `exploited`
-- `createServer`, `createLocalServer`
+- `get <targetIP> <toolName>` - Download tool from server
+- `tools` - List owned tools
+- `exploited` - Show all server access (credentials + backdoors)
+- `credentials` - List discovered username/password pairs
+- `backdoors` - List installed backdoors
+- `createServer`, `createLocalServer` - Create servers
 
 ### Tools (when owned)
-- `password_cracker`, `ssh_exploit`, `user_enum`, `lan_sniffer`
-- `password_sniffer`, `rootkit`, `exploit_kit`, `advanced_exploit_kit`
-- `sql_injector`, `xss_exploit`, `packet_capture`, `packet_decoder`
-- `log_cleaner`, `timestomper`, `database_dumper`, `phishing_kit`
-- `audit_disable`, `hash_cracker`, `log_analyzer`, `backup_destroyer`
+- **Reconnaissance:** `user_enum`, `lan_sniffer`, `packet_capture`, `packet_decoder`, `log_analyzer`
+- **Credential Attacks:** `password_cracker`, `password_sniffer`, `hash_cracker`, `phishing_kit`
+- **Exploits:** `ssh_exploit`, `exploit_kit`, `advanced_exploit_kit`, `sql_injector`, `xss_exploit`
+- **Privilege Escalation:** `privesc_scanner`, `sudo_exploit`, `kernel_exploit`, `suid_finder`
+- **Post-Exploitation:** `rootkit`, `log_cleaner`, `timestomper`, `audit_disable`, `database_dumper`, `backup_destroyer`
 
 ### Mining
 - `crypto_miner <targetIP>`, `stop_mining <targetIP>`, `miners`
@@ -866,11 +1204,11 @@ tools                   # Verify upgrade
 - `tutorial [tutorialID]`
 
 ### Story Missions
-- `mission` - List available missions
+- `mission` - List missions (story + board)
 - `mission <id>` - View mission details
-- `mission start <id>` - Start a mission
-- `mission complete <id>` - Complete a mission
-- `mission status` - View your mission progress
+- `mission start <id>` - Accept a board mission
+- `mission stop <id>` - Abandon a mission
+- `mission status` - View your progress
 
 ### Chat
 - `chat [--split]`
@@ -903,7 +1241,7 @@ tools                   # Verify upgrade
 
 **"Prerequisite mission not completed" error:**
 - Check mission prerequisites with `mission <missionID>`
-- Complete required missions first
+- Complete required missions first (they auto-complete when objectives are done)
 - Use `mission status` to see your progress
 
 **"Required level not met" error:**
@@ -915,6 +1253,10 @@ tools                   # Verify upgrade
 - You've already completed this mission
 - Check `mission status` to see completed missions
 - Move on to the next mission in the arc
+
+**"Cannot abandon story mission" error:**
+- Story missions (trigger-based) cannot be stopped
+- Use `mission stop` only for mission board missions
 
 ## Infinite Gameplay
 
@@ -934,6 +1276,7 @@ When you complete all available static missions or exhaust the available servers
   - Difficulty scaled to your level
   - Appropriate vulnerabilities for your tools
   - Local network connections for exploration depth
+  - Variety of services (SSH, Telnet, FTP, HTTP) with different access methods
 
 ### Mission Types
 

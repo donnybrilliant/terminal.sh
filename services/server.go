@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"terminal-sh/database"
@@ -51,26 +52,23 @@ func (s *ServerService) GetServerByPath(path string) (*models.Server, error) {
 		return nil, err
 	}
 
-	// Navigate through nested localNetwork
-	for i := 1; i < len(parts); i++ {
-		// Navigate through localNetwork structure
-		// This is a simplified version - in reality, we'd need to parse the JSON structure
-		// For now, we'll search for servers with matching IPs in the localNetwork
-		nestedIP := parts[i]
-		found := false
-		
-		// Check if this IP exists in the localNetwork
-		// We'll need to implement proper JSON traversal
-		// For now, search for a server with this IP
-		nestedServer, err := s.GetServerByIP(nestedIP)
-		if err == nil {
-			server = nestedServer
-			found = true
+	// Navigate through nested localNetwork (path segments include "localNetwork" markers)
+	for i := 1; i < len(parts); i += 2 {
+		if parts[i] != "localNetwork" {
+			return nil, fmt.Errorf("invalid server path: %s", path)
 		}
-		
-		if !found {
+		if i+1 >= len(parts) {
+			return nil, fmt.Errorf("invalid server path: %s", path)
+		}
+		nestedIP := parts[i+1]
+		if !serverHasLocalServer(server, nestedIP) {
 			return nil, fmt.Errorf("server not found at path: %s", path)
 		}
+		nestedServer, err := s.GetServerByIP(nestedIP)
+		if err != nil {
+			return nil, fmt.Errorf("server not found at path: %s", path)
+		}
+		server = nestedServer
 	}
 
 	return server, nil
@@ -79,11 +77,25 @@ func (s *ServerService) GetServerByPath(path string) (*models.Server, error) {
 // GetAllTopLevelServers retrieves all top-level servers (servers not nested in local networks).
 func (s *ServerService) GetAllTopLevelServers() ([]models.Server, error) {
 	var servers []models.Server
-	// For now, return all servers - we'll filter by checking if they're referenced in localNetwork later
 	if err := s.db.Find(&servers).Error; err != nil {
 		return nil, err
 	}
-	return servers, nil
+
+	referenced := make(map[string]struct{})
+	for _, server := range servers {
+		for ip := range server.LocalNetwork {
+			referenced[ip] = struct{}{}
+		}
+	}
+
+	var topLevel []models.Server
+	for _, server := range servers {
+		if _, isNested := referenced[server.IP]; !isNested {
+			topLevel = append(topLevel, server)
+		}
+	}
+
+	return topLevel, nil
 }
 
 // GetConnectedServers retrieves all servers connected to a given server (from ConnectedIPs).
@@ -94,7 +106,7 @@ func (s *ServerService) GetConnectedServers(serverIP string) ([]models.Server, e
 	}
 
 	var connectedServers []models.Server
-	for _, ip := range server.ConnectedIPs {
+	for ip := range server.LocalNetwork {
 		connectedServer, err := s.GetServerByIP(ip)
 		if err == nil {
 			connectedServers = append(connectedServers, *connectedServer)
@@ -154,11 +166,11 @@ func (s *ServerService) CreateLocalServer(parentServerIP, ip, localIP string) (*
 		return nil, fmt.Errorf("parent server not found: %w", err)
 	}
 
-	// Update parent's localNetwork (simplified - would need proper JSON manipulation)
+	// Update parent's localNetwork to reference child server by IP
 	if parentServer.LocalNetwork == nil {
 		parentServer.LocalNetwork = make(map[string]interface{})
 	}
-	parentServer.LocalNetwork[ip] = server.ID.String()
+	parentServer.LocalNetwork[ip] = ip
 
 	if err := s.db.Save(parentServer).Error; err != nil {
 		return nil, fmt.Errorf("failed to update parent server: %w", err)
@@ -167,28 +179,44 @@ func (s *ServerService) CreateLocalServer(parentServerIP, ip, localIP string) (*
 	return server, nil
 }
 
+func serverHasLocalServer(server *models.Server, ip string) bool {
+	if server.LocalNetwork == nil {
+		return false
+	}
+	_, ok := server.LocalNetwork[ip]
+	return ok
+}
+
 // Helper functions
 
+// parseServerPath parses a server path into components.
+// Paths can be:
+//   - Simple IP: "1.1.1.1" -> ["1.1.1.1"]
+//   - Simple hostname: "repo" -> ["repo"]
+//   - Nested: "1.1.1.1.localNetwork.10.0.0.5" -> ["1.1.1.1", "localNetwork", "10.0.0.5"]
+//
+// The function recognizes IP addresses (contains only digits and dots) and keeps them intact.
 func parseServerPath(path string) []string {
-	parts := []string{}
-	current := ""
-	
-	for _, char := range path {
-		if char == '.' {
-			if current != "" {
-				parts = append(parts, current)
-				current = ""
+	// Split by ".localNetwork." first, as that's our delimiter for nested paths
+	if strings.Contains(path, ".localNetwork.") {
+		// Split on ".localNetwork." to get the segments
+		segments := strings.Split(path, ".localNetwork.")
+		parts := []string{}
+		for i, seg := range segments {
+			if seg != "" {
+				parts = append(parts, seg)
+				// Insert "localNetwork" between segments (but not after the last one)
+				if i < len(segments)-1 {
+					parts = append(parts, "localNetwork")
+				}
 			}
-		} else {
-			current += string(char)
 		}
+		return parts
 	}
 	
-	if current != "" {
-		parts = append(parts, current)
-	}
-	
-	return parts
+	// No localNetwork in path - it's either a simple IP or hostname
+	// Return as a single element
+	return []string{path}
 }
 
 func generateRandomServices(rng *rand.Rand) []models.Service {

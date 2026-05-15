@@ -44,8 +44,16 @@ func (s *UpgradeService) GetCurrentUpgradeCount(toolState *models.UserToolState,
 	case patch.UpgradeBandwidth:
 		return toolState.BandwidthUpgrades
 	case patch.UpgradeFullTune:
-		// Full tune-up cost scales based on total upgrades applied
-		return toolState.CPUUpgrades + toolState.RAMUpgrades + toolState.BandwidthUpgrades
+		// Full tune-up cost scales based on the highest applied resource upgrade
+		// (prevents full tune-ups from escalating faster than individual upgrades)
+		maxCount := toolState.CPUUpgrades
+		if toolState.RAMUpgrades > maxCount {
+			maxCount = toolState.RAMUpgrades
+		}
+		if toolState.BandwidthUpgrades > maxCount {
+			maxCount = toolState.BandwidthUpgrades
+		}
+		return maxCount
 	default:
 		return 0
 	}

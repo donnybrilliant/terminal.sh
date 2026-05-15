@@ -1,56 +1,306 @@
 {
   "missions": [
     {
-      "id": "corp_espionage_01",
-      "arc_id": "corp_espionage",
-      "arc_name": "Corporate Espionage",
+      "id": "home_recovery",
+      "arc_id": "getting_started",
+      "arc_name": "Getting Started",
+      "trigger": {"type": "cat_file", "path": "README.txt"},
       "mission_number": 1,
-      "name": "The Coffee Shop WiFi",
-      "description": "Hack public WiFi to find employee credentials",
+      "name": "Back Online",
+      "description": "Recover your hacking tools from your old home PC",
       "prerequisites": [],
+      "required_tools": [],
+      "required_level": 0,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "connect_server",
+          "description": "Connect to your home PC",
+          "target_server": "home.pc",
+          "hint": "Use 'scan' to find your home PC on the local network, then 'connect home.pc' - no password needed, it's your computer."
+        },
+        {
+          "id": 2,
+          "type": "download_tool",
+          "description": "Download password_cracker from your old toolkit",
+          "tool": "password_cracker",
+          "target_server": "home.pc",
+          "hint": "Explore the filesystem with 'ls' and 'cd'. Find the /home/user/tools directory, then use 'get home.pc password_cracker' to download it."
+        }
+      ],
+      "rewards": {
+        "experience": 25,
+        "crypto": 5,
+        "tools": [
+          "password_cracker"
+        ],
+        "achievements": [
+          "back_online"
+        ]
+      },
+      "unlocks": [
+        "first_hack"
+      ]
+    },
+    {
+      "id": "first_hack",
+      "arc_id": "getting_started",
+      "arc_name": "Getting Started",
+      "mission_number": 2,
+      "name": "First Hack",
+      "description": "Use your password cracker to break into your first real target",
+      "prerequisites": [
+        "home_recovery"
+      ],
       "required_tools": [
-        "packet_capture",
-        "password_sniffer"
+        "password_cracker"
       ],
       "required_level": 1,
       "objectives": [
         {
           "id": 1,
-          "type": "exploit_server",
-          "description": "Exploit the coffee shop WiFi server",
-          "hint": "First, scan the internet with `scan` to find the coffee shop server. Then use `packet_capture` to capture network traffic, and `password_sniffer` to extract credentials from the captured packets."
+          "type": "use_tool",
+          "description": "Crack SSH credentials on the test server",
+          "tool": "password_cracker",
+          "target_server": "test",
+          "hint": "Run 'scan' to find servers. The 'test' server is an easy target. Use 'password_cracker test' to crack SSH credentials."
+        },
+        {
+          "id": 2,
+          "type": "connect_server",
+          "description": "Connect to the test server using cracked credentials",
+          "target_server": "test",
+          "hint": "After cracking credentials, use 'connect test' to log in with them."
+        }
+      ],
+      "rewards": {
+        "experience": 50,
+        "crypto": 15,
+        "achievements": [
+          "first_blood"
+        ]
+      },
+      "unlocks": [
+        "wifi_sniffing",
+        "legacy_access"
+      ]
+    },
+    {
+      "id": "wifi_sniffing",
+      "arc_id": "network_ops",
+      "arc_name": "Network Operations",
+      "mission_number": 1,
+      "name": "WiFi Sniffing",
+      "description": "Capture traffic from public WiFi to find credentials",
+      "prerequisites": [
+        "first_hack"
+      ],
+      "required_tools": [
+        "packet_capture",
+        "password_sniffer"
+      ],
+      "required_level": 2,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "use_tool",
+          "description": "Capture WiFi traffic with packet_capture",
+          "tool": "packet_capture",
+          "target_server": "wifi.coffeeshop",
+          "hint": "Find the coffee shop WiFi server (wifi.coffeeshop), then run 'packet_capture wifi.coffeeshop' to collect traffic for analysis."
+        },
+        {
+          "id": 2,
+          "type": "use_tool",
+          "description": "Extract credentials with password_sniffer",
+          "tool": "password_sniffer",
+          "target_server": "wifi.coffeeshop",
+          "hint": "Use 'password_sniffer wifi.coffeeshop' to extract employee credentials from captured traffic."
         }
       ],
       "rewards": {
         "experience": 100,
         "crypto": 20,
+        "tools": [
+          "packet_capture",
+          "password_sniffer"
+        ],
         "achievements": [
           "wifi_warrior"
         ]
       },
       "unlocks": [
-        "corp_espionage_02"
+        "network_recon"
       ]
     },
     {
-      "id": "corp_espionage_02",
-      "arc_id": "corp_espionage",
+      "id": "legacy_access",
+      "arc_id": "corporate_espionage",
+      "arc_name": "Corporate Espionage",
+      "mission_number": 1,
+      "name": "Legacy Access",
+      "description": "Break into legacy systems using password-based access",
+      "prerequisites": [
+        "first_hack"
+      ],
+      "required_tools": [
+        "password_cracker"
+      ],
+      "required_level": 2,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "use_tool",
+          "description": "Crack a Telnet account with password_cracker",
+          "tool": "password_cracker",
+          "target_server": "legacy.corp",
+          "hint": "Find the legacy server (legacy.corp has Telnet on port 23). Run 'password_cracker legacy.corp' to obtain credentials."
+        },
+        {
+          "id": 2,
+          "type": "use_tool",
+          "description": "Crack an FTP account with password_cracker",
+          "tool": "password_cracker",
+          "target_server": "legacy.corp",
+          "hint": "The legacy.corp server also has FTP (port 21). Use 'password_cracker legacy.corp' again to obtain FTP credentials."
+        }
+      ],
+      "rewards": {
+        "experience": 150,
+        "crypto": 30
+      },
+      "unlocks": [
+        "ssh_exploitation"
+      ]
+    },
+    {
+      "id": "ssh_exploitation",
+      "arc_id": "corporate_espionage",
       "arc_name": "Corporate Espionage",
       "mission_number": 2,
-      "name": "Phishing for Answers",
+      "name": "SSH Exploitation",
+      "description": "Escalate from credentials to remote code execution",
+      "prerequisites": [
+        "legacy_access"
+      ],
+      "required_tools": [
+        "ssh_exploit",
+        "user_enum"
+      ],
+      "required_level": 3,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "use_tool",
+          "description": "Enumerate users on an SSH server",
+          "tool": "user_enum",
+          "target_server_type": "ssh",
+          "hint": "Use 'user_enum <targetIP>' to identify usernames and roles on the target."
+        },
+        {
+          "id": 2,
+          "type": "use_tool",
+          "description": "Exploit SSH for shell access",
+          "tool": "ssh_exploit",
+          "target_server_type": "ssh",
+          "hint": "Use 'ssh_exploit <targetIP>' against SSH vulnerabilities to gain direct shell access."
+        }
+      ],
+      "rewards": {
+        "experience": 200,
+        "crypto": 50,
+        "tools": [
+          "ssh_exploit",
+          "user_enum"
+        ]
+      },
+      "unlocks": [
+        "privilege_escalation"
+      ]
+    },
+    {
+      "id": "privilege_escalation",
+      "arc_id": "corporate_espionage",
+      "arc_name": "Corporate Espionage",
+      "mission_number": 3,
+      "name": "Privilege Escalation",
+      "description": "Escalate from user access to root using local vulnerabilities",
+      "prerequisites": [
+        "ssh_exploitation"
+      ],
+      "required_tools": [
+        "privesc_scanner",
+        "sudo_exploit",
+        "kernel_exploit",
+        "suid_finder"
+      ],
+      "required_level": 4,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "use_tool",
+          "description": "Scan for local privilege escalation vectors",
+          "tool": "privesc_scanner",
+          "hint": "Connect to a compromised server first, then run 'privesc_scanner' to list local privilege escalation options."
+        },
+        {
+          "id": 2,
+          "type": "use_tool",
+          "description": "Exploit a sudo misconfiguration",
+          "tool": "sudo_exploit",
+          "hint": "After scanning, use 'sudo_exploit' on a vulnerable server to escalate privileges."
+        },
+        {
+          "id": 3,
+          "type": "use_tool",
+          "description": "Exploit a vulnerable SUID binary",
+          "tool": "suid_finder",
+          "hint": "Use 'suid_finder' to locate and exploit a vulnerable SUID binary for root access."
+        },
+        {
+          "id": 4,
+          "type": "use_tool",
+          "description": "Exploit a kernel vulnerability",
+          "tool": "kernel_exploit",
+          "hint": "Use 'kernel_exploit' on a server with a vulnerable kernel to gain root access."
+        }
+      ],
+      "rewards": {
+        "experience": 300,
+        "crypto": 75,
+        "tools": [
+          "privesc_scanner",
+          "sudo_exploit",
+          "kernel_exploit",
+          "suid_finder"
+        ]
+      },
+      "unlocks": [
+        "phishing_attack"
+      ]
+    },
+    {
+      "id": "phishing_attack",
+      "arc_id": "corporate_espionage",
+      "arc_name": "Corporate Espionage",
+      "mission_number": 4,
+      "name": "Phishing Attack",
       "description": "Create phishing campaign targeting corporate email",
       "prerequisites": [
-        "corp_espionage_01"
+        "privilege_escalation"
       ],
-      "required_tools": [],
-      "required_level": 2,
+      "required_tools": [
+        "phishing_kit"
+      ],
+      "required_level": 5,
       "objectives": [
         {
           "id": 1,
           "type": "use_tool",
           "description": "Use phishing_kit on target server",
           "tool": "phishing_kit",
-          "hint": "First, exploit a server with HTTP services. Then use `phishing_kit <targetIP>` to create a phishing campaign. This tool generates realistic-looking emails and sites to gather credentials. You'll receive this tool as a reward when you complete this mission!"
+          "target_server": "mail.corporate",
+          "hint": "The corporate mail server (mail.corporate) has HTTP services. Run 'phishing_kit mail.corporate' to launch a phishing campaign."
         }
       ],
       "rewards": {
@@ -64,37 +314,57 @@
         ]
       },
       "unlocks": [
-        "corp_espionage_03"
+        "database_heist"
       ]
     },
     {
-      "id": "corp_espionage_03",
-      "arc_id": "corp_espionage",
+      "id": "database_heist",
+      "arc_id": "corporate_espionage",
       "arc_name": "Corporate Espionage",
-      "mission_number": 3,
-      "name": "The Database Heist",
+      "mission_number": 5,
+      "name": "Database Heist",
       "description": "Steal sensitive corporate data",
       "prerequisites": [
-        "corp_espionage_02"
+        "phishing_attack"
       ],
       "required_tools": [
-        "sql_injector"
+        "sql_injector",
+        "database_dumper",
+        "hash_cracker"
       ],
-      "required_level": 3,
+      "required_level": 6,
       "objectives": [
         {
           "id": 1,
           "type": "use_tool",
+          "description": "Exploit the database with sql_injector",
+          "tool": "sql_injector",
+          "target_server_type": "http",
+          "hint": "Find a server with HTTP services and SQL injection vulnerabilities, then run 'sql_injector <targetIP>' to gain access."
+        },
+        {
+          "id": 2,
+          "type": "use_tool",
           "description": "Use database_dumper to extract data",
           "tool": "database_dumper",
-          "hint": "First, find a server with HTTP services and SQL injection vulnerabilities. Use `sql_injector <targetIP>` to exploit it. Then use `database_dumper <targetIP>` to extract all database contents. This tool dumps entire databases - perfect for data heists! You'll receive this tool as a reward."
+          "target_server_type": "http",
+          "hint": "Run 'database_dumper <targetIP>' after successful SQL injection."
+        },
+        {
+          "id": 3,
+          "type": "use_tool",
+          "description": "Crack extracted hashes with hash_cracker",
+          "tool": "hash_cracker",
+          "target_server_type": "http",
+          "hint": "Use 'hash_cracker <targetIP>' on the same target to crack dumped password hashes."
         }
       ],
       "rewards": {
         "experience": 750,
         "crypto": 150,
         "tools": [
-          "database_dumper"
+          "database_dumper",
+          "hash_cracker"
         ],
         "tool_upgrades": [
           {"tool": "sql_injector", "type": "exploit", "count": 2}
@@ -104,38 +374,46 @@
         ]
       },
       "unlocks": [
-        "corp_espionage_04"
+        "cover_tracks"
       ]
     },
     {
-      "id": "corp_espionage_04",
-      "arc_id": "corp_espionage",
+      "id": "cover_tracks",
+      "arc_id": "corporate_espionage",
       "arc_name": "Corporate Espionage",
-      "mission_number": 4,
+      "mission_number": 6,
       "name": "Cover Your Tracks",
       "description": "They're onto you. Cover your tracks before they trace your attacks back to you.",
       "prerequisites": [
-        "corp_espionage_03"
+        "database_heist"
       ],
       "required_tools": [
-        "sql_injector",
-        "database_dumper"
+        "log_cleaner",
+        "timestomper",
+        "audit_disable"
       ],
-      "required_level": 5,
+      "required_level": 7,
       "objectives": [
         {
           "id": 1,
           "type": "use_tool",
           "description": "Use log_cleaner on audit server",
           "tool": "log_cleaner",
-          "hint": "Find and exploit the audit server first. Then use `log_cleaner <targetIP>` to delete and clear all system logs. This removes evidence of your activities. You'll receive this tool as a reward!"
+          "hint": "Find and exploit the audit server first, then run 'log_cleaner <targetIP>' to delete system logs."
         },
         {
           "id": 2,
           "type": "use_tool",
           "description": "Use timestomper to modify file timestamps",
           "tool": "timestomper",
-          "hint": "After clearing logs, use `timestomper <targetIP>` on the same audit server. This modifies file timestamps to make forensic analysis harder. Combined with log_cleaner, you'll be nearly untraceable! You'll receive this tool as a reward."
+          "hint": "After clearing logs, run 'timestomper <targetIP>' on the same server to modify file timestamps."
+        },
+        {
+          "id": 3,
+          "type": "use_tool",
+          "description": "Disable auditing with audit_disable",
+          "tool": "audit_disable",
+          "hint": "Finish by running 'audit_disable <targetIP>' to prevent new logs from being created."
         }
       ],
       "rewards": {
@@ -143,7 +421,8 @@
         "crypto": 100,
         "tools": [
           "log_cleaner",
-          "timestomper"
+          "timestomper",
+          "audit_disable"
         ],
         "tool_upgrades": [
           {"tool": "sql_injector", "type": "cpu", "count": 1},
@@ -154,8 +433,216 @@
         ]
       },
       "unlocks": [
-        "academic_hacking_01"
+        "network_recon"
       ]
+    },
+    {
+      "id": "network_recon",
+      "arc_id": "field_ops",
+      "arc_name": "Field Operations",
+      "mission_number": 1,
+      "name": "Network Recon",
+      "description": "Map internal networks and decode traffic",
+      "prerequisites": [
+        "cover_tracks"
+      ],
+      "required_tools": [
+        "lan_sniffer",
+        "packet_decoder",
+        "log_analyzer"
+      ],
+      "required_level": 7,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "use_tool",
+          "description": "Identify nearby hosts with lan_sniffer",
+          "tool": "lan_sniffer",
+          "target_server_type": "ssh",
+          "hint": "Use 'lan_sniffer <targetIP>' to reveal nearby systems and internal routes."
+        },
+        {
+          "id": 2,
+          "type": "use_tool",
+          "description": "Decode captured traffic with packet_decoder",
+          "tool": "packet_decoder",
+          "target_server_type": "ssh",
+          "hint": "Run 'packet_decoder <targetIP>' to analyze captured network traffic."
+        },
+        {
+          "id": 3,
+          "type": "use_tool",
+          "description": "Extract intelligence from logs with log_analyzer",
+          "tool": "log_analyzer",
+          "target_server_type": "ssh",
+          "hint": "Use 'log_analyzer <targetIP>' to find admin access patterns and weak points."
+        }
+      ],
+      "rewards": {
+        "experience": 200,
+        "crypto": 40,
+        "tools": [
+          "lan_sniffer",
+          "packet_decoder",
+          "log_analyzer"
+        ]
+      },
+      "unlocks": [
+        "persistent_access"
+      ]
+    },
+    {
+      "id": "persistent_access",
+      "arc_id": "field_ops",
+      "arc_name": "Field Operations",
+      "mission_number": 2,
+      "name": "Persistent Access",
+      "description": "Install a backdoor for long-term control",
+      "prerequisites": [
+        "network_recon"
+      ],
+      "required_tools": [
+        "rootkit"
+      ],
+      "required_level": 8,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "use_tool",
+          "description": "Install a rootkit on a compromised server",
+          "tool": "rootkit",
+          "target_server_type": "ssh",
+          "hint": "Exploit a server first, then run 'rootkit <targetIP>' to establish persistent access."
+        }
+      ],
+      "rewards": {
+        "experience": 250,
+        "crypto": 60,
+        "tools": [
+          "rootkit"
+        ]
+      },
+      "unlocks": [
+        "exploit_at_scale"
+      ]
+    },
+    {
+      "id": "exploit_at_scale",
+      "arc_id": "field_ops",
+      "arc_name": "Field Operations",
+      "mission_number": 3,
+      "name": "Exploit at Scale",
+      "description": "Use multi-vulnerability tools for faster breaches",
+      "prerequisites": [
+        "persistent_access"
+      ],
+      "required_tools": [
+        "exploit_kit",
+        "advanced_exploit_kit",
+        "xss_exploit"
+      ],
+      "required_level": 9,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "use_tool",
+          "description": "Exploit multiple services with exploit_kit",
+          "tool": "exploit_kit",
+          "hint": "Run 'exploit_kit <targetIP>' to attack multiple vulnerable services at once."
+        },
+        {
+          "id": 2,
+          "type": "use_tool",
+          "description": "Exploit an HTTP service with xss_exploit",
+          "tool": "xss_exploit",
+          "target_server_type": "http",
+          "hint": "Find a web server with XSS and run 'xss_exploit <targetIP>'."
+        },
+        {
+          "id": 3,
+          "type": "use_tool",
+          "description": "Run advanced_exploit_kit for high-level targets",
+          "tool": "advanced_exploit_kit",
+          "hint": "Use 'advanced_exploit_kit <targetIP>' against tougher targets to chain vulnerabilities."
+        }
+      ],
+      "rewards": {
+        "experience": 350,
+        "crypto": 100,
+        "tools": [
+          "exploit_kit",
+          "advanced_exploit_kit",
+          "xss_exploit"
+        ]
+      },
+      "unlocks": [
+        "resource_hijack"
+      ]
+    },
+    {
+      "id": "resource_hijack",
+      "arc_id": "field_ops",
+      "arc_name": "Field Operations",
+      "mission_number": 4,
+      "name": "Resource Hijack",
+      "description": "Use compromised systems to mine cryptocurrency",
+      "prerequisites": [
+        "exploit_at_scale"
+      ],
+      "required_tools": [
+        "crypto_miner"
+      ],
+      "required_level": 10,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "use_tool",
+          "description": "Start a crypto miner on a compromised server",
+          "tool": "crypto_miner",
+          "hint": "Exploit a server with enough resources, then run 'crypto_miner <targetIP>' to start mining."
+        }
+      ],
+      "rewards": {
+        "experience": 200,
+        "crypto": 80,
+        "tools": [
+          "crypto_miner"
+        ]
+      },
+      "unlocks": [
+        "backup_erasure"
+      ]
+    },
+    {
+      "id": "backup_erasure",
+      "arc_id": "field_ops",
+      "arc_name": "Field Operations",
+      "mission_number": 5,
+      "name": "Backup Erasure",
+      "description": "Destroy backups to prevent recovery",
+      "prerequisites": [
+        "resource_hijack"
+      ],
+      "required_tools": [
+        "backup_destroyer"
+      ],
+      "required_level": 10,
+      "objectives": [
+        {
+          "id": 1,
+          "type": "use_tool",
+          "description": "Destroy backups on a compromised server",
+          "tool": "backup_destroyer",
+          "hint": "Exploit the target first, then run 'backup_destroyer <targetIP>' to remove backup files."
+        }
+      ],
+      "rewards": {
+        "experience": 220,
+        "crypto": 90,
+        "tools": [
+          "backup_destroyer"
+        ]
+      }
     }
   ]
 }

@@ -9,12 +9,13 @@ import (
 
 // MissionObjective represents a single objective in a mission
 type MissionObjective struct {
-	ID          int    `json:"id"`
-	Type        string `json:"type"` // "exploit_server", "use_tool", "collect_data", etc.
-	Description string `json:"description"`
-	Tool        string `json:"tool,omitempty"`           // Required tool for "use_tool" type
-	TargetType  string `json:"target_server_type,omitempty"` // Server type to target
-	Hint        string `json:"hint,omitempty"`          // Tutorial-like hint explaining how to complete this objective
+	ID           int    `json:"id"`
+	Type         string `json:"type"` // "exploit_server", "use_tool", "collect_data", etc.
+	Description  string `json:"description"`
+	Tool         string `json:"tool,omitempty"`                // Required tool for "use_tool" type
+	TargetType   string `json:"target_server_type,omitempty"`  // Server type to target (any server of this type)
+	TargetServer string `json:"target_server,omitempty"`       // Specific server IP to target (takes precedence over TargetType)
+	Hint         string `json:"hint,omitempty"`                // Tutorial-like hint explaining how to complete this objective
 }
 
 // ToolUpgradeReward represents a free upgrade granted as a mission reward.
@@ -33,7 +34,13 @@ type MissionRewards struct {
 	Achievements []string            `json:"achievements,omitempty"`  // Achievements to unlock
 }
 
-// Mission represents a story mission definition
+// MissionTrigger defines how a story mission auto-starts (e.g., when user cats README.txt)
+type MissionTrigger struct {
+	Type string `json:"type"` // "cat_file", "mission_complete", etc.
+	Path string `json:"path,omitempty"` // For cat_file: path or filename to match (e.g., "README.txt")
+}
+
+// Mission represents a story or board mission definition
 type Mission struct {
 	ID            string            `json:"id" gorm:"primaryKey"`
 	ArcID         string            `json:"arc_id" gorm:"index"`
@@ -47,6 +54,7 @@ type Mission struct {
 	Objectives    []MissionObjective `json:"objectives" gorm:"type:text;serializer:json"`
 	Rewards        MissionRewards    `json:"rewards" gorm:"type:text;serializer:json"`
 	Unlocks        []string         `json:"unlocks" gorm:"type:text;serializer:json"` // Next mission/arc IDs
+	Trigger       *MissionTrigger   `json:"trigger,omitempty" gorm:"type:text;serializer:json"` // If set, story mission that auto-starts on trigger
 }
 
 // UserMission represents a user's progress on a mission
