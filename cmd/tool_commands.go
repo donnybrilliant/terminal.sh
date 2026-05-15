@@ -259,11 +259,12 @@ func (h *CommandHandler) handlePasswordCracker(args []string) *CommandResult {
 			for _, role := range capturedServer.Roles {
 				// Map role to typical username
 				roleName := role.Role
-				if roleName == "admin" {
+				switch roleName {
+				case "admin":
 					usersToCrack = append(usersToCrack, struct{ username, role string }{"admin", roleName})
-				} else if roleName == "root" {
+				case "root":
 					usersToCrack = append(usersToCrack, struct{ username, role string }{"root", roleName})
-				} else {
+				default:
 					usersToCrack = append(usersToCrack, struct{ username, role string }{roleName, roleName})
 				}
 			}
@@ -491,11 +492,14 @@ func (h *CommandHandler) handleUserEnum(args []string) *CommandResult {
 		discoveredCount := 0
 		for _, role := range roles {
 			// Map role to username (roles often match usernames in this game)
-			username := role.Role
-			if role.Role == "admin" {
+			var username string
+			switch role.Role {
+			case "admin":
 				username = "admin"
-			} else if role.Role == "root" {
+			case "root":
 				username = "root"
+			default:
+				username = role.Role
 			}
 
 			// Store the discovered user
@@ -1265,7 +1269,7 @@ func (h *CommandHandler) handleBackupDestroyer(args []string) *CommandResult {
 
 // handlePrivescScanner scans for local privilege escalation vulnerabilities.
 // This tool must be run on a server you have shell access to.
-func (h *CommandHandler) handlePrivescScanner(args []string) *CommandResult {
+func (h *CommandHandler) handlePrivescScanner(_ []string) *CommandResult {
 	// This tool is run locally on the server, no args needed
 	if h.currentServerPath == "" {
 		return &CommandResult{Error: fmt.Errorf("privesc_scanner must be run on a remote server (connect first)")}
@@ -1328,7 +1332,7 @@ func (h *CommandHandler) handlePrivescScanner(args []string) *CommandResult {
 }
 
 // handleSudoExploit attempts to exploit sudo misconfigurations.
-func (h *CommandHandler) handleSudoExploit(args []string) *CommandResult {
+func (h *CommandHandler) handleSudoExploit(_ []string) *CommandResult {
 	if h.currentServerPath == "" {
 		return &CommandResult{Error: fmt.Errorf("sudo_exploit must be run on a remote server (connect first)")}
 	}
@@ -1396,7 +1400,7 @@ func (h *CommandHandler) handleSudoExploit(args []string) *CommandResult {
 }
 
 // handleKernelExploit attempts to exploit kernel vulnerabilities.
-func (h *CommandHandler) handleKernelExploit(args []string) *CommandResult {
+func (h *CommandHandler) handleKernelExploit(_ []string) *CommandResult {
 	if h.currentServerPath == "" {
 		return &CommandResult{Error: fmt.Errorf("kernel_exploit must be run on a remote server (connect first)")}
 	}
@@ -1467,7 +1471,7 @@ func (h *CommandHandler) handleKernelExploit(args []string) *CommandResult {
 }
 
 // handleSUIDFinder finds and exploits SUID binaries.
-func (h *CommandHandler) handleSUIDFinder(args []string) *CommandResult {
+func (h *CommandHandler) handleSUIDFinder(_ []string) *CommandResult {
 	if h.currentServerPath == "" {
 		return &CommandResult{Error: fmt.Errorf("suid_finder must be run on a remote server (connect first)")}
 	}

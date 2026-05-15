@@ -1518,15 +1518,16 @@ func (h *CommandHandler) handleConnect(args []string, requiredService string) *C
 
 	// Build connection message based on access method
 	var connectMsg string
-	if accessMethod == "no_auth" {
+	switch accessMethod {
+	case "no_auth":
 		connectMsg = fmt.Sprintf("Connecting to %s via %s (no auth required)...", targetIP, serviceType)
-	} else if accessMethod == "backdoor" {
+	case "backdoor":
 		if roleInfo != nil && roleInfo.IsRoot {
 			connectMsg = fmt.Sprintf("Connecting to %s via %s (backdoor → root)...", targetIP, serviceType)
 		} else {
 			connectMsg = fmt.Sprintf("Connecting to %s via %s (backdoor)...", targetIP, serviceType)
 		}
-	} else {
+	default:
 		connectMsg = fmt.Sprintf("Authenticating to %s via %s as %s...", targetIP, serviceType, accessUsername)
 	}
 
@@ -1975,7 +1976,7 @@ func (h *CommandHandler) handleEXPLOITED() *CommandResult {
 	return &CommandResult{Output: output.String()}
 }
 
-func (h *CommandHandler) handleCREDENTIALS(args []string) *CommandResult {
+func (h *CommandHandler) handleCREDENTIALS(_ []string) *CommandResult {
 	if h.user == nil {
 		return &CommandResult{Error: fmt.Errorf("not authenticated")}
 	}
