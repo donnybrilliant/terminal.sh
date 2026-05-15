@@ -1,0 +1,83 @@
+package models
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+// MissionObjective represents a single objective in a mission
+type MissionObjective struct {
+	ID           int    `json:"id"`
+	Type         string `json:"type"` // "exploit_server", "use_tool", "collect_data", etc.
+	Description  string `json:"description"`
+	Tool         string `json:"tool,omitempty"`                // Required tool for "use_tool" type
+	TargetType   string `json:"target_server_type,omitempty"`  // Server type to target (any server of this type)
+	TargetServer string `json:"target_server,omitempty"`       // Specific server IP to target (takes precedence over TargetType)
+	Hint         string `json:"hint,omitempty"`                // Tutorial-like hint explaining how to complete this objective
+}
+
+// ToolUpgradeReward represents a free upgrade granted as a mission reward.
+type ToolUpgradeReward struct {
+	ToolName    string `json:"tool"`  // Tool to upgrade (e.g., "sql_injector")
+	UpgradeType string `json:"type"`  // Type of upgrade: "exploit", "cpu", "ram", "bandwidth"
+	Count       int    `json:"count"` // How many free upgrades to grant
+}
+
+// MissionRewards represents rewards for completing a mission
+type MissionRewards struct {
+	Experience   int                 `json:"experience"`
+	Crypto       float64             `json:"crypto"`
+	Tools        []string            `json:"tools,omitempty"`         // Tools to unlock
+	ToolUpgrades []ToolUpgradeReward `json:"tool_upgrades,omitempty"` // Free upgrades to grant
+	Achievements []string            `json:"achievements,omitempty"`  // Achievements to unlock
+}
+
+// MissionTrigger defines how a story mission auto-starts (e.g., when user cats README.txt)
+type MissionTrigger struct {
+	Type string `json:"type"` // "cat_file", "mission_complete", etc.
+	Path string `json:"path,omitempty"` // For cat_file: path or filename to match (e.g., "README.txt")
+}
+
+// Mission represents a story or board mission definition
+type Mission struct {
+	ID            string            `json:"id" gorm:"primaryKey"`
+	ArcID         string            `json:"arc_id" gorm:"index"`
+	ArcName       string            `json:"arc_name"`
+	MissionNumber int              `json:"mission_number"`
+	Name          string            `json:"name"`
+	Description   string            `json:"description"`
+	Prerequisites []string          `json:"prerequisites" gorm:"type:text;serializer:json"` // Previous mission IDs
+	RequiredTools []string          `json:"required_tools" gorm:"type:text;serializer:json"`
+	RequiredLevel int              `json:"required_level"`
+	Objectives    []MissionObjective `json:"objectives" gorm:"type:text;serializer:json"`
+	Rewards        MissionRewards    `json:"rewards" gorm:"type:text;serializer:json"`
+	Unlocks        []string         `json:"unlocks" gorm:"type:text;serializer:json"` // Next mission/arc IDs
+	Trigger       *MissionTrigger   `json:"trigger,omitempty" gorm:"type:text;serializer:json"` // If set, story mission that auto-starts on trigger
+}
+
+// UserMission represents a user's progress on a mission
+type UserMission struct {
+	ID            uuid.UUID `gorm:"type:text;primary_key" json:"id"`
+	UserID        uuid.UUID `gorm:"type:text;not null;index" json:"user_id"`
+	MissionID     string    `gorm:"not null;index" json:"mission_id"`
+	Status        string    `gorm:"not null;default:pending" json:"status"` // "pending", "in_progress", "completed"
+	Progress      int       `gorm:"default:0" json:"progress"` // 0-100 percentage
+	CompletedAt   *time.Time `json:"completed_at,omitempty"`
+	StartedAt     time.Time `json:"started_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// BeforeCreate is a GORM hook that generates a UUID for the user mission if one doesn't exist.
+func (u *UserMission) BeforeCreate(tx *gorm.DB) error {
+	if u.ID == uuid.Nil {
+		u.ID = uuid.New()
+	}
+	return nil
+}
+
+// MissionData represents the complete mission data structure containing all missions.
+type MissionData struct {
+	Missions []Mission `json:"missions"`
+}

@@ -112,8 +112,8 @@ func (s *ShopService) PurchaseItem(userID uuid.UUID, shopID uuid.UUID, itemID uu
 	case models.ItemTypeTool:
 		// Tool will be added via tool service
 		return nil
-	case models.ItemTypePatch:
-		// Patch will be added via patch service
+	case models.ItemTypeUpgradeToken:
+		// Upgrade token - will be applied via upgrade service
 		return nil
 	case models.ItemTypeResource:
 		// Resource upgrade
@@ -151,6 +151,11 @@ func (s *ShopService) applyResourceUpgrade(user *models.User, upgradeName string
 
 // CreateShop creates a new shop on a server
 func (s *ShopService) CreateShop(serverIP string, shopType models.ShopType, name, description string) (*models.Shop, error) {
+	return s.CreateShopWithRequirements(serverIP, shopType, name, description, "", 0)
+}
+
+// CreateShopWithRequirements creates a new shop on a server with mission/level requirements
+func (s *ShopService) CreateShopWithRequirements(serverIP string, shopType models.ShopType, name, description, requiredMission string, requiredLevel int) (*models.Shop, error) {
 	// Check if shop already exists
 	var existing models.Shop
 	if err := s.db.Where("server_ip = ?", serverIP).First(&existing).Error; err == nil {
@@ -160,10 +165,12 @@ func (s *ShopService) CreateShop(serverIP string, shopType models.ShopType, name
 	}
 
 	shop := &models.Shop{
-		ServerIP:    serverIP,
-		ShopType:    shopType,
-		Name:        name,
-		Description: description,
+		ServerIP:        serverIP,
+		ShopType:        shopType,
+		Name:            name,
+		Description:     description,
+		RequiredMission: requiredMission,
+		RequiredLevel:   requiredLevel,
 	}
 
 	if err := s.db.Create(shop).Error; err != nil {

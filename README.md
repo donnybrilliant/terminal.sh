@@ -19,6 +19,11 @@ See the [Building](#building) and [Running](#running) sections below for more de
 - **[GAMEPLAY.md](GAMEPLAY.md)** - Complete gameplay guide with commands, strategies, and tips
 - **README.md** (this file) - Technical documentation for building, running, and deploying
 
+## Features
+
+### Infinite Gameplay
+The game features a **procedural generation system** that automatically creates missions and servers when static content is exhausted, ensuring players always have new content to explore. See [GAMEPLAY.md](GAMEPLAY.md#infinite-gameplay) for details.
+
 ## Architecture
 
 The project supports three deployment options:

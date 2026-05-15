@@ -3,38 +3,69 @@
     {
       "id": "getting_started",
       "name": "Getting Started",
-      "description": "Learn the basics of terminal.sh",
+      "description": "Recover your tools and get back online",
       "steps": [
         {
           "id": 1,
-          "title": "Welcome to terminal.sh",
-          "description": "terminal.sh is a hacking simulation game. You'll learn to scan networks, exploit vulnerabilities, and mine cryptocurrency."
+          "title": "Welcome Back",
+          "description": "Your main rig got seized, but your old home PC is still running on the local network. Time to recover your tools and get back in the game."
         },
         {
           "id": 2,
-          "title": "Basic Commands",
-          "description": "Try these basic commands:\n  - `help` - Show all available commands\n  - `userinfo` - View your user information\n  - `ifconfig` - View your network configuration\n  - `wallet` - Check your wallet balance",
-          "commands": [
-            "help",
-            "userinfo",
-            "ifconfig",
-            "wallet"
-          ]
-        },
-        {
-          "id": 3,
-          "title": "Scanning the Network",
-          "description": "Use `scan` to discover servers on the internet. This is your first step to finding targets.",
+          "title": "Find Your Home PC",
+          "description": "You're offline - only your local network is accessible. Use `scan` to find your old home PC.",
           "commands": [
             "scan"
           ]
         },
         {
-          "id": 4,
-          "title": "Scanning a Server",
-          "description": "Use `scan \u003ctargetIP\u003e` to scan a specific server for services and vulnerabilities. Try scanning one of the servers you found.",
+          "id": 3,
+          "title": "Connect to Your PC",
+          "description": "Found it! Your home PC is at `home.pc`. Since it's your computer, no password is needed. Use `connect home.pc` to access it.",
           "commands": [
-            "scan 1.1.1.1"
+            "connect home.pc"
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Explore the Filesystem",
+          "description": "You're in! Use `ls` to see what's here, then `cd` to navigate. Your old toolkit should be in your home directory.",
+          "commands": [
+            "ls",
+            "cd tools"
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Find Your Tool",
+          "description": "Your old `password_cracker` survived! You can see it here. Use `get home.pc password_cracker` to download it to your inventory.",
+          "commands": [
+            "get home.pc password_cracker"
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Exit and Verify",
+          "description": "Use `exit` to disconnect, then check your tools with `tools`. You should have your password_cracker back!",
+          "commands": [
+            "exit",
+            "tools"
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Mission Auto-Completed!",
+          "description": "You've recovered your tool! The home_recovery mission completes automatically. Internet access is now restored!",
+          "commands": [
+            "scan"
+          ]
+        },
+        {
+          "id": 8,
+          "title": "You're Back Online!",
+          "description": "Internet restored! Now `scan` will show real servers. Find targets like `test` (easy) or `wifi.coffeeshop`. Use your password_cracker to hack them!",
+          "commands": [
+            "scan"
           ]
         }
       ]
@@ -47,9 +78,9 @@
         {
           "id": 1,
           "title": "Getting Tools",
-          "description": "Tools are essential for exploitation. The 'repo' server contains all available tools. Use `get repo \u003ctoolName\u003e` to download tools.",
+          "description": "Tools are essential for exploitation. Your first tool (password_cracker) came from your home PC. More tools unlock through missions. Check available missions with `mission`.",
           "commands": [
-            "get repo password_cracker"
+            "mission"
           ]
         },
         {
@@ -62,18 +93,19 @@
         },
         {
           "id": 3,
-          "title": "Exploiting a Server",
-          "description": "Once you have a tool, you can exploit servers. First, scan a server to see its vulnerabilities, then use the appropriate tool. Example: `password_cracker \u003ctargetIP\u003e`",
+          "title": "Passwords vs Exploits",
+          "description": "Some services can be accessed with cracked credentials (SSH, Telnet, FTP). Others require an exploit. Scan a server to see its services, then pick the right tool. Example: `password_cracker <targetIP>`",
           "commands": [
-            "password_cracker 1.1.1.1"
+            "scan test",
+            "password_cracker test"
           ]
         },
         {
           "id": 4,
-          "title": "SSH Access",
-          "description": "After successfully exploiting a server, you can SSH into it using `ssh \u003ctargetIP\u003e`. This gives you access to the server's filesystem.",
+          "title": "Shell Access",
+          "description": "Once you have access (credentials or exploit), connect to the service to get a shell. Example: `ssh <targetIP>` or `telnet <targetIP>` or `ftp <targetIP>`.",
           "commands": [
-            "ssh 1.1.1.1"
+            "connect test"
           ]
         }
       ],
@@ -89,17 +121,17 @@
         {
           "id": 1,
           "title": "Getting the Crypto Miner",
-          "description": "Download the crypto_miner tool from the repo server.",
+          "description": "The `crypto_miner` tool is unlocked through the Field Operations arc. Complete the resource_hijack mission to gain access.",
           "commands": [
-            "get repo crypto_miner"
+            "mission resource_hijack"
           ]
         },
         {
           "id": 2,
           "title": "Starting a Miner",
-          "description": "Use `crypto_miner \u003ctargetIP\u003e` to start mining on an exploited server. The server must have enough resources (CPU, RAM, bandwidth).",
+          "description": "Use `crypto_miner <targetIP>` to start mining on an exploited server. The server must have enough resources (CPU, RAM, bandwidth).",
           "commands": [
-            "crypto_miner 1.1.1.1"
+            "crypto_miner test"
           ]
         },
         {
@@ -113,9 +145,9 @@
         {
           "id": 4,
           "title": "Stopping a Miner",
-          "description": "Use `stop_mining \u003ctargetIP\u003e` to stop a miner when needed.",
+          "description": "Use `stop_mining <targetIP>` to stop a miner when needed.",
           "commands": [
-            "stop_mining 1.1.1.1"
+            "stop_mining test"
           ]
         }
       ],
@@ -133,40 +165,247 @@
           "title": "Information Gathering",
           "description": "Tools like `user_enum` and `lan_sniffer` help you gather information about servers before exploitation.",
           "commands": [
-            "user_enum 1.1.1.1",
-            "lan_sniffer 1.1.1.1"
+            "user_enum test",
+            "lan_sniffer test"
           ]
         },
         {
           "id": 2,
-          "title": "Multi-Vulnerability Exploitation",
-          "description": "The `exploit_kit` and `advanced_exploit_kit` tools can exploit multiple vulnerability types at once.",
+          "title": "WiFi Sniffing",
+          "description": "The `packet_capture` and `password_sniffer` tools let you capture WiFi traffic and extract credentials. Unlock them through the wifi_sniffing mission.",
           "commands": [
-            "get repo exploit_kit",
-            "exploit_kit 1.1.1.1"
+            "mission wifi_sniffing"
           ]
         },
         {
           "id": 3,
-          "title": "Web Exploitation",
-          "description": "Tools like `sql_injector` and `xss_exploit` target HTTP services specifically.",
+          "title": "Rootkit Installation",
+          "description": "The `rootkit` tool installs a hidden backdoor for persistent access. Unlock it through the persistent_access mission.",
           "commands": [
-            "get repo sql_injector",
-            "sql_injector 1.1.1.1"
+            "rootkit test"
           ]
         },
         {
           "id": 4,
-          "title": "Network Analysis",
-          "description": "Use `packet_capture` and `packet_decoder` to analyze network traffic.",
+          "title": "Multi-Vulnerability Exploitation",
+          "description": "The `exploit_kit` and `advanced_exploit_kit` tools can exploit multiple vulnerability types at once. These unlock later through the exploit_at_scale mission.",
           "commands": [
-            "get repo packet_capture",
-            "packet_capture 1.1.1.1"
+            "exploit_kit test"
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Web Exploitation",
+          "description": "Tools like `sql_injector` and `xss_exploit` target HTTP services specifically. They unlock through story missions.",
+          "commands": [
+            "sql_injector 203.0.113.42",
+            "xss_exploit 203.0.113.42"
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Network Analysis",
+          "description": "Use `packet_capture` to capture network traffic, then `packet_decoder` to decode and analyze the captured packets. These unlock through the wifi_sniffing mission.",
+          "commands": [
+            "packet_capture wifi.coffeeshop",
+            "packet_decoder wifi.coffeeshop"
           ]
         }
       ],
       "prerequisites": [
         "exploitation"
+      ]
+    },
+    {
+      "id": "privilege_escalation",
+      "name": "Privilege Escalation",
+      "description": "Learn how to escalate privileges after gaining shell access",
+      "steps": [
+        {
+          "id": 1,
+          "title": "Get a Shell First",
+          "description": "Privilege escalation happens after you have shell access to a server. Use `connect`, `ssh`, `telnet`, or `ftp` to connect first."
+        },
+        {
+          "id": 2,
+          "title": "Scan for Local Vulnerabilities",
+          "description": "Use `privesc_scanner` on the server to identify local escalation paths. This tool unlocks through the privilege_escalation mission.",
+          "commands": [
+            "privesc_scanner"
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Exploit the Weakness",
+          "description": "Use the appropriate tool based on what you found: `sudo_exploit`, `suid_finder`, or `kernel_exploit`.",
+          "commands": [
+            "sudo_exploit",
+            "suid_finder",
+            "kernel_exploit"
+          ]
+        }
+      ],
+      "prerequisites": [
+        "exploitation"
+      ]
+    },
+    {
+      "id": "cover_your_tracks",
+      "name": "Cover Your Tracks",
+      "description": "Learn how to cover your tracks and avoid detection using stealth tools",
+      "steps": [
+        {
+          "id": 1,
+          "title": "Why Cover Your Tracks?",
+          "description": "After exploiting servers, you leave traces in logs and file timestamps. Covering your tracks prevents detection and forensic analysis."
+        },
+        {
+          "id": 2,
+          "title": "Clearing Logs",
+          "description": "Use `log_cleaner` to delete and clear system logs. This removes evidence of your activities. Unlock through the cover_tracks mission.",
+          "commands": [
+            "log_cleaner test"
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Modifying Timestamps",
+          "description": "Use `timestomper` to modify file timestamps. This makes forensic analysis harder by changing when files were accessed or modified.",
+          "commands": [
+            "timestomper test"
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Disabling Auditing",
+          "description": "Use `audit_disable` to disable system auditing and logging. This prevents future logs from being created.",
+          "commands": [
+            "audit_disable test"
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Stealth Workflow",
+          "description": "The best stealth workflow: 1) Exploit server, 2) Use log_cleaner, 3) Use timestomper, 4) Use audit_disable. This covers past, present, and future tracks!",
+          "commands": [
+            "log_cleaner test",
+            "timestomper test",
+            "audit_disable test"
+          ]
+        }
+      ],
+      "prerequisites": [
+        "exploitation"
+      ]
+    },
+    {
+      "id": "data_heist",
+      "name": "Data Heist",
+      "description": "Learn how to extract and crack data from databases",
+      "steps": [
+        {
+          "id": 1,
+          "title": "Finding Databases",
+          "description": "Databases are often exposed through web services. Scan servers for HTTP services with SQL injection vulnerabilities."
+        },
+        {
+          "id": 2,
+          "title": "SQL Injection First",
+          "description": "Before dumping a database, you need to exploit it. Use `sql_injector` to gain access to the database. Unlock through the database_heist mission.",
+          "commands": [
+            "sql_injector 203.0.113.42"
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Dumping the Database",
+          "description": "Once you have SQL injection access, use `database_dumper` to extract the entire database contents.",
+          "commands": [
+            "database_dumper 203.0.113.42"
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Cracking Hashed Passwords",
+          "description": "Databases often contain hashed passwords. Use `hash_cracker` to crack MD5, SHA256, bcrypt, and other hash types.",
+          "commands": [
+            "hash_cracker 203.0.113.42"
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Complete Heist Workflow",
+          "description": "The complete data heist: 1) Scan for HTTP services, 2) Use sql_injector, 3) Use database_dumper, 4) Use hash_cracker on extracted hashes. You now have all the data!",
+          "commands": [
+            "scan 203.0.113.42",
+            "sql_injector 203.0.113.42",
+            "database_dumper 203.0.113.42",
+            "hash_cracker 203.0.113.42"
+          ]
+        }
+      ],
+      "prerequisites": [
+        "advanced_tools"
+      ]
+    },
+    {
+      "id": "story_missions",
+      "name": "Story Missions",
+      "description": "Learn about story missions and how to unlock exclusive rewards",
+      "steps": [
+        {
+          "id": 1,
+          "title": "What are Story Missions?",
+          "description": "Story missions are narrative-driven challenges that unlock exclusive tools and achievements. Complete missions to progress through story arcs and unlock powerful rewards."
+        },
+        {
+          "id": 2,
+          "title": "Viewing Available Missions",
+          "description": "Use `mission` to see all available missions. Missions are organized by story arcs. Each mission shows its status: ⭕ (not started), 🔄 (in progress), or ✅ (completed).",
+          "commands": [
+            "mission"
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Viewing Mission Details",
+          "description": "Use `mission <missionID>` to view detailed information about a specific mission, including objectives, required tools, level requirements, and rewards.",
+          "commands": [
+            "mission home_recovery"
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Starting a Mission",
+          "description": "Use `mission start <missionID>` to begin a mission. Make sure you meet the prerequisites (completed previous missions) and have the required tools and level.",
+          "commands": [
+            "mission start first_hack"
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Checking Mission Progress",
+          "description": "Use `mission status` to view your progress on all started missions. This shows which missions you're working on and their completion percentage.",
+          "commands": [
+            "mission status"
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Completing Missions",
+          "description": "Missions complete automatically when you finish all objectives. No need to type 'mission complete' - just do the objectives and rewards appear!",
+          "commands": [
+            "mission status"
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Mission Rewards",
+          "description": "Mission rewards are exclusive - tools unlocked through missions cannot be purchased from shops. Complete missions to build your arsenal!"
+        }
+      ],
+      "prerequisites": [
+        "getting_started"
       ]
     }
   ]

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"terminal-sh/database"
+	"terminal-sh/filesystem"
 	"terminal-sh/models"
 
 	"github.com/google/uuid"
@@ -11,20 +13,30 @@ import (
 
 // ShopDiscovery handles shop discovery logic, automatically creating shops on servers when discovered.
 type ShopDiscovery struct {
-	shopService    *ShopService
-	serverService  *ServerService
-	patchService   *PatchService
-	toolService    *ToolService
+	db            *database.Database
+	shopService   *ShopService
+	serverService *ServerService
+	toolService   *ToolService
+	userService   *UserService
 }
 
 // NewShopDiscovery creates a new ShopDiscovery service with the provided dependencies.
-func NewShopDiscovery(shopService *ShopService, serverService *ServerService, patchService *PatchService, toolService *ToolService) *ShopDiscovery {
+func NewShopDiscovery(shopService *ShopService, serverService *ServerService, toolService *ToolService) *ShopDiscovery {
 	return &ShopDiscovery{
 		shopService:   shopService,
 		serverService: serverService,
-		patchService:  patchService,
-		toolService:  toolService,
+		toolService:   toolService,
 	}
+}
+
+// SetDatabase sets the database connection for mission queries
+func (s *ShopDiscovery) SetDatabase(db *database.Database) {
+	s.db = db
+}
+
+// SetUserService sets the user service for level checks
+func (s *ShopDiscovery) SetUserService(userService *UserService) {
+	s.userService = userService
 }
 
 // DiscoverShopsOnServer checks if a server has a shop configuration and creates it if found.
@@ -62,60 +74,19 @@ func (s *ShopDiscovery) FindShopFiles(serverIP string) (*models.Shop, error) {
 	return nil, fmt.Errorf("shop metadata file not found")
 }
 
-// findShopMetadataInFilesystem searches for shop metadata in filesystem structure
-func (s *ShopDiscovery) findShopMetadataInFilesystem(filesystem map[string]interface{}) (string, bool) {
-	// Look for shop.json in common locations
+// findShopMetadataInFilesystem searches for shop metadata in filesystem structure using FileReader.
+func (s *ShopDiscovery) findShopMetadataInFilesystem(fs map[string]interface{}) (string, bool) {
+	reader := filesystem.NewMapFileReader(fs)
 	locations := []string{"shop.json", "shop_config.json", "etc/shop.json", "var/shop.json"}
 
 	for _, location := range locations {
-		if content := s.getFileContent(filesystem, location); content != "" {
+		content, err := reader.ReadFile(location)
+		if err == nil && content != "" {
 			return content, true
 		}
 	}
 
 	return "", false
-}
-
-// getFileContent extracts file content from filesystem structure
-func (s *ShopDiscovery) getFileContent(filesystem map[string]interface{}, path string) string {
-	// Simple path traversal - split by /
-	parts := []string{}
-	current := ""
-	for _, char := range path {
-		if char == '/' {
-			if current != "" {
-				parts = append(parts, current)
-				current = ""
-			}
-		} else {
-			current += string(char)
-		}
-	}
-	if current != "" {
-		parts = append(parts, current)
-	}
-
-	// Traverse filesystem
-	currentLevel := filesystem
-	for i, part := range parts {
-		if i == len(parts)-1 {
-			// Last part - should be file
-			if file, ok := currentLevel[part].(map[string]interface{}); ok {
-				if content, ok := file["content"].(string); ok {
-					return content
-				}
-			}
-		} else {
-			// Directory
-			if dir, ok := currentLevel[part].(map[string]interface{}); ok {
-				currentLevel = dir
-			} else {
-				return ""
-			}
-		}
-	}
-
-	return ""
 }
 
 // ParseShopMetadata parses shop metadata from JSON content
@@ -179,14 +150,76 @@ func (s *ShopDiscovery) ParseShopMetadata(serverIP, fileContent string) (*models
 	return shop, nil
 }
 
-// DiscoverShops finds all shops for a user (via scanning)
+// DiscoverShops finds all shops accessible to a user (filtered by mission completion and level)
 func (s *ShopDiscovery) DiscoverShops(userID uuid.UUID) ([]models.Shop, error) {
 	// Get all shops
-	shops, err := s.shopService.GetAllShops()
+	allShops, err := s.shopService.GetAllShops()
 	if err != nil {
 		return nil, err
 	}
 
-	return shops, nil
+	// Filter shops based on requirements
+	var accessibleShops []models.Shop
+	for _, shop := range allShops {
+		accessible, _ := s.CanAccessShop(userID, &shop)
+		if accessible {
+			accessibleShops = append(accessibleShops, shop)
+		}
+	}
+
+	return accessibleShops, nil
+}
+
+// CanAccessShop checks if a user can access a shop based on mission completion and level
+func (s *ShopDiscovery) CanAccessShop(userID uuid.UUID, shop *models.Shop) (bool, string) {
+	// Check level requirement
+	if shop.RequiredLevel > 0 && s.userService != nil {
+		user, err := s.userService.GetUserByID(userID)
+		if err != nil {
+			return false, "Failed to check user level"
+		}
+		if user.Level < shop.RequiredLevel {
+			return false, fmt.Sprintf("Requires level %d (you are level %d)", shop.RequiredLevel, user.Level)
+		}
+	}
+
+	// Check mission requirement
+	if shop.RequiredMission != "" && s.db != nil {
+		var userMission models.UserMission
+		err := s.db.Where("user_id = ? AND mission_id = ? AND status = ?", 
+			userID, shop.RequiredMission, "completed").First(&userMission).Error
+		if err != nil {
+			return false, fmt.Sprintf("Requires completion of mission: %s", shop.RequiredMission)
+		}
+	}
+
+	return true, ""
+}
+
+// GetAllShopsWithStatus returns all shops with their accessibility status for a user
+func (s *ShopDiscovery) GetAllShopsWithStatus(userID uuid.UUID) ([]ShopWithStatus, error) {
+	allShops, err := s.shopService.GetAllShops()
+	if err != nil {
+		return nil, err
+	}
+
+	var result []ShopWithStatus
+	for _, shop := range allShops {
+		accessible, reason := s.CanAccessShop(userID, &shop)
+		result = append(result, ShopWithStatus{
+			Shop:       shop,
+			Accessible: accessible,
+			Reason:     reason,
+		})
+	}
+
+	return result, nil
+}
+
+// ShopWithStatus represents a shop with its accessibility status
+type ShopWithStatus struct {
+	Shop       models.Shop
+	Accessible bool
+	Reason     string // Reason why shop is inaccessible (empty if accessible)
 }
 

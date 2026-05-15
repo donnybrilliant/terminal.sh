@@ -1,0 +1,46 @@
+{
+  "achievements": [
+    {
+      "id": "back_online",
+      "name": "Back Online",
+      "description": "Recovered your hacking tools and got back online",
+      "icon": "🔌"
+    },
+    {
+      "id": "first_blood",
+      "name": "First Blood",
+      "description": "Successfully hacked your first real target",
+      "icon": "🩸"
+    },
+    {
+      "id": "wifi_warrior",
+      "name": "WiFi Warrior",
+      "description": "Successfully hacked public WiFi",
+      "icon": "📶"
+    },
+    {
+      "id": "social_engineer",
+      "name": "Social Engineer",
+      "description": "Successfully phished 10 targets",
+      "icon": "🎣"
+    },
+    {
+      "id": "data_thief",
+      "name": "Data Thief",
+      "description": "Extracted 1GB of data",
+      "icon": "💾"
+    },
+    {
+      "id": "ghost_in_the_machine",
+      "name": "Ghost in the Machine",
+      "description": "Completed mission without detection",
+      "icon": "👻"
+    },
+    {
+      "id": "academic_misconduct",
+      "name": "Academic Misconduct",
+      "description": "Modified academic records",
+      "icon": "🎓"
+    }
+  ]
+}

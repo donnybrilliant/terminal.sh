@@ -7,18 +7,24 @@ import (
 	"gorm.io/gorm"
 )
 
-// UserToolState represents a user's specific state for a tool, including applied patches and calculated properties.
-// This allows different users to have different versions of the same tool based on patches they've applied.
+// UserToolState represents a user's specific state for a tool, including upgrades and calculated properties.
+// This allows different users to have different versions of the same tool based on upgrades they've applied.
 type UserToolState struct {
-	ID                uuid.UUID      `gorm:"type:text;primary_key" json:"id"`
-	UserID            uuid.UUID      `gorm:"not null;index" json:"user_id"`
-	ToolID            uuid.UUID      `gorm:"not null;index" json:"tool_id"`
-	AppliedPatches    []string       `gorm:"type:text;serializer:json" json:"applied_patches"` // List of patch names applied
-	EffectiveExploits []Exploit      `gorm:"type:text;serializer:json" json:"effective_exploits"` // Calculated exploits after patches
-	EffectiveResources ToolResources `gorm:"type:text;serializer:json" json:"effective_resources"` // Calculated resources after patches
-	Version           int            `gorm:"default:1" json:"version"` // Tool version (increments with each patch)
-	CreatedAt         time.Time      `json:"created_at"`
-	UpdatedAt         time.Time      `json:"updated_at"`
+	ID                 uuid.UUID      `gorm:"type:text;primary_key" json:"id"`
+	UserID             uuid.UUID      `gorm:"not null;index" json:"user_id"`
+	ToolID             uuid.UUID      `gorm:"not null;index" json:"tool_id"`
+	EffectiveExploits  []Exploit      `gorm:"type:text;serializer:json" json:"effective_exploits"`  // Calculated exploits after upgrades
+	EffectiveResources ToolResources  `gorm:"type:text;serializer:json" json:"effective_resources"` // Calculated resources after upgrades
+	Version            int            `gorm:"default:1" json:"version"`                             // Tool version (increments with each upgrade)
+
+	// Progressive upgrade counts
+	ExploitUpgrades   int `gorm:"default:0" json:"exploit_upgrades"`
+	CPUUpgrades       int `gorm:"default:0" json:"cpu_upgrades"`
+	RAMUpgrades       int `gorm:"default:0" json:"ram_upgrades"`
+	BandwidthUpgrades int `gorm:"default:0" json:"bandwidth_upgrades"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	// Relationships
 	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`

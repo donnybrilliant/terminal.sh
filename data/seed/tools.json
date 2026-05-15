@@ -14,7 +14,7 @@
           "level": 10
         }
       ],
-      "services": "ssh"
+      "services": "ssh,telnet,ftp"
     },
     {
       "name": "pass_patch",
@@ -215,6 +215,145 @@
         "bandwidth": 0.1,
         "ram": 3
       }
+    },
+    {
+      "name": "log_cleaner",
+      "function": "Delete and clear system logs",
+      "resources": {
+        "cpu": 18,
+        "bandwidth": 0.2,
+        "ram": 6
+      }
+    },
+    {
+      "name": "timestomper",
+      "function": "Modify file timestamps to cover tracks",
+      "resources": {
+        "cpu": 15,
+        "bandwidth": 0.1,
+        "ram": 4
+      }
+    },
+    {
+      "name": "database_dumper",
+      "function": "Extract entire database contents",
+      "resources": {
+        "cpu": 35,
+        "bandwidth": 0.8,
+        "ram": 14
+      },
+      "exploits": [
+        {
+          "type": "sql_injection",
+          "level": 25
+        }
+      ],
+      "services": "http"
+    },
+    {
+      "name": "phishing_kit",
+      "function": "Create phishing emails and sites",
+      "resources": {
+        "cpu": 25,
+        "bandwidth": 0.5,
+        "ram": 10
+      }
+    },
+    {
+      "name": "audit_disable",
+      "function": "Disable system auditing and logging",
+      "resources": {
+        "cpu": 20,
+        "bandwidth": 0.2,
+        "ram": 7
+      }
+    },
+    {
+      "name": "hash_cracker",
+      "function": "Advanced hash cracking (MD5, SHA256, bcrypt)",
+      "resources": {
+        "cpu": 45,
+        "bandwidth": 0.6,
+        "ram": 16
+      },
+      "exploits": [
+        {
+          "type": "password_cracking",
+          "level": 30
+        }
+      ]
+    },
+    {
+      "name": "log_analyzer",
+      "function": "Parse and analyze system logs for intelligence",
+      "resources": {
+        "cpu": 14,
+        "bandwidth": 0.2,
+        "ram": 5
+      }
+    },
+    {
+      "name": "backup_destroyer",
+      "function": "Delete backups to prevent recovery",
+      "resources": {
+        "cpu": 22,
+        "bandwidth": 0.3,
+        "ram": 8
+      }
+    },
+    {
+      "name": "privesc_scanner",
+      "function": "Scan for local privilege escalation vectors",
+      "resources": {
+        "cpu": 10,
+        "bandwidth": 0.1,
+        "ram": 4
+      }
+    },
+    {
+      "name": "sudo_exploit",
+      "function": "Exploit sudo misconfigurations for privilege escalation",
+      "resources": {
+        "cpu": 15,
+        "bandwidth": 0.1,
+        "ram": 6
+      },
+      "exploits": [
+        {
+          "type": "sudo_misconfiguration",
+          "level": 20
+        }
+      ]
+    },
+    {
+      "name": "kernel_exploit",
+      "function": "Exploit kernel vulnerabilities for root access",
+      "resources": {
+        "cpu": 30,
+        "bandwidth": 0.2,
+        "ram": 12
+      },
+      "exploits": [
+        {
+          "type": "kernel_exploit",
+          "level": 40
+        }
+      ]
+    },
+    {
+      "name": "suid_finder",
+      "function": "Find and exploit vulnerable SUID binaries",
+      "resources": {
+        "cpu": 12,
+        "bandwidth": 0.1,
+        "ram": 5
+      },
+      "exploits": [
+        {
+          "type": "suid_binary",
+          "level": 25
+        }
+      ]
     }
   ]
 }

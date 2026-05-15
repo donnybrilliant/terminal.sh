@@ -28,6 +28,11 @@ type VFS struct {
 	serverID       string // Server ID or path for server VFS (for persistence)
 	userID         string // User ID for user VFS (for persistence)
 	onSaveCallback func(map[string]interface{}) error // Callback to save changes
+	
+	// Role-based access control
+	currentRole    string // Current role/username on the server
+	isRoot         bool   // Whether current role has root privileges
+	homeDir        string // Home directory for current role
 }
 
 // NewVFS creates a new VFS with standard filesystem structure.
@@ -35,6 +40,12 @@ type VFS struct {
 // system directories like /bin and /usr/bin, and a README.txt file.
 // Returns a VFS instance initialized with the provided username.
 func NewVFS(username string) *VFS {
+	return newVFSWithOptions(username, true)
+}
+
+// newVFSWithOptions creates a VFS with optional README.txt.
+// includeReadme should be true for user VFS, false for server VFS.
+func newVFSWithOptions(username string, includeReadme bool) *VFS {
 	if username == "" {
 		username = "user" // Default fallback
 	}
@@ -63,13 +74,46 @@ func NewVFS(username string) *VFS {
 	}
 	home.Children[username] = userDir
 
-	readme := &Node{
-		Name:    "README.txt",
-		IsDir:   false,
-		Content: "Welcome to the SSH Game Server!\n\nThis is a virtual filesystem. Type 'help' to see available commands.",
-		Parent:  userDir,
+	// Only add README.txt for user VFS (not server VFS)
+	if includeReadme {
+		readme := &Node{
+			Name:  "README.txt",
+			IsDir: false,
+			Content: `╔════════════════════════════════════════════════════════════════════╗
+║                         TERMINAL.SH                                ║
+╚════════════════════════════════════════════════════════════════════╝
+
+You've been offline for too long. Your main rig got seized, but your old
+home PC is still running on the local network.
+
+Your first move: recover your tools.
+
+GETTING BACK ONLINE
+═══════════════════
+    scan              - Find your old PC on the local network
+    connect home.pc   - Connect to it (no password needed, it's yours)
+
+Once inside, look for your old toolkit in ~/tools/
+
+Type 'help' for all commands, or 'tutorial getting_started' for guidance.
+
+QUICK REFERENCE
+═══════════════
+  help          - Show all commands
+  userinfo      - View your stats and level
+  tools         - List your hacking tools
+  scan          - Scan for servers
+  mission       - View available missions
+
+Good luck, hacker. Time to get back in the game.
+
+─────────────────────────────────────────────────────────────────────
+Type 'cat README.txt' anytime to see this message again.
+`,
+			Parent: userDir,
+		}
+		userDir.Children["README.txt"] = readme
 	}
-	userDir.Children["README.txt"] = readme
 
 	vfs := &VFS{
 		Root:          root,
@@ -94,7 +138,10 @@ func NewVFS(username string) *VFS {
 // to be restored while preserving standard system directories.
 // Returns a VFS instance and any error that occurred during merging.
 func NewVFSFromMap(username string, fs map[string]interface{}) (*VFS, error) {
-	vfs := NewVFS(username)
+	// Use newVFSWithOptions with includeReadme=false for server VFS
+	// The server filesystem data will provide its own content
+	vfs := newVFSWithOptions(username, false)
+	vfs.isServerVFS = true
 	
 	// Merge the provided filesystem data
 	if err := vfs.MergeFromMap(fs); err != nil {
@@ -124,6 +171,11 @@ func (vfs *VFS) GetCurrentPath() string {
 // Supports absolute paths, relative paths, "~" for home directory, "." for current, and ".." for parent.
 // Returns an error if the path doesn't exist or is not a directory.
 func (vfs *VFS) ChangeDir(path string) error {
+	// Strip trailing slashes (except for root "/")
+	if len(path) > 1 {
+		path = strings.TrimSuffix(path, "/")
+	}
+
 	if path == "" || path == "~" {
 		// Go to home directory using the stored username
 		homePath := "/home/" + vfs.username
@@ -203,8 +255,13 @@ func (vfs *VFS) ListDirWithOptions(showAll bool) []*Node {
 }
 
 // ReadFile reads the content of a file in the current directory.
-// Returns the file content and an error if the file doesn't exist or is a directory.
+// Returns the file content and an error if the file doesn't exist, is a directory, or permission denied.
 func (vfs *VFS) ReadFile(name string) (string, error) {
+	// Check read permission
+	if err := vfs.CheckReadPermission(name); err != nil {
+		return "", fmt.Errorf("cat: %s", err)
+	}
+	
 	if file, exists := vfs.Current.Children[name]; exists && !file.IsDir {
 		return file.Content, nil
 	}
@@ -229,10 +286,98 @@ func (vfs *VFS) findNode(path string) *Node {
 	return current
 }
 
+// ReadFileAtPath reads a file by absolute or relative path.
+// Relative paths are resolved from the current directory.
+func (vfs *VFS) ReadFileAtPath(path string) (string, error) {
+	absPath := path
+	if !strings.HasPrefix(path, "/") {
+		currentPath := vfs.GetCurrentPath()
+		if currentPath == "/" {
+			absPath = "/" + path
+		} else {
+			absPath = currentPath + "/" + path
+		}
+	}
+	absPath = filepath.Clean(absPath)
+
+	if err := vfs.CheckReadPermission(absPath); err != nil {
+		return "", err
+	}
+
+	node := vfs.findNode(absPath)
+	if node == nil {
+		return "", fmt.Errorf("no such file or directory: %s", path)
+	}
+	if node.IsDir {
+		return "", fmt.Errorf("is a directory: %s", path)
+	}
+	return node.Content, nil
+}
+
+// EnsureDirectoryAndCreateFile ensures the directory exists, then creates a file with the given content.
+// The path is like /home/user/Downloads. The filename is the leaf name.
+// Overwrites if the file already exists.
+func (vfs *VFS) EnsureDirectoryAndCreateFile(dirPath, fileName, content string) error {
+	dirPath = filepath.Clean(dirPath)
+	parts := strings.Split(strings.Trim(dirPath, "/"), "/")
+
+	current := vfs.Root
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		if child, exists := current.Children[part]; exists {
+			if !child.IsDir {
+				return fmt.Errorf("not a directory: %s", part)
+			}
+			current = child
+		} else {
+			newDir := &Node{
+				Name:     part,
+				IsDir:    true,
+				Children: make(map[string]*Node),
+				Parent:   current,
+			}
+			current.Children[part] = newDir
+			current = newDir
+		}
+	}
+
+	// Check write permission for the full path
+	fullPath := dirPath
+	if !strings.HasSuffix(dirPath, "/") {
+		fullPath += "/"
+	}
+	fullPath += fileName
+	if errMsg := vfs.CanAccessPath(fullPath, true); errMsg != "" {
+		return fmt.Errorf("%s: %s", fullPath, errMsg)
+	}
+
+	// Create or overwrite the file
+	file := &Node{
+		Name:    fileName,
+		IsDir:   false,
+		Content: content,
+		Parent:  current,
+	}
+	current.Children[fileName] = file
+
+	if vfs.onSaveCallback != nil {
+		changes := vfs.ExtractChanges()
+		_ = vfs.onSaveCallback(changes)
+	}
+	return nil
+}
+
 // CreateFile creates a new empty file in the current directory.
-// Returns an error if a file or directory with the same name already exists.
+// Returns an error if a file or directory with the same name already exists or permission denied.
 // Triggers the save callback if set to persist the change.
 func (vfs *VFS) CreateFile(name string) error {
+	// Check write permission
+	if err := vfs.CheckWritePermission(name); err != nil {
+		return fmt.Errorf("touch: %s", err)
+	}
+	
 	if _, exists := vfs.Current.Children[name]; exists {
 		return fmt.Errorf("file already exists: %s", name)
 	}
@@ -257,9 +402,14 @@ func (vfs *VFS) CreateFile(name string) error {
 }
 
 // CreateDirectory creates a new directory in the current directory.
-// Returns an error if a file or directory with the same name already exists.
+// Returns an error if a file or directory with the same name already exists or permission denied.
 // Triggers the save callback if set to persist the change.
 func (vfs *VFS) CreateDirectory(name string) error {
+	// Check write permission
+	if err := vfs.CheckWritePermission(name); err != nil {
+		return fmt.Errorf("mkdir: %s", err)
+	}
+	
 	if _, exists := vfs.Current.Children[name]; exists {
 		return fmt.Errorf("directory already exists: %s", name)
 	}
@@ -417,9 +567,14 @@ func (vfs *VFS) MoveNode(src, dest string) error {
 }
 
 // WriteFile writes content to a file in the current directory.
-// Returns an error if the file doesn't exist or is a directory.
+// Returns an error if the file doesn't exist, is a directory, or permission denied.
 // Triggers the save callback if set to persist the change.
 func (vfs *VFS) WriteFile(name, content string) error {
+	// Check write permission
+	if err := vfs.CheckWritePermission(name); err != nil {
+		return err
+	}
+	
 	file, exists := vfs.Current.Children[name]
 	if !exists {
 		return fmt.Errorf("file not found: %s", name)
@@ -543,9 +698,8 @@ func (vfs *VFS) InitializeSystemCommands() {
 		"ssh":             "Connect to a server",
 		"exit":            "Disconnect from server",
 		"server":          "Show current server info",
-		"createServer":    "Create a new server",
-		"createLocalServer": "Create local server",
 		"get":             "Download tool from server",
+		"download":        "Download file to ~/Downloads",
 		"tools":           "List owned tools",
 		"exploited":       "List exploited servers",
 		"wallet":          "Show wallet balance",
@@ -870,5 +1024,115 @@ func (vfs *VFS) SetServerID(serverID string) {
 func (vfs *VFS) SetUserID(userID string) {
 	vfs.isServerVFS = false
 	vfs.userID = userID
+}
+
+// --- Role-based Access Control ---
+
+// SetRole sets the current role for permission checking.
+// This is called when connecting to a server with credentials.
+func (vfs *VFS) SetRole(username string, isRoot bool, homeDir string) {
+	vfs.currentRole = username
+	vfs.isRoot = isRoot
+	if homeDir != "" {
+		vfs.homeDir = homeDir
+	} else if isRoot {
+		vfs.homeDir = "/root"
+	} else {
+		vfs.homeDir = "/home/" + username
+	}
+	vfs.username = username
+}
+
+// GetRole returns the current role/username.
+func (vfs *VFS) GetRole() string {
+	if vfs.currentRole != "" {
+		return vfs.currentRole
+	}
+	return vfs.username
+}
+
+// IsRoot returns whether the current role has root privileges.
+func (vfs *VFS) IsRoot() bool {
+	return vfs.isRoot
+}
+
+// GetHomeDir returns the home directory for the current role.
+func (vfs *VFS) GetHomeDir() string {
+	if vfs.homeDir != "" {
+		return vfs.homeDir
+	}
+	if vfs.isRoot {
+		return "/root"
+	}
+	return "/home/" + vfs.GetRole()
+}
+
+// CanAccessPath checks if the current role can access a path.
+// Returns an error message if access is denied, empty string if allowed.
+func (vfs *VFS) CanAccessPath(path string, isWrite bool) string {
+	// Root can access everything
+	if vfs.isRoot {
+		return ""
+	}
+
+	// Normalize path
+	if !strings.HasPrefix(path, "/") {
+		currentPath := vfs.GetCurrentPath()
+		if currentPath == "/" {
+			path = "/" + path
+		} else {
+			path = currentPath + "/" + path
+		}
+	}
+	path = filepath.Clean(path)
+
+	// Restricted paths that only root can access
+	rootOnlyPaths := []string{
+		"/root",
+		"/etc/shadow",
+		"/etc/sudoers",
+	}
+
+	for _, restricted := range rootOnlyPaths {
+		if path == restricted || strings.HasPrefix(path, restricted+"/") {
+			return "Permission denied"
+		}
+	}
+
+	// System directories - require root for write access
+	if isWrite {
+		systemDirs := []string{"/etc", "/usr", "/bin", "/sbin", "/var", "/lib"}
+		for _, sysDir := range systemDirs {
+			if path == sysDir || strings.HasPrefix(path, sysDir+"/") {
+				return "Permission denied: requires root privileges"
+			}
+		}
+	}
+
+	// Users can only write to their own home directory
+	if isWrite {
+		userHome := vfs.GetHomeDir()
+		if !strings.HasPrefix(path, userHome) && !strings.HasPrefix(path, "/tmp") {
+			return "Permission denied: can only write to home directory or /tmp"
+		}
+	}
+
+	return ""
+}
+
+// CheckReadPermission checks read permission for a path.
+func (vfs *VFS) CheckReadPermission(name string) error {
+	if errMsg := vfs.CanAccessPath(name, false); errMsg != "" {
+		return fmt.Errorf("%s: %s", name, errMsg)
+	}
+	return nil
+}
+
+// CheckWritePermission checks write permission for a path.
+func (vfs *VFS) CheckWritePermission(name string) error {
+	if errMsg := vfs.CanAccessPath(name, true); errMsg != "" {
+		return fmt.Errorf("%s: %s", name, errMsg)
+	}
+	return nil
 }
 

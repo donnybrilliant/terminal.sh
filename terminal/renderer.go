@@ -10,6 +10,7 @@ import (
 	"terminal-sh/database"
 	"terminal-sh/filesystem"
 	"terminal-sh/models"
+	"terminal-sh/ui"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -227,7 +228,13 @@ var (
 
 // RenderPrompt renders the shell prompt with styled user, hostname, and path.
 func RenderPrompt(user, hostname, path string) string {
-	prompt := fmt.Sprintf("%s@%s:%s$ ", user, hostname, path)
+	return RenderPromptWithChar(user, hostname, path, "$")
+}
+
+// RenderPromptWithChar renders a command prompt with a custom prompt character.
+// Uses # for root, $ for regular users.
+func RenderPromptWithChar(user, hostname, path, promptChar string) string {
+	prompt := fmt.Sprintf("%s@%s:%s%s ", user, hostname, path, promptChar)
 	return promptStyle.Render(prompt)
 }
 
@@ -604,7 +611,11 @@ func FormatCommand(cmd string, isTool bool) string {
 }
 
 // AnimatedWelcome returns an animated "TERMINAL.SH" ASCII art welcome message
-func AnimatedWelcome() string {
+// This is a convenience wrapper that uses the ui package ASCII art functions.
+// For new code, use ui.StringToAnimatedASCIIArt() for full animation support.
+//
+// width: target width for the ASCII art (0 means use original width)
+func AnimatedWelcome(width int) string {
 	// ASCII art for TERMINAL.SH (proper block letters)
 	asciiArt := `
 ████████╗███████╗██████╗ ███╗   ███╗██╗███╗   ██╗ █████╗ ██╗         ███████╗██╗  ██╗
@@ -615,27 +626,7 @@ func AnimatedWelcome() string {
    ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝    ╚══════╝╚═╝  ╚═╝
 `
 	
-	var styled strings.Builder
-	
-	// Style the ASCII art with gradient colors
-	lines := strings.Split(strings.TrimPrefix(asciiArt, "\n"), "\n")
-	colors := []string{"205", "213", "207", "219", "218", "212", "205"} // Magenta/pink gradient
-	
-	for lineIdx, line := range lines {
-		if line == "" {
-			styled.WriteString("\n")
-			continue
-		}
-		// Cycle through colors for each line
-		color := colors[lineIdx%len(colors)]
-		lineStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color(color)).
-			Bold(true)
-		styled.WriteString(lineStyle.Render(line))
-		styled.WriteString("\n")
-	}
-	
-	return strings.TrimSuffix(styled.String(), "\n")
+	return ui.RenderASCIIArtWithGradient(asciiArt, width, nil)
 }
 
 // WelcomeHelpText returns the help text that appears below the ASCII art

@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"terminal-sh/database"
@@ -10,27 +11,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// SeedInitialData seeds the database with initial game data from JSON files (servers, shops, patches).
+// SeedInitialData seeds the database with initial game data from JSON files (servers, shops).
 // This should be called during application initialization.
 func SeedInitialData(db *database.Database) error {
 	// Seed servers from JSON
 	if err := seedServersFromJSON(db); err != nil {
 		return fmt.Errorf("failed to seed servers: %w", err)
 	}
-	
-	// Seed patches
-	serverService := NewServerService(db)
-	toolService := NewToolService(db, serverService)
-	patchService := NewPatchService(db, toolService)
-	if err := patchService.SeedPatches(); err != nil {
-		return fmt.Errorf("failed to seed patches: %w", err)
-	}
-	
+
 	// Seed shops from JSON
 	if err := seedShopsFromJSON(db); err != nil {
 		return fmt.Errorf("failed to seed shops: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -48,32 +41,106 @@ func seedServersFromJSON(db *database.Database) error {
 		return fmt.Errorf("failed to parse servers.json: %w", err)
 	}
 
-	for _, server := range serverData.Servers {
+	for i := range serverData.Servers {
+		server := serverData.Servers[i]
+		if err := seedServerWithLocalNetwork(db, &server); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func seedServerWithLocalNetwork(db *database.Database, server *models.Server) error {
+	if server.LocalNetwork == nil {
+		server.LocalNetwork = make(map[string]interface{})
+	}
+
+	localRefs := make(map[string]interface{})
+	for ip, raw := range server.LocalNetwork {
+		switch value := raw.(type) {
+		case map[string]interface{}:
+			var child models.Server
+			payload, err := json.Marshal(value)
+			if err != nil {
+				return fmt.Errorf("failed to marshal local server %s: %w", ip, err)
+			}
+			if err := json.Unmarshal(payload, &child); err != nil {
+				return fmt.Errorf("failed to parse local server %s: %w", ip, err)
+			}
+			if child.IP == "" {
+				child.IP = ip
+			}
+			if child.LocalIP == "" {
+				child.LocalIP = ip
+			}
+			if err := seedServerWithLocalNetwork(db, &child); err != nil {
+				return err
+			}
+			localRefs[ip] = child.IP
+		case string:
+			localRefs[ip] = value
+		default:
+			localRefs[ip] = ip
+		}
+	}
+
+	server.LocalNetwork = localRefs
+
 		// Check if server already exists
 		var existing models.Server
 		err := db.Where("ip = ?", server.IP).First(&existing).Error
 		if err != nil && err == gorm.ErrRecordNotFound {
-			// For repo server, populate tools list with all available tools
+			// For repo server, populate tools list with free tools only (exclude mission-exclusive tools)
 			if server.IP == "repo" {
 				var tools []models.Tool
 				if err := db.Find(&tools).Error; err == nil {
-					toolNames := make([]string, len(tools))
-					for i, tool := range tools {
-						toolNames[i] = tool.Name
+					// Mission-exclusive tools that should NOT be in repo
+					missionExclusiveTools := map[string]bool{
+						"packet_capture":     true,
+						"password_sniffer":   true,
+						"password_cracker":   true,
+						"ssh_exploit":        true,
+						"user_enum":          true,
+						"privesc_scanner":    true,
+						"sudo_exploit":       true,
+						"kernel_exploit":     true,
+						"suid_finder":        true,
+						"phishing_kit":       true,
+						"database_dumper":    true,
+						"hash_cracker":       true,
+						"log_cleaner":        true,
+						"timestomper":        true,
+						"audit_disable":      true,
+						"lan_sniffer":        true,
+						"packet_decoder":     true,
+						"log_analyzer":       true,
+						"rootkit":            true,
+						"exploit_kit":        true,
+						"advanced_exploit_kit": true,
+						"xss_exploit":        true,
+						"crypto_miner":       true,
+						"backup_destroyer":   true,
+					}
+					
+					var toolNames []string
+					for _, tool := range tools {
+						// Skip patches and mission-exclusive tools
+						if !tool.IsPatch && !missionExclusiveTools[tool.Name] {
+							toolNames = append(toolNames, tool.Name)
+						}
 					}
 					server.Tools = toolNames
 				}
 			}
 			
-			if err := db.Create(&server).Error; err != nil {
+			if err := db.Create(server).Error; err != nil {
 				return fmt.Errorf("failed to seed server %s: %w", server.IP, err)
 			}
 		} else if err != nil {
 			return fmt.Errorf("failed to check server %s: %w", server.IP, err)
 		}
 		// If server exists, skip it
-	}
-
 	return nil
 }
 
@@ -85,7 +152,7 @@ func createRepoServer(db *database.Database) (*models.Server, error) {
 	if err == nil {
 		return &existing, nil
 	}
-	if err != nil && err != gorm.ErrRecordNotFound {
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 	
@@ -95,10 +162,40 @@ func createRepoServer(db *database.Database) (*models.Server, error) {
 		return nil, err
 	}
 	
-	// Create tool names list
-	toolNames := make([]string, len(tools))
-	for i, tool := range tools {
-		toolNames[i] = tool.Name
+	// Mission-exclusive tools that should NOT be in repo
+	missionExclusiveTools := map[string]bool{
+		"packet_capture":     true,
+		"password_sniffer":   true,
+		"password_cracker":   true,
+		"ssh_exploit":        true,
+		"user_enum":          true,
+		"privesc_scanner":    true,
+		"sudo_exploit":       true,
+		"kernel_exploit":     true,
+		"suid_finder":        true,
+		"phishing_kit":       true,
+		"database_dumper":    true,
+		"hash_cracker":       true,
+		"log_cleaner":        true,
+		"timestomper":        true,
+		"audit_disable":      true,
+		"lan_sniffer":        true,
+		"packet_decoder":     true,
+		"log_analyzer":       true,
+		"rootkit":            true,
+		"exploit_kit":        true,
+		"advanced_exploit_kit": true,
+		"xss_exploit":        true,
+		"crypto_miner":       true,
+		"backup_destroyer":   true,
+	}
+	
+	// Create tool names list (exclude patches and mission-exclusive tools)
+	var toolNames []string
+	for _, tool := range tools {
+		if !tool.IsPatch && !missionExclusiveTools[tool.Name] {
+			toolNames = append(toolNames, tool.Name)
+		}
 	}
 	
 	// Create repo server
@@ -148,7 +245,7 @@ func createTestServer(db *database.Database) (*models.Server, error) {
 	if err == nil {
 		return &existing, nil
 	}
-	if err != nil && err != gorm.ErrRecordNotFound {
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 	
@@ -205,27 +302,24 @@ func seedShopsFromJSON(db *database.Database) error {
 	}
 
 	var shopData struct {
-		Shops      []struct {
-			ServerIP        string `json:"server_ip"`
+		Shops []struct {
+			ServerIP        string        `json:"server_ip"`
 			Server          models.Server `json:"server"`
-			ShopType        string `json:"shop_type"`
-			ShopName        string `json:"shop_name"`
-			ShopDescription string `json:"shop_description"`
+			ShopType        string        `json:"shop_type"`
+			ShopName        string        `json:"shop_name"`
+			ShopDescription string        `json:"shop_description"`
+			RequiredMission string        `json:"required_mission,omitempty"`
+			RequiredLevel   int           `json:"required_level,omitempty"`
 			Items           []struct {
-				ItemType    string `json:"item_type"`
-				ItemID      string `json:"item_id"`
-				Name        string `json:"name"`
-				Description string `json:"description"`
-				CryptoPrice  float64 `json:"crypto_price"`
-				DataPrice    float64 `json:"data_price"`
-				Stock        int     `json:"stock"`
+				ItemType    string  `json:"item_type"`
+				ItemID      string  `json:"item_id"`
+				Name        string  `json:"name"`
+				Description string  `json:"description"`
+				CryptoPrice float64 `json:"crypto_price"`
+				DataPrice   float64 `json:"data_price"`
+				Stock       int     `json:"stock"`
 			} `json:"items"`
 		} `json:"shops"`
-		PatchFiles []struct {
-			ServerIP string `json:"server_ip"`
-			FilePath string `json:"file_path"`
-			Content  string `json:"content"`
-		} `json:"patch_files"`
 	}
 	if err := json.Unmarshal(data, &shopData); err != nil {
 		return fmt.Errorf("failed to parse shops.json: %w", err)
@@ -263,8 +357,15 @@ func seedShopsFromJSON(db *database.Database) error {
 			shopType = models.ShopTypeTools
 		}
 
-		// Create shop
-		shop, err := shopService.CreateShop(shopDef.ServerIP, shopType, shopDef.ShopName, shopDef.ShopDescription)
+		// Create shop with requirements
+		shop, err := shopService.CreateShopWithRequirements(
+			shopDef.ServerIP, 
+			shopType, 
+			shopDef.ShopName, 
+			shopDef.ShopDescription,
+			shopDef.RequiredMission,
+			shopDef.RequiredLevel,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to create shop: %w", err)
 		}
@@ -275,8 +376,8 @@ func seedShopsFromJSON(db *database.Database) error {
 			switch item.ItemType {
 			case "tool":
 				itemType = models.ItemTypeTool
-			case "patch":
-				itemType = models.ItemTypePatch
+			case "upgrade_token":
+				itemType = models.ItemTypeUpgradeToken
 			case "resource":
 				itemType = models.ItemTypeResource
 			default:
@@ -287,56 +388,6 @@ func seedShopsFromJSON(db *database.Database) error {
 			if err != nil {
 				return fmt.Errorf("failed to add shop item %s: %w", item.Name, err)
 			}
-		}
-	}
-
-	// Seed patch files on servers
-	for _, patchFile := range shopData.PatchFiles {
-		var server models.Server
-		if err := db.Where("ip = ?", patchFile.ServerIP).First(&server).Error; err != nil {
-			continue // Server doesn't exist, skip
-		}
-
-		if server.FileSystem == nil {
-			server.FileSystem = make(map[string]interface{})
-		}
-
-		// Parse file path to create directory structure
-		parts := []string{}
-		current := ""
-		for _, char := range patchFile.FilePath {
-			if char == '/' {
-				if current != "" {
-					parts = append(parts, current)
-					current = ""
-				}
-			} else {
-				current += string(char)
-			}
-		}
-		if current != "" {
-			parts = append(parts, current)
-		}
-
-		// Create directory structure
-		currentLevel := server.FileSystem
-		for i, part := range parts {
-			if i == len(parts)-1 {
-				// Last part is the file
-				currentLevel[part] = map[string]interface{}{
-					"content": patchFile.Content,
-				}
-			} else {
-				// Directory
-				if _, ok := currentLevel[part].(map[string]interface{}); !ok {
-					currentLevel[part] = make(map[string]interface{})
-				}
-				currentLevel = currentLevel[part].(map[string]interface{})
-			}
-		}
-
-		if err := db.Save(&server).Error; err != nil {
-			return fmt.Errorf("failed to save patch file on server %s: %w", patchFile.ServerIP, err)
 		}
 	}
 
@@ -411,12 +462,12 @@ func seedShops(db *database.Database) error {
 		return fmt.Errorf("failed to add shop item: %w", err)
 	}
 	
-	_, err = shopService.AddShopItem(shop.ID, models.ItemTypePatch, "pass_patch_v2", "Enhanced password cracking algorithm", 0, 500, -1)
+	_, err = shopService.AddShopItem(shop.ID, models.ItemTypeUpgradeToken, "Exploit Booster Token", "Grants one free exploit upgrade to any tool", 150, 0, -1)
 	if err != nil {
 		return fmt.Errorf("failed to add shop item: %w", err)
 	}
 	
-	_, err = shopService.AddShopItem(shop.ID, models.ItemTypePatch, "ssh_patch_v2", "Improved SSH exploitation techniques", 0, 750, -1)
+	_, err = shopService.AddShopItem(shop.ID, models.ItemTypeUpgradeToken, "CPU Optimizer Token", "Grants one free CPU upgrade to any tool", 75, 0, -1)
 	if err != nil {
 		return fmt.Errorf("failed to add shop item: %w", err)
 	}

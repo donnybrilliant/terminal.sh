@@ -2,13 +2,18 @@ package services
 
 import (
 	"fmt"
+	"terminal-sh/config"
 	"terminal-sh/models"
+
+	"github.com/google/uuid"
 )
 
 // NetworkService handles network scanning operations including internet and local network scans.
 type NetworkService struct {
-	serverService *ServerService
-	shopService   *ShopService // Will be set if available
+	serverService   *ServerService
+	shopService     *ShopService     // Will be set if available
+	serverGenerator *ServerGenerator // Optional server generator
+	missionService  *MissionService  // For checking mission completion (internet gating)
 }
 
 // NewNetworkService creates a new NetworkService with the provided server service.
@@ -23,12 +28,58 @@ func (n *NetworkService) SetShopService(shopService *ShopService) {
 	n.shopService = shopService
 }
 
+// SetServerGenerator sets the server generator for this network service.
+func (n *NetworkService) SetServerGenerator(generator *ServerGenerator) {
+	n.serverGenerator = generator
+}
+
+// SetMissionService sets the mission service for internet gating.
+func (n *NetworkService) SetMissionService(missionService *MissionService) {
+	n.missionService = missionService
+}
+
 // ScanInternet scans the internet for top-level servers (servers not in local networks).
+// Deprecated: Use ScanInternetForUser for proper internet gating.
 func (n *NetworkService) ScanInternet() ([]models.Server, error) {
+	return n.ScanInternetForUser(uuid.Nil)
+}
+
+// ScanInternetForUser scans the internet for a specific user.
+// If user hasn't completed 'home_recovery' mission, only shows home.pc (local network only).
+// If procedural server generator is available and server count is low, generates new servers.
+func (n *NetworkService) ScanInternetForUser(userID uuid.UUID) ([]models.Server, error) {
+	// Check if user has completed the initial home_recovery mission
+	// If not, they're "offline" and can only see their local home.pc
+	if userID != uuid.Nil && n.missionService != nil {
+		if !n.missionService.HasCompletedMission(userID, "home_recovery") {
+			// User is offline - only show home.pc
+			homePC, err := n.serverService.GetServerByIP("home.pc")
+			if err != nil {
+				return nil, fmt.Errorf("failed to find home.pc: %w", err)
+			}
+			return []models.Server{*homePC}, nil
+		}
+	}
+	
+	// User has internet access - show all servers
 	servers, err := n.serverService.GetAllTopLevelServers()
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan internet: %w", err)
 	}
+	
+	// Check if we need to generate more servers
+	if n.serverGenerator != nil && len(servers) < config.MinServersOnline {
+		if err := n.serverGenerator.CheckAndGenerateServers(userID); err != nil {
+			// Log error but continue - return existing servers
+		} else {
+			// Re-fetch servers after generation
+			servers, err = n.serverService.GetAllTopLevelServers()
+			if err != nil {
+				return nil, fmt.Errorf("failed to scan internet: %w", err)
+			}
+		}
+	}
+	
 	return servers, nil
 }
 
@@ -60,10 +111,6 @@ func (n *NetworkService) FormatScanResult(server *models.Server) string {
 	result += fmt.Sprintf("Wallet: Crypto=%.2f, Data=%.2f\n",
 		server.Wallet.Crypto, server.Wallet.Data)
 	
-	if len(server.Tools) > 0 {
-		result += fmt.Sprintf("Available Tools (use 'get %s <toolName>' to download): %v\n", server.IP, server.Tools)
-	}
-	
 	if len(server.Services) > 0 {
 		result += "Services:\n"
 		for _, service := range server.Services {
@@ -77,8 +124,8 @@ func (n *NetworkService) FormatScanResult(server *models.Server) string {
 		}
 	}
 	
-	if len(server.ConnectedIPs) > 0 {
-		result += fmt.Sprintf("Connected IPs: %v\n", server.ConnectedIPs)
+	if len(server.LocalNetwork) > 0 {
+		result += fmt.Sprintf("Local Network Hosts: %d\n", len(server.LocalNetwork))
 	}
 	
 	// Check if server has a shop

@@ -4,174 +4,223 @@ import (
 	"fmt"
 	"strings"
 	"terminal-sh/models"
+	"terminal-sh/patch"
 	"terminal-sh/ui"
 )
 
-// handlePATCH handles patch-related commands
+// handlePATCH handles patch-related commands for the progressive upgrade system
 func (h *CommandHandler) handlePATCH(args []string) *CommandResult {
 	if h.user == nil {
 		return &CommandResult{Error: fmt.Errorf("not authenticated")}
 	}
 
-	if h.patchService == nil {
-		return &CommandResult{Error: fmt.Errorf("patch service not available")}
+	if h.upgradeService == nil {
+		return &CommandResult{Error: fmt.Errorf("upgrade service not available")}
 	}
 
+	// No args - list all tools with upgrade status
 	if len(args) == 0 {
 		return h.handlePatchList()
 	}
 
-	if args[0] == "info" && len(args) == 2 {
-		return h.handlePatchInfo(args[1])
+	toolName := args[0]
+
+	// Single arg - show upgrades for a specific tool
+	if len(args) == 1 {
+		return h.handlePatchTool(toolName)
 	}
 
+	// Two args - apply upgrade to tool
 	if len(args) == 2 {
-		// patch <patchName> <toolName>
-		return h.handlePatchApply(args[0], args[1])
+		upgradeTypeStr := args[1]
+		return h.handlePatchApply(toolName, upgradeTypeStr)
 	}
 
-	return &CommandResult{Error: fmt.Errorf("usage: patches - List available patches\n       patch <patchName> <toolName> - Apply patch to tool\n       patch info <patchName> - Show patch details")}
+	return &CommandResult{Error: fmt.Errorf("usage: patches - List all tools with upgrade status\n       patch <tool> - Show available upgrades for a tool\n       patch <tool> <type> - Apply upgrade (exploit/cpu/ram/bw/full)")}
 }
 
-// handlePatchList lists all available patches
+// handlePatchList lists all owned tools with their upgrade status
 func (h *CommandHandler) handlePatchList() *CommandResult {
-	// Get all patches
-	allPatches, err := h.patchService.GetAllPatches()
-	if err != nil {
-		return &CommandResult{Error: err}
+	// Get user's tool states
+	var toolStates []models.UserToolState
+	if err := h.db.Where("user_id = ?", h.user.ID).Preload("Tool").Find(&toolStates).Error; err != nil {
+		return &CommandResult{Error: fmt.Errorf("failed to get tools: %w", err)}
 	}
 
-	// Get user's owned patches
-	ownedPatches, err := h.patchService.GetUserPatches(h.user.ID)
-	if err != nil {
-		ownedPatches = []models.Patch{} // Continue even if error
-	}
-
-	ownedMap := make(map[string]bool)
-	for _, patch := range ownedPatches {
-		ownedMap[patch.Name] = true
+	if len(toolStates) == 0 {
+		return &CommandResult{Output: "No tools owned yet. Download tools from the repo server.\n"}
 	}
 
 	var output strings.Builder
-	output.WriteString(ui.FormatSectionHeader("Available Patches:", "🔧"))
-	
-	if len(allPatches) == 0 {
-		output.WriteString("  No patches available.\n")
-		output.WriteString("  Patches can be found in shop files or on servers.\n")
-	} else {
-		for _, patch := range allPatches {
-			owned := ""
-			if ownedMap[patch.Name] {
-				owned = " " + ui.SuccessStyleNoBold.Render("[OWNED]")
+	output.WriteString(ui.FormatSectionHeader("Your Tools & Upgrades:", "🔧"))
+
+	for _, ts := range toolStates {
+		totalUpgrades := ts.ExploitUpgrades + ts.CPUUpgrades + ts.RAMUpgrades + ts.BandwidthUpgrades
+
+		output.WriteString(ui.FormatListBulletWithStyle(ui.AccentStyle.Render(ts.Tool.Name), ui.ListStyle))
+		output.WriteString(fmt.Sprintf("    Version: %d | Total Upgrades: %d\n", ts.Version, totalUpgrades))
+
+		if totalUpgrades > 0 {
+			upgrades := []string{}
+			if ts.ExploitUpgrades > 0 {
+				upgrades = append(upgrades, fmt.Sprintf("%d exploit", ts.ExploitUpgrades))
 			}
-			output.WriteString(ui.FormatListBulletWithStyle(ui.AccentStyle.Render(patch.Name)+owned, ui.ListStyle))
-			output.WriteString(ui.FormatKeyValuePair("    Target:", patch.TargetTool) + "\n")
-			if patch.Description != "" {
-				output.WriteString("    " + ui.ValueStyle.Render(patch.Description) + "\n")
+			if ts.CPUUpgrades > 0 {
+				upgrades = append(upgrades, fmt.Sprintf("%d cpu", ts.CPUUpgrades))
 			}
-			if len(patch.Upgrades.Exploits) > 0 {
-				output.WriteString(ui.LabelStyle.Render("    Exploit upgrades:") + " ")
-				for i, exploit := range patch.Upgrades.Exploits {
-					if i > 0 {
-						output.WriteString(", ")
-					}
-					output.WriteString(ui.ValueStyle.Render(fmt.Sprintf("%s (level %d)", exploit.Type, exploit.Level)))
-				}
-				output.WriteString("\n")
+			if ts.RAMUpgrades > 0 {
+				upgrades = append(upgrades, fmt.Sprintf("%d ram", ts.RAMUpgrades))
 			}
-			if patch.Upgrades.Resources.CPU != 0 || patch.Upgrades.Resources.Bandwidth != 0 || patch.Upgrades.Resources.RAM != 0 {
-				output.WriteString(ui.LabelStyle.Render("    Resource changes:") + " ")
-				changes := []string{}
-				if patch.Upgrades.Resources.CPU != 0 {
-					changes = append(changes, ui.ValueStyle.Render(fmt.Sprintf("CPU %+.1f", patch.Upgrades.Resources.CPU)))
-				}
-				if patch.Upgrades.Resources.Bandwidth != 0 {
-					changes = append(changes, ui.ValueStyle.Render(fmt.Sprintf("Bandwidth %+.1f", patch.Upgrades.Resources.Bandwidth)))
-				}
-				if patch.Upgrades.Resources.RAM != 0 {
-					changes = append(changes, ui.ValueStyle.Render(fmt.Sprintf("RAM %+d", patch.Upgrades.Resources.RAM)))
-				}
-				output.WriteString(strings.Join(changes, ", "))
-				output.WriteString("\n")
+			if ts.BandwidthUpgrades > 0 {
+				upgrades = append(upgrades, fmt.Sprintf("%d bw", ts.BandwidthUpgrades))
 			}
-			output.WriteString("\n")
+			output.WriteString("    " + ui.ValueStyle.Render("Upgrades: "+strings.Join(upgrades, ", ")) + "\n")
 		}
+
+		// Show effective stats
+		if len(ts.EffectiveExploits) > 0 {
+			maxLevel := 0
+			for _, e := range ts.EffectiveExploits {
+				if e.Level > maxLevel {
+					maxLevel = e.Level
+				}
+			}
+			output.WriteString(fmt.Sprintf("    Exploit Level: %d/%d | CPU: %.0f | RAM: %d | BW: %.1f\n",
+				maxLevel, patch.MaxExploitLevel,
+				ts.EffectiveResources.CPU, ts.EffectiveResources.RAM, ts.EffectiveResources.Bandwidth))
+		}
+		output.WriteString("\n")
 	}
 
-	output.WriteString(ui.FormatUsage("Usage: patch <patchName> <toolName> - Apply patch to tool"))
-	output.WriteString(ui.FormatUsage("       patch info <patchName> - Show detailed patch information"))
+	output.WriteString(ui.FormatUsage("Usage: patch <tool> - View upgrade options for a tool"))
 
 	return &CommandResult{Output: output.String()}
 }
 
-// handlePatchApply applies a patch to a tool
-func (h *CommandHandler) handlePatchApply(patchName, toolName string) *CommandResult {
+// handlePatchTool shows available upgrades for a specific tool
+func (h *CommandHandler) handlePatchTool(toolName string) *CommandResult {
+	// Get upgrade info
+	info, err := h.upgradeService.GetToolUpgradeInfo(h.user.ID, toolName)
+	if err != nil {
+		return &CommandResult{Error: err}
+	}
+
+	// Get user's wallet
+	user, _ := h.userService.GetUserByID(h.user.ID)
+
+	var output strings.Builder
+	output.WriteString("╔═══════════════════════════════════════╗\n")
+	output.WriteString("║   " + ui.HeaderStyle.Render("Tool Patches: ") + ui.AccentBoldStyle.Render(toolName) + "\n")
+	output.WriteString("╚═══════════════════════════════════════╝\n\n")
+
+	// Current stats
+	output.WriteString(ui.FormatSectionHeader("Current Stats:", "📊"))
+	if len(info.EffectiveExploits) > 0 {
+		output.WriteString(fmt.Sprintf("  Exploit Level: %d (max %d)\n", info.MaxExploitLevel, patch.MaxExploitLevel))
+	}
+	output.WriteString(fmt.Sprintf("  CPU: %.0f | RAM: %d | Bandwidth: %.1f\n",
+		info.EffectiveResources.CPU, info.EffectiveResources.RAM, info.EffectiveResources.Bandwidth))
+
+	if info.TotalUpgrades > 0 {
+		upgrades := []string{}
+		if info.ExploitUpgrades > 0 {
+			upgrades = append(upgrades, fmt.Sprintf("%d exploit", info.ExploitUpgrades))
+		}
+		if info.CPUUpgrades > 0 {
+			upgrades = append(upgrades, fmt.Sprintf("%d cpu", info.CPUUpgrades))
+		}
+		if info.RAMUpgrades > 0 {
+			upgrades = append(upgrades, fmt.Sprintf("%d ram", info.RAMUpgrades))
+		}
+		if info.BandwidthUpgrades > 0 {
+			upgrades = append(upgrades, fmt.Sprintf("%d bandwidth", info.BandwidthUpgrades))
+		}
+		output.WriteString("  Upgrades Applied: " + ui.ValueStyle.Render(strings.Join(upgrades, ", ")) + "\n")
+	}
+	output.WriteString("\n")
+
+	// Available upgrades
+	output.WriteString(ui.FormatSectionHeader("Available Patches:", "🔧"))
+
+	for _, upgrade := range info.AvailableUpgrades {
+		typeKey := string(upgrade.Type)
+		if upgrade.Type == patch.UpgradeBandwidth {
+			typeKey = "bw"
+		}
+
+		costStr := fmt.Sprintf("%.0f crypto", upgrade.Cost)
+		if !upgrade.CanApply {
+			costStr = ui.ErrorStyle.Render(upgrade.Reason)
+		}
+
+		output.WriteString(fmt.Sprintf("  [%s] %s\n", ui.AccentStyle.Render(typeKey), upgrade.Name))
+		output.WriteString(fmt.Sprintf("       %s\n", ui.ValueStyle.Render(upgrade.Description)))
+		output.WriteString(fmt.Sprintf("       Cost: %s\n", costStr))
+	}
+
+	output.WriteString("\n")
+	output.WriteString(ui.FormatKeyValuePair("Your wallet:", fmt.Sprintf("%.0f crypto", user.Wallet.Crypto)) + "\n\n")
+	output.WriteString(ui.FormatUsage("Usage: patch " + toolName + " <type>"))
+	output.WriteString(ui.FormatUsage("Types: exploit, cpu, ram, bw, full"))
+
+	return &CommandResult{Output: output.String()}
+}
+
+// handlePatchApply applies an upgrade to a tool
+func (h *CommandHandler) handlePatchApply(toolName, upgradeTypeStr string) *CommandResult {
+	// Parse upgrade type
+	upgradeType, valid := patch.ParseUpgradeType(upgradeTypeStr)
+	if !valid {
+		return &CommandResult{Error: fmt.Errorf("invalid upgrade type: %s\nValid types: exploit, cpu, ram, bw, full", upgradeTypeStr)}
+	}
+
 	// Check if user owns the tool
 	if !h.toolService.UserHasTool(h.user.ID, toolName) {
 		return &CommandResult{Error: fmt.Errorf("tool %s not owned", toolName)}
 	}
 
-	// Check if user owns the patch (if it's a purchased patch)
-	if !h.patchService.UserOwnsPatch(h.user.ID, patchName) {
-		// Patch might be free/discoverable, continue anyway
+	// Get the cost before applying
+	toolState, _ := h.toolService.GetUserToolState(h.user.ID, toolName)
+	currentCount := 0
+	switch upgradeType {
+	case patch.UpgradeExploit:
+		currentCount = toolState.ExploitUpgrades
+	case patch.UpgradeCPU:
+		currentCount = toolState.CPUUpgrades
+	case patch.UpgradeRAM:
+		currentCount = toolState.RAMUpgrades
+	case patch.UpgradeBandwidth:
+		currentCount = toolState.BandwidthUpgrades
+	case patch.UpgradeFullTune:
+		currentCount = toolState.CPUUpgrades + toolState.RAMUpgrades + toolState.BandwidthUpgrades
 	}
+	cost := patch.CalculateUpgradeCost(upgradeType, currentCount)
 
-	// Apply patch
-	if err := h.patchService.ApplyPatch(h.user.ID, toolName, patchName); err != nil {
+	// Apply upgrade
+	if err := h.upgradeService.ApplyUpgrade(h.user.ID, toolName, upgradeType); err != nil {
 		return &CommandResult{Error: err}
 	}
 
-	// Get updated tool state to show version
-	toolState, err := h.toolService.GetUserToolState(h.user.ID, toolName)
-		if err == nil {
-		var output strings.Builder
-		output.WriteString(ui.SuccessStyle.Render("✅ Patch ") + ui.AccentStyle.Render(patchName) + ui.SuccessStyle.Render(fmt.Sprintf(" successfully applied to %s", toolName)) + "\n")
-		output.WriteString(ui.FormatKeyValuePair("Tool version:", fmt.Sprintf("%d", toolState.Version)) + "\n")
-		output.WriteString(ui.FormatKeyValuePair("Applied patches:", strings.Join(toolState.AppliedPatches, ", ")) + "\n")
-		return &CommandResult{Output: output.String()}
-	}
+	// Get updated tool state
+	toolState, _ = h.toolService.GetUserToolState(h.user.ID, toolName)
+	def := patch.GetUpgradeDefinition(upgradeType)
 
 	var output strings.Builder
-	output.WriteString(ui.SuccessStyle.Render("✅ Patch ") + ui.AccentStyle.Render(patchName) + ui.SuccessStyle.Render(fmt.Sprintf(" successfully applied to %s", toolName)) + "\n")
-	return &CommandResult{Output: output.String()}
-}
+	output.WriteString(ui.SuccessStyle.Render("✅ "+def.Name+" applied to "+toolName) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Cost:", fmt.Sprintf("%.0f crypto", cost)) + "\n")
+	output.WriteString(ui.FormatKeyValuePair("Tool version:", fmt.Sprintf("%d", toolState.Version)) + "\n")
 
-// handlePatchInfo shows detailed patch information
-func (h *CommandHandler) handlePatchInfo(patchName string) *CommandResult {
-	patch, err := h.patchService.GetPatchByName(patchName)
-	if err != nil {
-		return &CommandResult{Error: fmt.Errorf("patch not found: %s", patchName)}
-	}
-
-	var output strings.Builder
-	output.WriteString("╔═══════════════════════════════════════╗\n")
-	output.WriteString("║   " + ui.HeaderStyle.Render("Patch: ") + ui.AccentBoldStyle.Render(patch.Name) + "\n")
-	output.WriteString("╚═══════════════════════════════════════╝\n\n")
-	output.WriteString(ui.FormatKeyValuePair("Target Tool:", patch.TargetTool) + "\n")
-	output.WriteString(ui.FormatKeyValuePair("Description:", patch.Description) + "\n\n")
-
-	if len(patch.Upgrades.Exploits) > 0 {
-		output.WriteString(ui.FormatSectionHeader("Exploit Upgrades:", ""))
-		for _, exploit := range patch.Upgrades.Exploits {
-			output.WriteString(ui.FormatListBullet(ui.ValueStyle.Render(fmt.Sprintf("%s (level %d)", exploit.Type, exploit.Level))))
+	// Show new stats
+	if len(toolState.EffectiveExploits) > 0 {
+		maxLevel := 0
+		for _, e := range toolState.EffectiveExploits {
+			if e.Level > maxLevel {
+				maxLevel = e.Level
+			}
 		}
-		output.WriteString("\n")
-	}
-
-	if patch.Upgrades.Resources.CPU != 0 || patch.Upgrades.Resources.Bandwidth != 0 || patch.Upgrades.Resources.RAM != 0 {
-		output.WriteString(ui.FormatSectionHeader("Resource Changes:", ""))
-		if patch.Upgrades.Resources.CPU != 0 {
-			output.WriteString(ui.FormatKeyValuePair("  CPU:", fmt.Sprintf("%+.1f", patch.Upgrades.Resources.CPU)) + "\n")
-		}
-		if patch.Upgrades.Resources.Bandwidth != 0 {
-			output.WriteString(ui.FormatKeyValuePair("  Bandwidth:", fmt.Sprintf("%+.1f", patch.Upgrades.Resources.Bandwidth)) + "\n")
-		}
-		if patch.Upgrades.Resources.RAM != 0 {
-			output.WriteString(ui.FormatKeyValuePair("  RAM:", fmt.Sprintf("%+d", patch.Upgrades.Resources.RAM)) + "\n")
-		}
-		output.WriteString("\n")
+		output.WriteString(fmt.Sprintf("New stats: Exploit %d | CPU %.0f | RAM %d | BW %.1f\n",
+			maxLevel, toolState.EffectiveResources.CPU, toolState.EffectiveResources.RAM, toolState.EffectiveResources.Bandwidth))
 	}
 
 	return &CommandResult{Output: output.String()}
 }
-

@@ -19,13 +19,15 @@ const (
 
 // Shop represents a shop on a server where users can purchase items.
 type Shop struct {
-	ID          uuid.UUID `gorm:"type:text;primary_key" json:"id"`
-	ServerIP    string    `gorm:"uniqueIndex;not null" json:"server_ip"`
-	ShopType    ShopType  `gorm:"not null" json:"shop_type"`
-	Name        string    `gorm:"not null" json:"name"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID              uuid.UUID `gorm:"type:text;primary_key" json:"id"`
+	ServerIP        string    `gorm:"uniqueIndex;not null" json:"server_ip"`
+	ShopType        ShopType  `gorm:"not null" json:"shop_type"`
+	Name            string    `gorm:"not null" json:"name"`
+	Description     string    `json:"description"`
+	RequiredMission string    `json:"required_mission,omitempty"` // Mission ID that must be completed to access this shop
+	RequiredLevel   int       `json:"required_level,omitempty"`   // Minimum player level to access this shop
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 
 	// Relationships
 	Items []ShopItem `gorm:"foreignKey:ShopID" json:"items,omitempty"`
@@ -43,9 +45,9 @@ func (s *Shop) BeforeCreate(tx *gorm.DB) error {
 type ItemType string
 
 const (
-	ItemTypeTool     ItemType = "tool"     // Hacking tool
-	ItemTypePatch    ItemType = "patch"    // Tool upgrade patch
-	ItemTypeResource ItemType = "resource" // Resource upgrade
+	ItemTypeTool         ItemType = "tool"          // Hacking tool
+	ItemTypeUpgradeToken ItemType = "upgrade_token" // Tool upgrade token (exploit, cpu, ram, bandwidth)
+	ItemTypeResource     ItemType = "resource"      // Resource upgrade (CPU/RAM/Bandwidth for user)
 )
 
 // ShopItem represents an item for sale in a shop.

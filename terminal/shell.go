@@ -10,6 +10,7 @@ import (
 	"terminal-sh/filesystem"
 	"terminal-sh/models"
 	"terminal-sh/services"
+	"terminal-sh/ui"
 	"time"
 
 	"github.com/charmbracelet/bubbles/textarea"
@@ -55,6 +56,9 @@ type ShellModel struct {
 	gradientAnimating bool
 	gradientSeed      int64
 
+	// ASCII animation state (for ascii command)
+	asciiAnimation *ui.ASCIIAnimationState
+
 	// Incremental rendering state
 	pendingOutput      string // New output to append (command results)
 	pendingClear       bool   // Whether to clear screen
@@ -68,13 +72,26 @@ type ShellModel struct {
 	// In-app scrollback state
 	scrollOffset    int  // Lines scrolled up from bottom (0 = at bottom)
 	isScrolledUp    bool // True if user has scrolled up (shows indicator)
+
+	// Progress bar state
+	activeProgress    *progressState // Currently active progress operation
+}
+
+// progressState tracks an active progress bar operation
+type progressState struct {
+	ID        string
+	Message   string
+	StartTime time.Time
+	Duration  time.Duration
+	Progress  float64 // 0.0 to 1.0
 }
 
 // ShellContext represents a shell session context
 type ShellContext struct {
-	serverPath string
-	vfs        *filesystem.VFS
-	handler    *cmd.CommandHandler
+	serverPath  string
+	serviceType string // Service type used for connection (ssh, ftp, telnet, etc.)
+	vfs         *filesystem.VFS
+	handler     *cmd.CommandHandler
 }
 
 // NewShellModel creates a new shell model
@@ -222,6 +239,9 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.gradientAnimating {
 			m.refreshGradientFrames()
 		}
+		if m.asciiAnimation != nil {
+			m.asciiAnimation.UpdateDimensions(msg.Width, msg.Height)
+		}
 		return m, nil
 	case GradientTickMsg:
 		if m.gradientAnimating {
@@ -289,6 +309,14 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Scroll down through history
 			m.scrollDown(m.height / 2) // Half page at a time
 			return m, nil
+		case "ctrl+u":
+			// Scroll up through history (terminal-style)
+			m.scrollUp(m.height / 2) // Half page at a time
+			return m, nil
+		case "ctrl+d":
+			// Scroll down through history (terminal-style)
+			m.scrollDown(m.height / 2) // Half page at a time
+			return m, nil
 		case "home":
 			// Scroll to top of history (only if ctrl is held for home)
 			// Regular home goes to start of input line
@@ -327,6 +355,22 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if cmd == "tutorial" && len(parts) >= 2 {
 					tutorialNames := m.getTutorialNames(prefix)
 					if completed, ok := CompleteFromList(prefix, tutorialNames); ok {
+						current := m.textInput.Value()
+						lastSpaceIdx := strings.LastIndex(current, " ")
+						if lastSpaceIdx >= 0 {
+							m.textInput.SetValue(current[:lastSpaceIdx+1] + completed)
+						} else {
+							m.textInput.SetValue(completed)
+						}
+						m.textInput.CursorEnd()
+						return m, nil
+					}
+				}
+				
+				// Handle mission subcommand and ID autocomplete
+				if cmd == "mission" && len(parts) >= 2 {
+					missionMatches := m.getMissionMatches(prefix)
+					if completed, ok := CompleteFromList(prefix, missionMatches); ok {
 						current := m.textInput.Value()
 						lastSpaceIdx := strings.LastIndex(current, " ")
 						if lastSpaceIdx >= 0 {
@@ -452,6 +496,57 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.inputHistory.Reset()
 		return m, nil
+	case StartASCIIAnimationMsg:
+		// Start ASCII animation
+		// Recalculate character dimensions based on actual viewport size if sizeScale is provided
+		charWidth := msg.CharWidth
+		charHeight := msg.CharHeight
+		if msg.SizeScale > 0 {
+			// Recalculate with actual viewport dimensions (though scale is viewport-independent)
+			var err error
+			charWidth, charHeight, err = cmd.GetASCIISize(msg.SizeScale, m.width, m.height)
+			if err == nil {
+				// Use calculated dimensions
+			}
+		}
+		m.asciiAnimation = ui.StringToAnimatedASCIIArt(msg.Text, m.width, m.height, msg.Colors, charWidth, charHeight)
+		m.asciiAnimation.BuildGradientFrames()
+		// Start the animation ticker
+		return m, m.nextASCIIAnimationTick()
+	case ASCIIAnimationTickMsg:
+		if m.asciiAnimation != nil && m.asciiAnimation.IsAnimating() {
+			oldPhase := m.asciiAnimation.GetPhase()
+			// Advance animation frame
+			m.asciiAnimation.AdvanceFrame()
+			newPhase := m.asciiAnimation.GetPhase()
+			
+			// If we just transitioned to ASCII phase, set completion timer
+			if oldPhase == "gradient" && newPhase == "ascii" {
+				// Transitioned to ASCII phase - set timer for completion after showing ASCII for 2 seconds
+				return m, tea.Batch(
+					m.nextASCIIAnimationTick(), // Continue animation
+					tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+						return ASCIIAnimationCompleteMsg{}
+					}),
+				)
+			}
+			
+			// Continue animation
+			if m.asciiAnimation.GetPhase() == "ascii" || m.asciiAnimation.GetPhase() == "gradient" {
+				return m, m.nextASCIIAnimationTick()
+			}
+		}
+		return m, nil
+	case ASCIIAnimationCompleteMsg:
+		// Animation complete - fall away
+		if m.asciiAnimation != nil {
+			m.asciiAnimation.Complete()
+			m.asciiAnimation = nil
+			m.pendingClearScrollback = true
+			// Force view update by clearing lastView in web mode
+			// This ensures the animation disappears immediately
+		}
+		return m, nil
 	case WelcomeMsg:
 		m.showWelcome = true
 		// Don't set pendingOutput here - initialRender handles it
@@ -459,7 +554,101 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case LogoutMsg:
 		// Return to login screen
 		return m.handleLogout()
+	case ProgressStartMsg:
+		// Start a progress bar operation
+		m.activeProgress = &progressState{
+			ID:        msg.ID,
+			Message:   msg.Message,
+			StartTime: time.Now(),
+			Duration:  msg.Duration,
+			Progress:  0.0,
+		}
+		// Start the progress ticker
+		return m, m.nextProgressTick()
+	case ProgressTickMsg:
+		// Update progress bar - ID check is optional since we only have one progress at a time
+		if m.activeProgress != nil {
+			// Only check ID if it's provided (not empty)
+			if msg.ID != "" && m.activeProgress.ID != msg.ID {
+				return m, nil
+			}
+			elapsed := time.Since(m.activeProgress.StartTime)
+			m.activeProgress.Progress = float64(elapsed) / float64(m.activeProgress.Duration)
+			if m.activeProgress.Progress > 1.0 {
+				m.activeProgress.Progress = 1.0
+			}
+			// Continue ticking if not complete
+			if m.activeProgress.Progress < 1.0 {
+				return m, m.nextProgressTick()
+			}
+		}
+		return m, nil
+	case ProgressCompleteMsg:
+		// Progress operation completed
+		if m.activeProgress != nil && m.activeProgress.ID == msg.ID {
+			m.activeProgress = nil
+		}
+		// Process the result like a normal command result
+		if msg.Result != nil {
+			return m.Update(CommandResultMsg{Result: msg.Result})
+		}
+		return m, nil
 	case CommandResultMsg:
+		// Handle progress operation trigger
+		if msg.Result.StartProgress != nil {
+			req := msg.Result.StartProgress
+			// Clear input but keep command pending (we're still waiting for the operation)
+			m.textInput.SetValue("")
+			m.commandPending = true // Still waiting for the operation
+			m.showWelcome = false
+			
+			// Start the progress bar and run the operation in background
+			duration := time.Duration(req.Duration * float64(time.Second))
+			operationID := req.ID
+			operation := req.Operation
+			
+			return m, tea.Batch(
+				// Start progress bar
+				func() tea.Msg {
+					return ProgressStartMsg{
+						ID:       operationID,
+						Message:  req.Message,
+						Duration: duration,
+					}
+				},
+				// Run the actual operation in background
+				func() tea.Msg {
+					// Wait for the duration to let progress bar animate
+					time.Sleep(duration)
+					// Execute the actual operation
+					result := operation()
+					return ProgressCompleteMsg{
+						ID:     operationID,
+						Result: result,
+					}
+				},
+			)
+		}
+
+		// Handle ASCII animation trigger
+		if msg.Result.StartASCIIAnimation != nil {
+			req := msg.Result.StartASCIIAnimation
+			// Clear input and command state
+			m.textInput.SetValue("")
+			m.commandPending = false
+			m.commandJustDone = false
+			m.pendingOutput = ""
+			// Return the animation start message
+			return m, func() tea.Msg {
+				return StartASCIIAnimationMsg{
+					Text:      req.Text,
+					Colors:    req.Colors,
+					CharWidth: req.CharWidth,
+					CharHeight: req.CharHeight,
+				}
+			}
+		}
+
 		// Handle clear command - clear history and terminal
 		if len(m.history) > 0 {
 			lastCommand := m.history[len(m.history)-1].command
@@ -497,8 +686,81 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				output = FormatDirListWithOptions(msg.Result.Nodes, msg.Result.LongFormat)
 			} else if msg.Result.Output != "" {
 				// Handle special messages
-				if strings.HasPrefix(msg.Result.Output, "__SSH_CONNECT__") {
-					// Handle SSH connection - push to stack and update path
+				if strings.HasPrefix(msg.Result.Output, "__CONNECT__") {
+					// Handle server connection - push to stack and update path
+					// Format: __CONNECT__<serviceType>:<accessMethod>:<accessUsername>:<isRoot>:<homeDir>:<serverPath>
+					connectData := strings.TrimPrefix(msg.Result.Output, "__CONNECT__")
+					parts := strings.SplitN(connectData, ":", 6)
+					serviceType := "ssh"
+					accessMethod := "backdoor"
+					accessUsername := "root"
+					isRoot := true
+					homeDir := "/root"
+					newServerPath := connectData
+					
+					if len(parts) >= 6 {
+						serviceType = parts[0]
+						accessMethod = parts[1]
+						accessUsername = parts[2]
+						isRoot = parts[3] == "1"
+						homeDir = parts[4]
+						newServerPath = parts[5]
+					} else if len(parts) >= 4 {
+						// Legacy format without role info
+						serviceType = parts[0]
+						accessMethod = parts[1]
+						accessUsername = parts[2]
+						newServerPath = parts[3]
+					} else if len(parts) == 2 {
+						// Legacy format: serviceType:serverPath
+						serviceType = parts[0]
+						newServerPath = parts[1]
+					}
+					
+					// Get server filesystem and create new VFS
+					serverVFS, err := m.handler.CreateServerVFS(newServerPath)
+					if err != nil {
+						output = FormatError(fmt.Errorf("failed to load server filesystem: %w", err))
+					} else {
+						// Set role on the VFS for permission checking
+						serverVFS.SetRole(accessUsername, isRoot, homeDir)
+						
+						// Push current context to stack (including current service type)
+						m.shellStack = append(m.shellStack, ShellContext{
+							serverPath:  m.handler.GetCurrentServerPath(),
+							serviceType: m.handler.GetCurrentServiceType(),
+							vfs:         m.vfs,
+							handler:     m.handler,
+						})
+						
+						// Switch to server VFS
+						m.vfs = serverVFS
+						m.handler.SetVFS(serverVFS)
+						
+						// Update handler's server path and service type
+						m.handler.SetCurrentServerPath(newServerPath)
+						m.handler.SetCurrentServiceType(serviceType)
+						
+						// Navigate to home directory
+						serverVFS.ChangeDir(homeDir)
+						
+						// Add connection message to history
+						pathParts := strings.Split(newServerPath, ".")
+						serverIP := pathParts[len(pathParts)-1]
+						roleIndicator := "$"
+						if isRoot {
+							roleIndicator = "#"
+						}
+						if accessMethod == "backdoor" {
+							output = fmt.Sprintf("Connected to %s via %s (backdoor)\nLogged in as %s\n%s@%s:%s%s\n", 
+								serverIP, serviceType, accessUsername, accessUsername, serverIP, homeDir, roleIndicator)
+						} else {
+							output = fmt.Sprintf("Authenticated to %s via %s as %s\n%s@%s:%s%s\n", 
+								serverIP, serviceType, accessUsername, accessUsername, serverIP, homeDir, roleIndicator)
+						}
+					}
+				} else if strings.HasPrefix(msg.Result.Output, "__SSH_CONNECT__") {
+					// Legacy SSH connection marker - for backward compatibility
 					newServerPath := strings.TrimPrefix(msg.Result.Output, "__SSH_CONNECT__")
 					
 					// Get server filesystem and create new VFS
@@ -508,9 +770,10 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					} else {
 						// Push current context to stack
 						m.shellStack = append(m.shellStack, ShellContext{
-							serverPath: m.handler.GetCurrentServerPath(),
-							vfs:        m.vfs,
-							handler:    m.handler,
+							serverPath:  m.handler.GetCurrentServerPath(),
+							serviceType: m.handler.GetCurrentServiceType(),
+							vfs:         m.vfs,
+							handler:     m.handler,
 						})
 						
 						// Switch to server VFS
@@ -519,16 +782,17 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						
 						// Update handler's server path
 						m.handler.SetCurrentServerPath(newServerPath)
+						m.handler.SetCurrentServiceType("ssh")
 						
 						// Add connection message to history
-						parts := strings.Split(newServerPath, ".")
-						serverIP := parts[len(parts)-1]
+						pathParts := strings.Split(newServerPath, ".")
+						serverIP := pathParts[len(pathParts)-1]
 						output = fmt.Sprintf("Connected to %s\n", serverIP)
 						output += fmt.Sprintf("Server path: %s\n", newServerPath)
 					}
-				} else if msg.Result.Output == "__EXIT_SSH__" {
-					// Handle exit from SSH session - return immediately
-					return m.handleExitSSH()
+				} else if msg.Result.Output == "__EXIT_CONNECT__" || msg.Result.Output == "__EXIT_SSH__" {
+					// Handle exit from server session - return immediately
+					return m.handleExitConnection()
 				} else if msg.Result.Output == "__QUIT__" {
 					// Quit the program
 					return m, tea.Quit
@@ -569,6 +833,10 @@ func (m *ShellModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						output += "\n"
 					}
 				}
+			}
+			// Append mission auto-completion rewards if any
+			if msg.Result.MissionCompleted != nil {
+				output += cmd.FormatMissionCompletion(msg.Result.MissionCompleted)
 			}
 			// Set output in history
 			m.history[lastIdx].output = output
@@ -641,7 +909,7 @@ func (m *ShellModel) GetIncrementalOutput() (output string, isClear bool, prompt
 		promptLine := m.getPromptLine(username)
 
 		if m.showWelcome {
-			ascii := AnimatedWelcome()
+			ascii := AnimatedWelcome(0) // 0 means don't stretch, keep original size
 			help := strings.TrimSuffix(WelcomeHelpText(m.user, m.db), "\n")
 
 			centered := lipgloss.Place(
@@ -707,7 +975,10 @@ func (m *ShellModel) GetIncrementalOutput() (output string, isClear bool, prompt
 
 // getPromptLine returns the current prompt line with input
 func (m *ShellModel) getPromptLine(username string) string {
-	m.textInput.Prompt = RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
+	// Get prompt info from handler (respects SSH context)
+	promptUser, hostname := m.handler.GetPromptInfo()
+	promptChar := m.handler.GetPromptChar()
+	m.textInput.Prompt = RenderPromptWithChar(promptUser, hostname, m.vfs.GetCurrentPath(), promptChar)
 	return m.textInput.View()
 }
 
@@ -733,6 +1004,11 @@ func (m *ShellModel) NeedsClearScrollback() bool {
 // IsGradientAnimating reports whether the welcome gradient is currently running.
 func (m *ShellModel) IsGradientAnimating() bool {
 	return m.gradientAnimating
+}
+
+// IsASCIIAnimating reports whether an ASCII animation is currently running.
+func (m *ShellModel) IsASCIIAnimating() bool {
+	return m.asciiAnimation != nil && m.asciiAnimation.IsAnimating()
 }
 
 // scrollUp scrolls the view up by n lines
@@ -818,14 +1094,13 @@ func (m *ShellModel) renderScrollIndicator(totalLines, startLine, viewportHeight
 		endLine = totalLines
 	}
 	
-	// Style the indicator
-	indicatorStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("243")).
+	// Style the indicator using ui package
+	indicatorStyle := ui.GrayStyle.
 		Background(lipgloss.Color("235")).
 		Padding(0, 1)
 	
 	// Show lines range and scroll hint
-	indicator := fmt.Sprintf("↑ lines %d-%d of %d (PgUp/PgDn to scroll, End to return)", 
+	indicator := fmt.Sprintf("↑ lines %d-%d of %d (PgUp/PgDn or Ctrl+U/Ctrl+D to scroll, End to return)", 
 		startLine+1, endLine, totalLines)
 	
 	return indicatorStyle.Render(indicator)
@@ -834,12 +1109,6 @@ func (m *ShellModel) renderScrollIndicator(totalLines, startLine, viewportHeight
 // GetViewContent returns the view content without the prompt line
 // Used to detect if only the prompt changed (user typing)
 func (m *ShellModel) GetViewContent() string {
-	// Get username for prompt
-	username := "guest"
-	if m.user != nil && m.user.Username != "" {
-		username = m.user.Username
-	}
-
 	// Ensure we have valid dimensions
 	width := m.width
 	height := m.height
@@ -854,6 +1123,36 @@ func (m *ShellModel) GetViewContent() string {
 	availableLines := height - 1
 	if availableLines < 1 {
 		availableLines = 1
+	}
+
+	// ASCII animation (from ascii command) takes priority
+	if m.asciiAnimation != nil {
+		if m.asciiAnimation.IsAnimating() {
+			frame := m.asciiAnimation.GetCurrentFrame()
+			frameLines := strings.Split(frame, "\n")
+
+			// Ensure frame height matches available lines
+			if len(frameLines) < availableLines {
+				padding := availableLines - len(frameLines)
+				for i := 0; i < padding; i++ {
+					frameLines = append(frameLines, "")
+				}
+			} else if len(frameLines) > availableLines {
+				frameLines = frameLines[:availableLines]
+			}
+
+			var output strings.Builder
+			for _, line := range frameLines {
+				output.WriteString(line)
+				output.WriteString("\n")
+			}
+			// Note: GetViewContent doesn't include prompt, but View() will add it
+			return output.String()
+		} else {
+			// Animation completed - clear it and continue to normal rendering
+			m.asciiAnimation = nil
+			m.pendingClearScrollback = true
+		}
 	}
 
 	// Animated gradient welcome fills the screen, then disappears
@@ -885,7 +1184,8 @@ func (m *ShellModel) GetViewContent() string {
 
 	// Add welcome message as first entry if shown
 	if m.showWelcome && len(m.history) == 0 {
-		ascii := AnimatedWelcome()
+		// Get ASCII art without stretching (preserve aspect ratio), then center it
+		ascii := AnimatedWelcome(0) // 0 means don't stretch, keep original size
 		centered := lipgloss.Place(
 			width,
 			availableLines-3, // leave room for help + spacer
@@ -905,8 +1205,9 @@ func (m *ShellModel) GetViewContent() string {
 
 	// Add all history entries
 	for _, entry := range m.history {
-		// Command line: prompt + command
-		prompt := RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
+		// Command line: prompt + command (use handler's prompt info for SSH context)
+		promptUser, hostname := m.handler.GetPromptInfo()
+		prompt := RenderPrompt(promptUser, hostname, m.vfs.GetCurrentPath())
 		commandLine := prompt + entry.command
 		contentLines = append(contentLines, commandLine)
 
@@ -915,6 +1216,14 @@ func (m *ShellModel) GetViewContent() string {
 			outputText := strings.TrimSuffix(entry.output, "\n")
 			outputLines := strings.Split(outputText, "\n")
 			contentLines = append(contentLines, outputLines...)
+		}
+	}
+
+	// Add progress bar if active (after history but before prompt)
+	if m.activeProgress != nil {
+		progressBar := m.GetProgressBar()
+		if progressBar != "" {
+			contentLines = append(contentLines, ui.InfoStyle.Render(progressBar))
 		}
 	}
 
@@ -1010,12 +1319,6 @@ func (m *ShellModel) GetViewContent() string {
 
 // View renders the shell (used for edit mode and fallback)
 func (m *ShellModel) View() string {
-	// Get username for prompt
-	username := "guest"
-	if m.user != nil && m.user.Username != "" {
-		username = m.user.Username
-	}
-
 	// Ensure we have valid dimensions
 	width := m.width
 	height := m.height
@@ -1058,8 +1361,9 @@ func (m *ShellModel) View() string {
 	// Add content
 	output.WriteString(content)
 	
-	// Build the current prompt line
-	m.textInput.Prompt = RenderPrompt(username, "terminal.sh", m.vfs.GetCurrentPath())
+	// Build the current prompt line (use handler's prompt info for SSH context)
+	promptUser, hostname := m.handler.GetPromptInfo()
+	m.textInput.Prompt = RenderPrompt(promptUser, hostname, m.vfs.GetCurrentPath())
 	m.textInput.Width = width
 	promptLine := m.textInput.View()
 
@@ -1079,21 +1383,53 @@ type LogoutMsg struct{}
 
 type GradientTickMsg struct{}
 
+type ASCIIAnimationTickMsg struct{}
+
+type ASCIIAnimationCompleteMsg struct{}
+
+type StartASCIIAnimationMsg struct {
+	Text       string
+	Colors     []string
+	CharWidth  int
+	CharHeight int
+	SizeScale  int
+}
+
 type PasteTextMsg struct {
 	Text string
 }
 
+// ProgressStartMsg signals the start of a progress bar operation
+type ProgressStartMsg struct {
+	ID       string        // Unique identifier for this operation
+	Message  string        // Message to display (e.g., "Downloading password_cracker...")
+	Duration time.Duration // Total duration for the operation
+}
+
+// ProgressTickMsg signals a progress bar update
+type ProgressTickMsg struct {
+	ID string // Which operation to update
+}
+
+// ProgressCompleteMsg signals a progress bar operation completed
+type ProgressCompleteMsg struct {
+	ID     string          // Which operation completed
+	Result *cmd.CommandResult // The result of the operation
+}
+
 // getCommandMatches returns commands that start with the given prefix
 func (m *ShellModel) getCommandMatches(prefix string) []string {
-	// Built-in commands (from cmd/commands.go)
+	// Built-in commands (from cmd/commands.go - must stay in sync with parseAndExecute switch)
 	// Note: crypto_miner, stop_mining, miners are built-in commands, not tool commands
+	// Tool commands (password_cracker, ssh_exploit, etc.) come from GetUserToolNames()
 	builtInCommands := []string{
-		"pwd", "ls", "cd", "cat", "clear", "help", "chat", "tutorial",
+		"pwd", "ls", "cd", "cat", "clear", "help", "chat", "tutorial", "mission",
 		"login", "logout", "register", "userinfo", "info", "whoami", "name",
-		"ifconfig", "scan", "server", "createServer", "createLocalServer",
-		"ssh", "exit", "get", "tools", "exploited", "shop", "buy",
+		"ifconfig", "scan", "server",
+		"connect", "ssh", "telnet", "ftp", "exit", "get", "download", "dl",
+		"tools", "exploited", "credentials", "creds", "backdoors", "shop", "buy",
 		"patches", "patch", "crypto_miner", "stop_mining", "miners", "wallet",
-		"touch", "mkdir", "rm", "cp", "mv", "edit", "vi", "nano",
+		"ascii", "touch", "mkdir", "rm", "cp", "mv", "edit", "vi", "nano",
 	}
 	
 	// Get user's owned tools (only include tool commands the user owns)
@@ -1127,13 +1463,16 @@ func (m *ShellModel) getTutorialNames(prefix string) []string {
 	if m.handler == nil {
 		return []string{}
 	}
-	
-	// Get tutorial service from handler (we need to access it)
-	// Since we can't directly access tutorialService from handler, we'll need to
-	// reload tutorials each time. This is acceptable since it's only on tab completion.
-	// We'll use a helper method on CommandHandler to get tutorial names
 	tutorialNames := m.handler.GetTutorialNames(prefix)
 	return tutorialNames
+}
+
+// getMissionMatches returns mission subcommands (start, stop, status, list) and IDs that start with the prefix
+func (m *ShellModel) getMissionMatches(prefix string) []string {
+	if m.handler == nil {
+		return []string{}
+	}
+	return m.handler.GetMissionMatches(prefix)
 }
 
 // getFileMatches returns files/directories in current directory that start with prefix
@@ -1161,10 +1500,10 @@ func (m *ShellModel) handleLogout() (tea.Model, tea.Cmd) {
 	return loginModel, loginModel.Init()
 }
 
-// handleExitSSH handles exiting from an SSH session
-func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
+// handleExitConnection handles exiting from a server connection
+func (m *ShellModel) handleExitConnection() (tea.Model, tea.Cmd) {
 	if len(m.shellStack) == 0 {
-		// No more shells in stack, quit program (SSH closes connection)
+		// No more shells in stack, quit program (connection closes)
 		return m, tea.Quit
 	}
 
@@ -1180,8 +1519,9 @@ func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
 	// Update handler's VFS reference
 	m.handler.SetVFS(context.vfs)
 
-	// Update handler's server path
+	// Update handler's server path and service type
 	m.handler.SetCurrentServerPath(context.serverPath)
+	m.handler.SetCurrentServiceType(context.serviceType)
 
 	// Add exit message as pending output
 	m.pendingOutput = "Disconnected\n"
@@ -1193,6 +1533,12 @@ func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
 	m.commandJustDone = true
 
 	return m, nil
+}
+
+// handleExitSSH handles exiting from an SSH session
+// Deprecated: Use handleExitConnection instead
+func (m *ShellModel) handleExitSSH() (tea.Model, tea.Cmd) {
+	return m.handleExitConnection()
 }
 
 // handleEditModeInput handles input when in edit mode
@@ -1246,6 +1592,63 @@ func (m *ShellModel) nextGradientTick() tea.Cmd {
 	})
 }
 
+// nextASCIIAnimationTick schedules the next ASCII animation frame
+func (m *ShellModel) nextASCIIAnimationTick() tea.Cmd {
+	if m.asciiAnimation == nil || !m.asciiAnimation.IsAnimating() {
+		return nil
+	}
+	return tea.Tick(ui.ASCIIGradientFrameDelay, func(time.Time) tea.Msg {
+		return ASCIIAnimationTickMsg{}
+	})
+}
+
+// nextProgressTick schedules the next progress bar update
+func (m *ShellModel) nextProgressTick() tea.Cmd {
+	if m.activeProgress == nil {
+		return nil
+	}
+	// Capture the ID now, not in the callback (activeProgress may be nil by then)
+	progressID := m.activeProgress.ID
+	return tea.Tick(50*time.Millisecond, func(time.Time) tea.Msg {
+		return ProgressTickMsg{ID: progressID}
+	})
+}
+
+// IsProgressActive returns true if a progress bar is currently active
+func (m *ShellModel) IsProgressActive() bool {
+	return m.activeProgress != nil
+}
+
+// GetProgressBar returns the current progress bar string for rendering
+func (m *ShellModel) GetProgressBar() string {
+	if m.activeProgress == nil {
+		return ""
+	}
+	
+	progress := m.activeProgress.Progress
+	if progress > 1.0 {
+		progress = 1.0
+	}
+	if progress < 0 {
+		progress = 0
+	}
+	
+	width := 50
+	filled := int(float64(width) * progress)
+	empty := width - filled
+	
+	bar := ""
+	for i := 0; i < filled; i++ {
+		bar += "█"
+	}
+	for i := 0; i < empty; i++ {
+		bar += "░"
+	}
+	
+	percentage := int(progress * 100)
+	return fmt.Sprintf("%s [%s] %d%%", m.activeProgress.Message, bar, percentage)
+}
+
 // refreshGradientFrames rebuilds the gradient frames for the current viewport.
 func (m *ShellModel) refreshGradientFrames() {
 	if !m.gradientAnimating {
@@ -1271,9 +1674,8 @@ func (m *ShellModel) buildGradientFrames() []string {
 	if height <= 0 {
 		height = 24
 	}
-	if width > gradientWidthCap {
-		width = gradientWidthCap
-	}
+	// Don't cap width - use full terminal width for proper stretching
+	// Only cap height to prevent excessive rendering
 	if height > gradientHeightCap {
 		height = gradientHeightCap
 	}

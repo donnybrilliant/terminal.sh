@@ -21,6 +21,14 @@ type Config struct {
 	JWTSecret    string // Secret key for JWT token signing
 }
 
+// Procedural generation configuration constants
+const (
+	MinServersOnline  = 10  // Minimum servers to keep available
+	MissionsPerUser   = 5   // How many missions to generate per user
+	GenerationInterval = 3600 // Check interval in seconds (1 hour)
+	MaxGeneratedServers = 1000 // Limit on procedural servers
+)
+
 // Load loads configuration from environment variables and .env file.
 // Environment variables take precedence over .env file values.
 // The .env file is loaded for local development convenience and is optional.

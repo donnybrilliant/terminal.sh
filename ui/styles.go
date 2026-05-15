@@ -94,6 +94,10 @@ var (
 		Foreground(lipgloss.Color(currentTheme.Error)).
 		Bold(true)
 	
+	// Dim/muted style for secondary info
+	DimStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(currentTheme.Gray))
+	
 	// Accent styles
 	AccentStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(currentTheme.Pink))

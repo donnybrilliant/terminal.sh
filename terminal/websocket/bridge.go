@@ -57,6 +57,8 @@ type BubbleTeaBridge struct {
 	promptRow   int    // Track which row the prompt is on for updates
 
 	gradientTickerRunning bool
+	asciiTickerRunning    bool
+	progressTickerRunning bool
 }
 
 // NewBubbleTeaBridge creates a new bridge between Bubble Tea and WebSocket
@@ -343,15 +345,7 @@ func (b *BubbleTeaBridge) processMessages() {
 			
 			// Execute any returned command
 			if cmd != nil {
-				go func(c tea.Cmd) {
-					if msg := c(); msg != nil {
-						select {
-						case b.msgChan <- msg:
-						case <-b.done:
-							return
-						}
-					}
-				}(cmd)
+				go b.executeCmd(cmd)
 			}
 			
 			// Check if we transitioned models
@@ -425,6 +419,16 @@ func (b *BubbleTeaBridge) processMessages() {
 				if shell.IsGradientAnimating() && !b.gradientTickerRunning {
 					b.gradientTickerRunning = true
 					go b.runGradientTicker(shell)
+				}
+				// If ASCII animation is running, start a bridge-side ticker
+				if shell.IsASCIIAnimating() && !b.asciiTickerRunning {
+					b.asciiTickerRunning = true
+					go b.runASCIITicker(shell)
+				}
+				// If progress bar is active, start a bridge-side ticker
+				if shell.IsProgressActive() && !b.progressTickerRunning {
+					b.progressTickerRunning = true
+					go b.runProgressTicker(shell)
 				}
 			}
 			
@@ -583,6 +587,36 @@ func (b *BubbleTeaBridge) Close() {
 	b.closeDone()
 }
 
+// executeCmd executes a tea.Cmd and handles BatchMsg properly.
+// This is essential for commands that use tea.Batch to run multiple operations.
+func (b *BubbleTeaBridge) executeCmd(c tea.Cmd) {
+	if c == nil {
+		return
+	}
+	
+	msg := c()
+	if msg == nil {
+		return
+	}
+	
+	// Handle BatchMsg - execute all commands in the batch
+	if batchMsg, ok := msg.(tea.BatchMsg); ok {
+		for _, cmd := range batchMsg {
+			if cmd != nil {
+				go b.executeCmd(cmd)
+			}
+		}
+		return
+	}
+	
+	// Regular message - send to channel
+	select {
+	case b.msgChan <- msg:
+	case <-b.done:
+		return
+	}
+}
+
 // runGradientTicker injects gradient tick messages while the shell welcome animation is active.
 // This ensures web sessions (which rely on bridge-driven redraws) animate like SSH.
 func (b *BubbleTeaBridge) runGradientTicker(shell *terminal.ShellModel) {
@@ -606,6 +640,70 @@ func (b *BubbleTeaBridge) runGradientTicker(shell *terminal.ShellModel) {
 			}
 			select {
 			case b.msgChan <- terminal.GradientTickMsg{}:
+			case <-b.done:
+				return
+			default:
+				// Drop tick if channel is full; next tick will try again.
+			}
+		}
+	}
+}
+
+// runASCIITicker injects ASCII animation tick messages while an ASCII animation is active.
+// This ensures web sessions (which rely on bridge-driven redraws) animate like SSH.
+func (b *BubbleTeaBridge) runASCIITicker(shell *terminal.ShellModel) {
+	ticker := time.NewTicker(75 * time.Millisecond) // Use ASCII animation frame delay
+	defer ticker.Stop()
+	defer func() { b.asciiTickerRunning = false }()
+
+	for {
+		select {
+		case <-b.done:
+			return
+		case <-ticker.C:
+			// Check if we're still in shell mode
+			currentShell := b.getShellModel()
+			if currentShell == nil || currentShell != shell {
+				// Model changed, stop ticker
+				return
+			}
+			if !shell.IsASCIIAnimating() {
+				return
+			}
+			select {
+			case b.msgChan <- terminal.ASCIIAnimationTickMsg{}:
+			case <-b.done:
+				return
+			default:
+				// Drop tick if channel is full; next tick will try again.
+			}
+		}
+	}
+}
+
+// runProgressTicker injects progress tick messages while a progress operation is active.
+// This ensures web sessions display animated progress bars like SSH.
+func (b *BubbleTeaBridge) runProgressTicker(shell *terminal.ShellModel) {
+	ticker := time.NewTicker(50 * time.Millisecond) // Update progress every 50ms
+	defer ticker.Stop()
+	defer func() { b.progressTickerRunning = false }()
+
+	for {
+		select {
+		case <-b.done:
+			return
+		case <-ticker.C:
+			// Check if we're still in shell mode
+			currentShell := b.getShellModel()
+			if currentShell == nil || currentShell != shell {
+				// Model changed, stop ticker
+				return
+			}
+			if !shell.IsProgressActive() {
+				return
+			}
+			select {
+			case b.msgChan <- terminal.ProgressTickMsg{}:
 			case <-b.done:
 				return
 			default:
