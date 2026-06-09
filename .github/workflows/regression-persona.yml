@@ -7,9 +7,9 @@
 #      block with a Haiku 4.5 subagent under a $0.10 hard cap. If the bug
 #      still trips, fail the job — PR cannot become ready-for-review.
 #
-# The replay logic lives in the sibling `terminal-sh-agents` repo
-# (`python -m terminal_sh_agents.regression`). The workflow checks it out as
-# a second source so we keep one canonical CLI.
+# The replay logic lives in donnybrilliant/terminal-sh-agents (private).
+# Checkout uses secrets.TERMINAL_SH_AGENTS_CHECKOUT_TOKEN (PAT with repo read).
+# Game boot uses HOSTKEY_PATH (see config/config.go), not SSH_HOST_KEY_PATH.
 name: regression-persona
 
 on:
@@ -104,6 +104,7 @@ jobs:
           repository: donnybrilliant/terminal-sh-agents
           path: agents
           fetch-depth: 1
+          token: ${{ secrets.TERMINAL_SH_AGENTS_CHECKOUT_TOKEN }}
 
       - name: Install uv
         if: steps.issue.outputs.skip != 'true'

@@ -1,6 +1,6 @@
 # Engineer-agent workflow.
 #
-# Triggered by the agent fleet's Analyst (terminal-sh-agents) labelling
+# Triggered by the agent fleet Analyst (donnybrilliant/terminal-sh-agents) labelling
 # an Issue `ai-scaffold`, or by subsequent updates to a PR the agent opens.
 # Hard rules from /Users/daniel/.claude/plans/encapsulated-juggling-mountain.md:
 #   - Default model: Sonnet 4.6.

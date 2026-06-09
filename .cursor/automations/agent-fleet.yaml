@@ -1,0 +1,6 @@
+name: Agent fleet smoke
+schedule: "0 */6 * * *"
+prompt: |
+  Run one agent session from the sibling terminal-sh-agents repo:
+  cd ../terminal-sh-agents && uv run python -m terminal_sh_agents.run \
+    --provider claude --persona newbie --cycles 1

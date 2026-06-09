@@ -112,6 +112,7 @@ invoked by `.github/workflows/ai-scaffold.yml` on Issues labelled
 |--------|---------|
 | `ANTHROPIC_API_KEY_ENGINEER` | `ai-scaffold.yml` engineer agent |
 | `ANTHROPIC_API_KEY_REGRESSION` | `regression-persona.yml` replay subagent |
+| `TERMINAL_SH_AGENTS_CHECKOUT_TOKEN` | `regression-persona.yml` — PAT with read access to private `terminal-sh-agents` |
 
 ## GitHub labels
 
