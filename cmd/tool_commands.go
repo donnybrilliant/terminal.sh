@@ -407,8 +407,14 @@ func (h *CommandHandler) handleSSHExploit(args []string) *CommandResult {
 	capturedServerPath := serverPath
 	capturedExploitType := exploitType
 	capturedServer := server
+	actionTracker := h.actionTracker
 
 	return h.createExploitProgressResult("ssh_exploit", targetIP, func() *CommandResult {
+		if actionTracker != nil {
+			actionTracker.TrackToolUse(userID, "ssh_exploit", targetIP, "ssh")
+			actionTracker.TrackBackdoorInstall(userID, "ssh_exploit", capturedServerPath)
+		}
+
 		// Create backdoor access (RCE = direct shell access, no credentials needed)
 		err := credService.CreateBackdoor(
 			userID,

@@ -186,7 +186,12 @@ func (h *CommandHandler) handleMissionView(missionID string) *CommandResult {
 
 	if userMission != nil {
 		output.WriteString(ui.FormatKeyValuePair("Status:", userMission.Status) + "\n")
-		output.WriteString(ui.FormatKeyValuePair("Progress:", fmt.Sprintf("%d%%", userMission.Progress)) + "\n")
+		progress := userMission.Progress
+		if userMission.Status == "in_progress" {
+			progress = h.missionService.GetMissionProgress(h.user.ID, missionID)
+			_ = h.missionService.RefreshMissionProgress(h.user.ID, missionID)
+		}
+		output.WriteString(ui.FormatKeyValuePair("Progress:", fmt.Sprintf("%d%%", progress)) + "\n")
 	}
 
 	output.WriteString("\n")
@@ -345,8 +350,9 @@ func (h *CommandHandler) handleMissionStatus() *CommandResult {
 		output.WriteString(ui.FormatKeyValuePair("  Mission:", mission.Name) + "\n")
 		output.WriteString(ui.FormatKeyValuePair("    Status:", statusStyle.Render(um.Status)) + "\n")
 		
-		// Calculate real-time progress from action tracker
+		// Calculate real-time progress from action tracker and persist to DB
 		realProgress := h.missionService.GetMissionProgress(h.user.ID, um.MissionID)
+		_ = h.missionService.RefreshMissionProgress(h.user.ID, um.MissionID)
 		output.WriteString(ui.FormatKeyValuePair("    Progress:", fmt.Sprintf("%d%%", realProgress)) + "\n")
 		
 		// Show incomplete objectives

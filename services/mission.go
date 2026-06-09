@@ -258,6 +258,7 @@ func (s *MissionService) TryAutoComplete(userID uuid.UUID) *MissionCompletionRes
 		if um.Status != "in_progress" {
 			continue
 		}
+		_ = s.RefreshMissionProgress(userID, um.MissionID)
 		mission, err := s.GetMissionByID(um.MissionID)
 		if err != nil || len(mission.Objectives) == 0 {
 			continue
@@ -543,6 +544,12 @@ func (s *MissionService) GetEndlessModeStatus(userID uuid.UUID) EndlessMode {
 		HighestTierReached: highestTier,
 		ServersExploited:   int(exploitedCount),
 	}
+}
+
+// RefreshMissionProgress persists action-tracker progress into user_missions.progress.
+func (s *MissionService) RefreshMissionProgress(userID uuid.UUID, missionID string) error {
+	progress := s.GetMissionProgress(userID, missionID)
+	return s.UpdateMissionProgress(userID, missionID, progress)
 }
 
 // UpdateMissionProgress updates the progress of a mission
