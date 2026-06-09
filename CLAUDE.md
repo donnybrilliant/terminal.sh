@@ -44,8 +44,6 @@ config/          # Env-var loader. Single source of truth for ports, DB
                  # path, JWT secret, host-key path.
 database/        # GORM init, migrations, seeders for the procgen content.
 patch/           # Save-state migrations between game versions.
-agents/          # Python playtester (legacy; the fleet lives in
-                 # terminal-sh-agents). Scheduled for removal after migration.
 ```
 
 ## Conventions
