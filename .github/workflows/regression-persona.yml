@@ -1,0 +1,129 @@
+# Regression-persona CI for ai-scaffold PRs.
+#
+# Layered guard for engineer-agent PRs:
+#   1. `go test ./... -race` (catches the obvious).
+#   2. Build the game from this PR branch.
+#   3. Boot it on :2222 and replay the originating Issue's `## Reproducer`
+#      block with a Haiku 4.5 subagent under a $0.10 hard cap. If the bug
+#      still trips, fail the job — PR cannot become ready-for-review.
+#
+# The replay logic lives in the sibling `terminal-sh-agents` repo
+# (`python -m terminal_sh_agents.regression`). The workflow checks it out as
+# a second source so we keep one canonical CLI.
+name: regression-persona
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  go-test:
+    if: contains(github.event.pull_request.labels.*.name, 'ai-scaffold')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: go build
+        run: go build ./...
+      - name: go test ./... -race
+        run: go test ./... -race -count=1 -timeout=5m
+
+  replay-reproducer:
+    if: contains(github.event.pull_request.labels.*.name, 'ai-scaffold')
+    needs: go-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Body and ref are user-controlled — pass via env, never interpolate
+      # directly into shell. See the engineer workflow's preamble.
+      PR_BODY: ${{ github.event.pull_request.body }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Check out the game (PR branch)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Extract originating Issue number from PR body
+        id: issue
+        run: |
+          set -euo pipefail
+          # Look for `Fixes #123`, `Closes #123`, `Resolves #123` (case-insensitive).
+          issue_number=$(printf '%s' "$PR_BODY" |
+            grep -ioE '(fixes|closes|resolves)[[:space:]]+#[0-9]+' |
+            head -1 |
+            grep -oE '[0-9]+' || true)
+          if [ -z "${issue_number:-}" ]; then
+            echo "PR body has no Fixes #N reference; skipping regression replay."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "issue=$issue_number" >> "$GITHUB_OUTPUT"
+
+      - name: Boot game on :2222
+        if: steps.issue.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/regression
+          # Pre-build so we own the binary's PID. `go run` spawns a child
+          # that survives a kill of the runner; killing the binary directly
+          # is the only reliable cleanup on a CI runner.
+          go build -o /tmp/regression/game ./cmd/ssh
+          DATABASE_PATH=/tmp/regression/game.db \
+          HOSTKEY_PATH=/tmp/regression/host_key \
+          JWT_SECRET=regression \
+          /tmp/regression/game &
+          echo "GAME_PID=$!" >> "$GITHUB_ENV"
+          # Wait up to 60s for the SSH port to open.
+          for _ in $(seq 1 60); do
+            if (echo >/dev/tcp/127.0.0.1/2222) >/dev/null 2>&1; then
+              echo "game ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Check out terminal-sh-agents
+        if: steps.issue.outputs.skip != 'true'
+        uses: actions/checkout@v5
+        with:
+          repository: donnybrilliant/terminal-sh-agents
+          path: agents
+          fetch-depth: 1
+
+      - name: Install uv
+        if: steps.issue.outputs.skip != 'true'
+        uses: astral-sh/setup-uv@v6
+
+      - name: Run regression replay (Haiku 4.5, $0.10 cap)
+        if: steps.issue.outputs.skip != 'true'
+        working-directory: agents
+        env:
+          ANTHROPIC_API_KEY_AGENTS: ${{ secrets.ANTHROPIC_API_KEY_REGRESSION }}
+          ISSUE: ${{ steps.issue.outputs.issue }}
+        run: |
+          uv sync --frozen
+          uv run python -m terminal_sh_agents.regression \
+            --issue "$ISSUE" --repo "$REPO" \
+            --host localhost --port 2222 \
+            --db /tmp/regression/observations.duckdb \
+            --game-db /tmp/regression/game.db
+
+      - name: Stop game
+        if: always() && env.GAME_PID != ''
+        run: |
+          kill "$GAME_PID" 2>/dev/null || true

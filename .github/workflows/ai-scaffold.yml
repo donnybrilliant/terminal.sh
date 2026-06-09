@@ -1,0 +1,127 @@
+# Engineer-agent workflow.
+#
+# Triggered by the agent fleet's Analyst (terminal-sh-agents) labelling
+# an Issue `ai-scaffold`, or by subsequent updates to a PR the agent opens.
+# Hard rules from /Users/daniel/.claude/plans/encapsulated-juggling-mountain.md:
+#   - Default model: Sonnet 4.6.
+#   - Path-filter to Opus 4.7 for security-critical code (auth, terminal, and
+#     payment when it lands).
+#   - NEVER auto-merge: the action opens DRAFT PRs only. A human gates merge.
+#   - Budget rule: if the fix would touch >3 files or >200 lines, the agent
+#     must instead open a PR containing only a failing test that reproduces
+#     the bug, and stop.
+#
+# All inputs derived from issue/PR bodies are passed via `env:` (the safe
+# pattern) and inspected inside `run:` blocks — never interpolated directly
+# into shell commands. See:
+# https://github.blog/security/vulnerability-research/how-to-catch-github-actions-workflow-injections-before-attackers-do/
+name: ai-scaffold
+
+on:
+  issues:
+    types: [labeled]
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: ai-scaffold-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    # Only react to the `ai-scaffold` label on Issues, or to any PR the agent
+    # itself opened (PR carries the same label).
+    if: >-
+      (github.event_name == 'issues' && github.event.label.name == 'ai-scaffold') ||
+      (github.event_name == 'pull_request' &&
+        contains(github.event.pull_request.labels.*.name, 'ai-scaffold'))
+    runs-on: ubuntu-latest
+    outputs:
+      model: ${{ steps.pick.outputs.model }}
+      sensitive_paths: ${{ steps.pick.outputs.sensitive_paths }}
+    steps:
+      - id: pick
+        name: Pick model based on label and body paths
+        env:
+          LABELS_JSON: ${{ toJSON(github.event.issue.labels || github.event.pull_request.labels) }}
+          BODY: ${{ github.event.issue.body || github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          # Security-sensitive paths escalate to Opus 4.7. We grep the Issue
+          # body for path mentions inside the Reproducer block. BODY is in an
+          # env var so no shell-injection surface from issue authors.
+          if printf '%s' "$BODY" | grep -qE '(^|[^a-zA-Z])(auth/|services/payment/|terminal/)'; then
+            echo "sensitive_paths=true"  >> "$GITHUB_OUTPUT"
+            echo "model=claude-opus-4-7" >> "$GITHUB_OUTPUT"
+          else
+            echo "sensitive_paths=false" >> "$GITHUB_OUTPUT"
+            echo "model=claude-sonnet-4-6" >> "$GITHUB_OUTPUT"
+          fi
+          echo "labels: $LABELS_JSON"
+
+  engineer-sonnet:
+    needs: triage
+    if: needs.triage.outputs.sensitive_paths == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Run engineer agent (Sonnet 4.6)
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY_ENGINEER }}
+          claude_args: --model claude-sonnet-4-6 --max-turns 25
+          prompt: |
+            You are the engineer agent for terminal.sh. The Issue or PR linked
+            in this workflow run has the `ai-scaffold` label and was created
+            by the autonomous agent fleet in donnybrilliant/terminal-sh-agents.
+
+            Read the Issue body (or PR description) carefully. It MUST contain
+            a `## Reproducer` block with `AGENT_SEED`, the command sequence,
+            and a screen-hash. Use that as your starting point.
+
+            Hard rules:
+            1. NEVER mark the PR ready for review — always keep `draft: true`.
+            2. If the fix would touch more than 3 files or more than 200 lines,
+               STOP. Instead open a PR with only a failing test reproducing
+               the bug (Go: prefer `services/*_test.go` or a `teatest` block
+               under `terminal/`) and tag it `needs-human-design`.
+            3. Always run `go test ./... -race` locally before requesting CI.
+            4. Read CLAUDE.md for Go conventions and review checklist.
+
+  engineer-opus:
+    needs: triage
+    if: needs.triage.outputs.sensitive_paths == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Run engineer agent (Opus 4.7, security-critical)
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY_ENGINEER }}
+          claude_args: --model claude-opus-4-7 --max-turns 25
+          prompt: |
+            You are the engineer agent for terminal.sh, working on a
+            SECURITY-CRITICAL path (auth, payment, terminal/SSH). Extra care:
+
+            - Treat all user-supplied SSH/TUI input as untrusted.
+            - No new global state; favour dependency injection through the
+              services package.
+            - Wrap all errors (`fmt.Errorf("...: %w", err)`); never swallow.
+            - No panics on user input — return errors and let the caller log.
+            - Authorization must remain centralised in `auth/` — do not bypass.
+
+            Workflow rules (same as the Sonnet path):
+            1. Keep PR `draft: true`. Never auto-merge.
+            2. >3 files or >200 lines ⇒ open a failing-test PR instead.
+            3. Read CLAUDE.md before editing anything in `auth/` or `terminal/`.
+            4. Run `go test ./... -race` locally and report the result in
+               the PR body.
